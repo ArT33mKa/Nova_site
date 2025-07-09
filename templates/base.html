@@ -25,8 +25,8 @@
   </div>
 
 <!-- 🛒 Центроване модальне вікно кошика -->
-<div id="cart-modal" class="modal hidden">
-  <div class="modal-content cart-window">
+<div id="cart-sidebar" class="cart-sidebar hidden">
+  <div class="cart-sidebar-content">
     <h3 class="cart-title">Ваш кошик</h3>
 
     <!-- Сюди JS підставить товари -->
@@ -37,7 +37,7 @@
       <button id="cart-checkout" class="btn">Оформити</button>
     </div>
 
-    <button id="close-cart-modal" class="btn danger">Закрити</button>
+    <button id="close-cart-sidebar" class="btn danger">Закрити</button>
 
   </div>
 </div>
@@ -165,11 +165,11 @@
 document.addEventListener('DOMContentLoaded', () => {
   const cartIcon        = document.getElementById('cart-icon');
   const cartCountBadge  = document.getElementById('cart-count');
-  const cartModal       = document.getElementById('cart-modal');
+  const cartSidebar = document.getElementById('cart-sidebar');
   const cartItemsUl     = document.getElementById('cart-modal-items');
   const cartTotalEl     = document.getElementById('cart-total');
   const cartCheckoutBtn = document.getElementById('cart-checkout');
-  const closeCartModal  = document.getElementById('close-cart-modal');
+  const closeCartSidebar = document.getElementById('close-cart-sidebar');
   const productList     = document.getElementById('productList');
   const toast           = document.getElementById('toast');
 
@@ -200,12 +200,14 @@ fetch('/get_session_cart')
     }
   });
 
-  cartIcon.addEventListener('click', () => {
-    renderCartModal();
-    cartModal.classList.remove('hidden');
-  });
+    cartIcon.addEventListener('click', () => {
+      renderCartModal();
+      cartSidebar.classList.add('show');
+    });
 
-  closeCartModal.addEventListener('click', () => cartModal.classList.add('hidden'));
+  closeCartSidebar.addEventListener('click', () => {
+  cartSidebar.classList.remove('show');
+});
 
   cartCheckoutBtn.addEventListener('click', () => {
     if (!cart.length) return alert('Кошик порожній');
