@@ -1,18 +1,11 @@
-"""
-app.py — основний Flask‑сервер з підтримкою Google OAuth 2.0 (Flask‑Dance)
-"""
-
 import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
-
-from flask import (
-    Flask, render_template, request, redirect,
-    url_for, session, jsonify
-)
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_dance.contrib.google import make_google_blueprint, google
+from flask_dance.consumer.storage.session import SessionStorage
 
 # ────────────────────────────────
 #  INIT
@@ -21,7 +14,6 @@ load_dotenv()                                              # .env → ENV
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")  # безпечніше через ENV
 
-# Google OAuth 2.0 (Flask‑Dance)
 google_bp = make_google_blueprint(
     client_id=os.getenv("GOOGLE_CLIENT_ID"),
     client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
@@ -30,7 +22,12 @@ google_bp = make_google_blueprint(
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/userinfo.email"
     ],
-    redirect_to="google_auth_complete"
+    redirect_to="google_auth_complete",
+    storage=SessionStorage(),
+    fetch_token_kwargs={
+        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+    }
 )
 app.register_blueprint(google_bp, url_prefix="/login")
 
@@ -178,17 +175,22 @@ def google_auth_complete():
     if not google.authorized:
         return redirect(url_for("google.login"))
 
-    resp = google.get("/oauth2/v2/userinfo")
-    if not resp.ok:
-        return "Google OAuth помилка", 500
+    try:
+        resp = google.get("/oauth2/v2/userinfo")
+        if not resp.ok:
+            return f"❌ Помилка авторизації: {resp.text}", 500
 
-    data = resp.json()
-    session["user"] = {
-        "name": data.get("name"),
-        "email": data.get("email"),
-        "picture": data.get("picture"),
-    }
-    return redirect(url_for("index"))
+        data = resp.json()
+        session["user"] = {
+            "name": data.get("name"),
+            "email": data.get("email"),
+            "picture": data.get("picture"),
+        }
+        return redirect(url_for("index"))
+
+    except Exception as e:
+        return f"❌ Виняток під час обробки авторизації: {str(e)}", 500
+
 
 
 @app.route("/logout")

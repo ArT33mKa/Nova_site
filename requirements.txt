@@ -1,10 +1,5 @@
 Flask
-flask-dance
+Flask-Dance
+requests
+requests-oauthlib
 python-dotenv
-gunicorn
-os
-smtplib
-MIMEMultipart
-MIMEText
-make_google_blueprint
-google
