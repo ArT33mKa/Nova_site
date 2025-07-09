@@ -23,12 +23,9 @@ google_bp = make_google_blueprint(
         "https://www.googleapis.com/auth/userinfo.email"
     ],
     redirect_to="google_auth_complete",
-    storage=SessionStorage(),
-    fetch_token_kwargs={
-        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
-        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
-    }
+    storage=SessionStorage()
 )
+
 app.register_blueprint(google_bp, url_prefix="/login")
 
 # ────────────────────────────────
