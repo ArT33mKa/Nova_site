@@ -426,9 +426,16 @@ footer {
 
 #close-cart-sidebar {
   align-self: flex-end;
-  background: #eee;
+  background: #e63946;
+  color: white;
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
   cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+#close-cart-sidebar:hover {
+  background: #d62828;
 }
