@@ -162,19 +162,30 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const cartIcon = document.getElementById('cart-icon');
-  const cartSidebar = document.getElementById('cart-sidebar');
-  const closeCartSidebar = document.getElementById('close-cart-sidebar');
-  const cartItemsUl = document.getElementById('cart-modal-items');
-  const cartTotalEl = document.getElementById('cart-total');
+  const cartIcon        = document.getElementById('cart-icon');
+  const cartCountBadge  = document.getElementById('cart-count');
+  const cartSidebar     = document.getElementById('cart-sidebar');
+  const cartItemsUl     = document.getElementById('cart-modal-items');
+  const cartTotalEl     = document.getElementById('cart-total');
   const cartCheckoutBtn = document.getElementById('cart-checkout');
-  const cartCountBadge = document.getElementById('cart-count');
-  const productList = document.getElementById('productList');
-  const toast = document.getElementById('toast');
+  const closeCartSidebar = document.getElementById('close-cart-sidebar');
+  const productList     = document.getElementById('productList');
+  const toast           = document.getElementById('toast');
 
   let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
-  // 🛒 Додавання товару
+  // Завантаження кошика з сесії
+  fetch('/get_session_cart')
+    .then(res => res.json())
+    .then(data => {
+      if (data.cart && data.cart.length) {
+        localStorage.setItem('cart', JSON.stringify(data.cart));
+        cart = data.cart;
+        updateBadge();
+      }
+    });
+
+  // Додавання товару
   productList?.addEventListener('click', e => {
     if (!e.target.classList.contains('add-to-cart')) return;
 
@@ -182,17 +193,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = +product.dataset.id;
     const name = product.querySelector('h4').innerText;
     const price = +product.querySelector('p').innerText.replace(/[^\d]/g, '');
-    const image = product.querySelector('img').getAttribute('src').split('/').pop();
+    const imagePath = product.querySelector('img').getAttribute('src').split('/').pop();
 
     const existing = cart.find(i => i.id === id);
-    existing ? existing.qty++ : cart.push({ id, name, price, image, qty: 1 });
+    existing ? existing.qty++ : cart.push({ id, name, price, image: imagePath, qty: 1 });
 
     persistCart();
     renderCart();
     showToast('✅ Товар додано');
   });
 
-  // 📦 Відкрити/закрити кошик
+  // Відкриття/закриття кошика
   cartIcon.addEventListener('click', () => {
     cartSidebar.classList.toggle('show');
     if (cartSidebar.classList.contains('show')) {
@@ -204,36 +215,18 @@ document.addEventListener('DOMContentLoaded', () => {
     cartSidebar.classList.remove('show');
   });
 
-  // ➖➕🗑 Зміни в кошику
-  cartItemsUl.addEventListener('click', e => {
-    const idx = +e.target.dataset.idx;
-    if (isNaN(idx)) return;
-
-    if (e.target.classList.contains('plus')) {
-      cart[idx].qty++;
-    } else if (e.target.classList.contains('minus')) {
-      if (cart[idx].qty > 1) cart[idx].qty--;
-      else cart.splice(idx, 1);
-    } else if (e.target.classList.contains('remove-item')) {
-      cart.splice(idx, 1);
-    }
-
-    persistCart();
-    renderCart();
-  });
-
+  // Оформити замовлення
   cartCheckoutBtn.addEventListener('click', () => {
     if (!cart.length) return alert('Кошик порожній');
-    console.log('До оформлення:', cart);
     showToast('✅ Товари готові до оформлення');
   });
 
+  // Рендеринг кошика
   function renderCart() {
     cartItemsUl.innerHTML = '';
-
     if (!cart.length) {
       cartItemsUl.innerHTML = '<li class="empty">Кошик порожній</li>';
-      cartTotalEl.innerHTML = '<strong>Разом:</strong> 0 грн';
+      cartTotalEl.innerHTML = '<strong>Разом:</strong> 0&nbsp;грн';
       return;
     }
 
@@ -244,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <img src="/static/img/${item.image}" alt="${item.name}">
         <div class="item-info">
           <h4>${item.name}</h4>
-          <p>${item.price} грн</p>
+          <p>${item.price}&nbsp;грн · <span style="color:#4caf50">в наявності</span></p>
         </div>
         <div class="qty-controls">
           <button class="qty-btn minus" data-idx="${idx}">−</button>
@@ -256,38 +249,86 @@ document.addEventListener('DOMContentLoaded', () => {
       cartItemsUl.appendChild(li);
     });
 
-    const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-    cartTotalEl.innerHTML = `<strong>Разом:</strong> ${total} грн`;
+    updateTotal();
   }
 
+  // Події: +/-/видалити
+  cartItemsUl.addEventListener('click', e => {
+    const idx = +e.target.dataset.idx;
+    if (isNaN(idx)) return;
+
+    if (e.target.classList.contains('plus')) {
+      cart[idx].qty++;
+    } else if (e.target.classList.contains('minus')) {
+      cart[idx].qty > 1 ? cart[idx].qty-- : cart.splice(idx, 1);
+    } else if (e.target.classList.contains('remove-item')) {
+      cart.splice(idx, 1);
+    }
+
+    persistCart();
+    renderCart();
+  });
+
+  // Зберегти в localStorage + оновити бейдж
   function persistCart() {
     localStorage.setItem('cart', JSON.stringify(cart));
     updateBadge();
   }
 
+  // Підрахунок кількості
   function updateBadge() {
-    const count = cart.reduce((sum, item) => sum + item.qty, 0);
+    const count = cart.reduce((sum, i) => sum + i.qty, 0);
     cartCountBadge.textContent = count;
+  }
+
+  // Сума
+  function updateTotal() {
+    const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+    cartTotalEl.innerHTML = `<strong>Разом:</strong> ${total}&nbsp;грн`;
   }
 
   function showToast(msg) {
     toast.textContent = msg;
+    toast.classList.remove('hidden');
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 3000);
   }
 
-  // 🔄 Завантаження з сесії
-  fetch('/get_session_cart')
-    .then(res => res.json())
-    .then(data => {
-      if (data.cart?.length) {
-        localStorage.setItem('cart', JSON.stringify(data.cart));
-        cart = data.cart;
-        updateBadge();
-      }
-    });
-
   updateBadge();
+
+  // 🔐 Авторизація (Google та ручна)
+  document.getElementById('open-auth-modal')?.addEventListener('click', () => {
+    document.getElementById('auth-modal').classList.remove('hidden');
+  });
+
+  document.getElementById('close-auth-modal')?.addEventListener('click', () => {
+    document.getElementById('auth-modal').classList.add('hidden');
+  });
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  document.getElementById('login-form')?.addEventListener('submit', e => {
+    e.preventDefault();
+    alert('🔐 Вхід успішний (тестово)');
+    document.getElementById('auth-modal').classList.add('hidden');
+  });
+
+  document.getElementById('register-form')?.addEventListener('submit', e => {
+    e.preventDefault();
+    alert('👤 Реєстрація пройшла успішно (тестово)');
+    document.getElementById('auth-modal').classList.add('hidden');
+  });
+
+  document.getElementById('google-login')?.addEventListener('click', () => {
+    window.location.href = "/login/google";
+  });
 });
 </script>
 
