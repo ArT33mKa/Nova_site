@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Додати товар</h2>
+<form method="post">
+    <input type="text" name="name" placeholder="Назва" required>
+    <input type="text" name="price" placeholder="Ціна" required>
+    <textarea name="desc" placeholder="Опис"></textarea>
+    <input type="text" name="image" placeholder="Назва картинки (boiler.jpg)">
+    <button type="submit" class="btn">Додати</button>
+</form>
+{% endblock %}

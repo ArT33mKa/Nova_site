@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Кошик</h2>
+
+{% if cart %}
+<ul class="cart-items">
+    {% for item in cart %}
+    <li>
+        <img src="{{ url_for('static', filename='img/' ~ item.image) }}" alt="{{ item.name }}" style="height: 60px; border-radius: 8px;">
+        <strong>{{ item.name }}</strong> — {{ item.price }} грн
+    </li>
+    {% endfor %}
+</ul>
+
+<!-- Тут додай форму оформлення замовлення, вибір доставки і т.д. -->
+
+{% else %}
+<p>Ваш кошик порожній.</p>
+{% endif %}
+
+<a href="{{ url_for('index') }}" class="btn">Повернутись до каталогу</a>
+
+{% endblock %}
