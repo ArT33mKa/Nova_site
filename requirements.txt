@@ -2,7 +2,5 @@ Flask
 flask-dance
 python-dotenv
 gunicorn
-MIMEMultipart
-MIMEText
 make_google_blueprint
 google
