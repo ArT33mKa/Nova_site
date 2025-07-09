@@ -26,7 +26,13 @@ header {
   padding: 1.5rem 0;
   margin-bottom: 2rem;
   box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+  transition: box-shadow 0.3s ease;
+  /* 🔽 додано для фіксації */
+  position: sticky;
+  top: 0;
+  z-index: 999;
 }
+
 
 .header-wrapper {
   display: flex;
@@ -441,7 +447,7 @@ footer {
 }
 .map-wrapper {
   width: 100%;
-  max-width: 600px;
+  max-width: 1000px;
   height: 300px;
   margin: 0 auto 2rem;
   border-radius: 12px;

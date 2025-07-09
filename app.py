@@ -34,12 +34,12 @@ app.register_blueprint(google_bp, url_prefix="/login")
 shop_info = {
     "name": "НОВА ХВИЛЯ",
     "city": "Миргород",
-    "address": "вул. Гоголя 47/2",
+    "address": "вул. Гоголя 47/2",
     "phone": ["+380506706216", "+380957523258"],
     "email": "novakhvylia@gmail.com",
     "hours": {
         "Mon‑Fri": "09:00–18:00",
-        "Fri": "до 20:00",
+        "Fri": "до:20:00",
         "Sat": "09:00–17:00",
         "Sun": "10:00–16:00",
     },
