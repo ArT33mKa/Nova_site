@@ -128,10 +128,12 @@
 
   <section id="contact">
       <h2>Як нас знайти?</h2>
-      <div
-          id="map"
-          style="width: 100%; height: 300px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 2rem;"
-      ></div>
+      <div style="width: 100%; height: 300px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+           <iframe
+                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2566.8912042439915!2d33.611240976806315!3d49.95714332275981!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x40d7b3c848541469%3A0xacaf5dc8b4f2c334!2z0J3QvtCy0LAg0KXQstC40LvRjw!5e0!3m2!1suk!2sua!4v1752061163454!5m2!1suk!2sua"
+                   width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+           </iframe>
+      </div>
 
       <h3>Напишіть нам:</h3>
       <form id="contactForm" class="contact-form">
@@ -332,5 +334,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+  <script>
+  function initMap() {
+    const location = { lat: 49.965537, lng: 33.599890 }; // Миргород
+
+    const map = new google.maps.Map(document.getElementById("map"), {
+      center: location,
+      zoom: 15,
+    });
+
+    new google.maps.Marker({
+      position: location,
+      map: map,
+      title: "Нова Хвиля",
+    });
+  }
+</script>
+
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap">
+</script>
 </body>
 </html>
