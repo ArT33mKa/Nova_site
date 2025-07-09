@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
     <script defer src="https://g.co/kgs/7BxMZX2"></script>
 </head>
-
 <body>
   <div id="order-modal" class="modal hidden">
     <div class="modal-content">
@@ -316,5 +315,6 @@ document.getElementById('register-form').addEventListener('submit', e => {
 });
 
 </script>
+<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
 </body>
 </html>
