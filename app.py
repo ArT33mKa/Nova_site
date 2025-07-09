@@ -165,6 +165,9 @@ def add_product():
         return redirect(url_for("admin"))
     return render_template("add_product.html", shop=shop_info)
 
+@app.route("/get_session_cart")
+def get_session_cart():
+    return jsonify(cart=session.get("cart", []))
 
 # -----------------  GOOGLE OAUTH  -----------------
 @app.route("/google_auth_complete")
