@@ -187,9 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
     existing ? existing.qty++ : cart.push({ id, name, price, image: imagePath, qty: 1 });
 
     persistCart();
+    renderCartModal();
     showToast('✅ Товар додано');
   });
-
 fetch('/get_session_cart')
   .then(res => res.json())
   .then(data => {
@@ -200,9 +200,12 @@ fetch('/get_session_cart')
   });
 
     cartIcon.addEventListener('click', () => {
-      renderCartModal();
-      cartSidebar.classList.add('show');
+      cartModal.classList.toggle('hidden');
+      if (!cartModal.classList.contains('hidden')) {
+        renderCartModal();
+      }
     });
+
 
   closeCartSidebar.addEventListener('click', () => {
   cartSidebar.classList.remove('show');
@@ -253,6 +256,7 @@ fetch('/get_session_cart')
     else if (e.target.classList.contains('remove-item')) cart.splice(idx,1);
 
     persistCart();
+    renderCartModal();
   });
 
   function persistCart() {
@@ -315,6 +319,5 @@ document.getElementById('register-form').addEventListener('submit', e => {
 });
 
 </script>
-<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
 </body>
 </html>
