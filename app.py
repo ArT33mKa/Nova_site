@@ -25,7 +25,11 @@ app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")  # безпечніш�
 google_bp = make_google_blueprint(
     client_id=os.getenv("GOOGLE_CLIENT_ID"),
     client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-    scope=["profile", "email"],
+    scope=[
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email"
+    ],
     redirect_to="google_auth_complete"
 )
 app.register_blueprint(google_bp, url_prefix="/login")

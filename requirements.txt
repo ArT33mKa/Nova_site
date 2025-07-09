@@ -2,3 +2,9 @@ Flask
 flask-dance
 python-dotenv
 gunicorn
+os
+smtplib
+MIMEMultipart
+MIMEText
+make_google_blueprint
+google
