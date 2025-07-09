@@ -59,9 +59,9 @@ header {
 }
 
 .header-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .cart {
@@ -331,14 +331,14 @@ footer {
 }
 
 .user-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .user-avatar {
-  height: 32px;
-  width: 32px;
-  border-radius: 50%;
-  object-fit: cover;
+    height: 36px;
+    width: 36px;
+    border-radius: 50%;
+    object-fit: cover;
 }

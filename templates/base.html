@@ -15,7 +15,7 @@
       <h3>Оформлення замовлення</h3>
       <div id="order-summary"></div>
       <form id="orderForm">
-          <input type="text" name="name" placeholder="Ваше ім’я" required />
+          <input type="text" name="name" placeholder="Ваше  ім’я" required />
           <input type="tel" name="phone" placeholder="Номер телефону" required />
           <input type="text" name="address" placeholder="Адреса доставки" required />
           <button type="submit" class="btn">Підтвердити</button>
@@ -91,16 +91,16 @@
     <div class="header-right">
       {% if user %}
         <div class="user-info">
-          <img src="{{ user.picture }}" alt="Аватар" class="user-avatar">
+          <img src="{{ user.picture }}" class="user-avatar">
           <span>{{ user.name }}</span>
-          <a href="{{ url_for('logout') }}" class="btn danger">Вийти</a>
+          <a href="{{ url_for('logout') }}" class="btn">Вийти</a>
         </div>
       {% else %}
-        <div class="cart" id="cart-icon">🛒 <span id="cart-count">0</span></div>
         <button id="open-auth-modal" class="btn login-btn">Увійти</button>
       {% endif %}
+
+      <div class="cart" id="cart-icon">🛒 <span id="cart-count">0</span></div>
     </div>
-  </div>
 </header>
 
 
