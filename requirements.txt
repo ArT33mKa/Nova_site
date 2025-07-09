@@ -3,3 +3,4 @@ Flask-Dance
 requests
 requests-oauthlib
 python-dotenv
+gunicorn
