@@ -2,5 +2,3 @@ Flask
 flask-dance
 python-dotenv
 gunicorn
-make_google_blueprint
-google
