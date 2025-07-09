@@ -172,22 +172,26 @@ def google_auth_complete():
     if not google.authorized:
         return redirect(url_for("google.login"))
 
-    try:
-        resp = google.get("/oauth2/v2/userinfo")
-        if not resp.ok:
-            return f"❌ Помилка авторизації: {resp.text}", 500
+    # 🔒 Зберігаємо корзину перед оновленням session
+    saved_cart = session.get("cart", [])
 
-        data = resp.json()
-        session["user"] = {
-            "name": data.get("name"),
-            "email": data.get("email"),
-            "picture": data.get("picture"),
-        }
-        return redirect(url_for("index"))
+    # Отримуємо дані користувача з Google
+    resp = google.get("/oauth2/v2/userinfo")
+    if not resp.ok:
+        return "Google OAuth помилка", 500
 
-    except Exception as e:
-        return f"❌ Виняток під час обробки авторизації: {str(e)}", 500
+    data = resp.json()
+    session.clear()  # 🧹 очищає все (включно з cart)
+    session["user"] = {
+        "name": data.get("name"),
+        "email": data.get("email"),
+        "picture": data.get("picture"),
+    }
 
+    # 🛒 Повертаємо корзину назад у session
+    session["cart"] = saved_cart
+
+    return redirect(url_for("index"))
 
 
 @app.route("/logout")
