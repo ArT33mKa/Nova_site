@@ -23,15 +23,13 @@ body {
 header {
   background: #0077b6;
   color: white;
-  padding: 1.5rem 0;
-  margin-bottom: 2rem;
+  padding: 1rem 0;
   box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-  transition: box-shadow 0.3s ease;
-  /* 🔽 додано для фіксації */
   position: sticky;
   top: 0;
   z-index: 999;
 }
+
 
 
 .header-wrapper {
@@ -73,9 +71,9 @@ header {
 }
 
 .header-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .cart {
@@ -348,14 +346,13 @@ footer {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  text-align: right;
 }
 
 .user-avatar {
-    height: 36px;
-    width: 36px;
-    border-radius: 50%;
-    object-fit: cover;
+  height: 36px;
+  width: 36px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .cart-sidebar {
@@ -474,7 +471,7 @@ footer {
 .nav-links {
   display: flex;
   gap: 1.5rem;
-  margin-top: 0.5rem;
+  margin-left: 2rem;
 }
 
 .nav-links a {
@@ -489,6 +486,7 @@ footer {
 .nav-links a:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
 html {
   scroll-behavior: smooth;
 }

@@ -79,7 +79,7 @@
 <header>
   <div class="container header-wrapper">
 
-    <!-- ЛОГО І НАЗВА -->
+    <!-- ЛОГО -->
     <div class="logo-block">
       <a href="{{ url_for('index') }}" class="logo-inline">
         <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Логотип" class="logo-img" />
@@ -87,7 +87,17 @@
       </a>
     </div>
 
+    <!-- НАВІГАЦІЯ ЗЛІВА -->
+    <nav class="nav-links">
+      <a href="#catalog">Каталог</a>
+      <a href="#contact">Як нас знайти</a>
+      <a href="#contactForm">Напишіть нам</a>
+    </nav>
+
+    <!-- СПРАВА: Кошик + Авторизація -->
     <div class="header-right">
+      <div class="cart" id="cart-icon">🛒 <span id="cart-count">0</span></div>
+
       {% if user %}
         <div class="user-info">
           <img src="{{ user.picture }}" class="user-avatar">
@@ -97,17 +107,11 @@
       {% else %}
         <button id="open-auth-modal" class="btn login-btn">Увійти</button>
       {% endif %}
-
-    <nav class="nav-links">
-      <a href="#catalog">Каталог</a>
-      <a href="#contact">Як нас знайти</a>
-      <a href="#contactForm">Напишіть нам</a>
-    </nav>
-
-      <div class="cart" id="cart-icon">🛒 <span id="cart-count">0</span></div>
     </div>
+
   </div>
 </header>
+
 
 
 <main class="container">
