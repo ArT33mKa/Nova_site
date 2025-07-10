@@ -1,11 +1,14 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<h2>Додати товар</h2>
-<form method="post">
-    <input type="text" name="name" placeholder="Назва" required>
-    <input type="text" name="price" placeholder="Ціна" required>
-    <textarea name="desc" placeholder="Опис"></textarea>
-    <input type="text" name="image" placeholder="Назва картинки (boiler.jpg)">
+<section class="container" style="margin-top: 2rem;">
+  <h2>Додати новий товар</h2>
+  <form method="post">
+    <input type="text" name="name" placeholder="Назва товару" required />
+    <input type="number" name="price" placeholder="Ціна" required />
+    <input type="text" name="category" placeholder="Категорія" required />
+    <input type="text" name="image" placeholder="Ім'я файлу зображення (наприклад: kotel.jpg)" required />
+    <textarea name="desc" placeholder="Опис товару..." required></textarea>
     <button type="submit" class="btn">Додати</button>
-</form>
+  </form>
+</section>
 {% endblock %}

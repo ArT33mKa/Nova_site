@@ -1,16 +1,2 @@
-{% extends 'base.html' %}
-{% block content %}
-<h2>Ласкаво просимо до магазину {{ shop.name }}!</h2>
-<img src="{{ url_for('static', filename='img/shop.jpg') }}" alt="магазин" class="hero">
-<h3>Наші товари</h3>
-<div class="products">
-    {% for product in products %}
-    <div class="product" data-id="{{ product.id }}">
-        <img src="{{ url_for('static', filename='img/' ~ product.image) }}" alt="{{ product.name }}">
-        <h4>{{ product.name }}</h4>
-        <p>{{ product.price }} грн</p>
-        <button class="btn add-to-cart">Додати в кошик</button>
-    </div>
-    {% endfor %}
-</div>
-{% endblock %}
+{% extends "base.html" %}
+{% block content %}{% endblock %}

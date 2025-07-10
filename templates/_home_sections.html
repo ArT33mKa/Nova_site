@@ -1,0 +1,29 @@
+<section id="menu" class="hero-section">
+  <img src="{{ url_for('static', filename='img/shop.jpg') }}" alt="Магазин" class="hero" />
+  <h2>Ласкаво просимо до "НоваХвиля"</h2>
+  <p>Більше ніж 1000+ задоволених клієнтів!<br />Понад 5000 замовлень.<br />Відгуки 4.9/5 ⭐️</p>
+</section>
+
+<section id="catalog-preview">
+  <h2>Ви нещодавно переглядали</h2>
+  <div class="products" id="recentProducts"></div>
+  <div style="text-align: center; margin-top: 1rem;">
+    <a href="{{ url_for('catalog') }}" class="btn">Перейти до повного каталогу</a>
+  </div>
+</section>
+
+<section id="contact" class="anchor-offset">
+  <h3>Як нас знайти?</h3>
+  <div class="map-wrapper">
+    <iframe src="https://www.google.com/maps/embed?..." allowfullscreen="" loading="lazy"></iframe>
+  </div>
+
+  <h3>Напишіть нам:</h3>
+  <form id="contactForm" class="contact-form anchor-offset">
+    <input type="text" name="name" placeholder="Ваше ім’я" required />
+    <input type="email" name="email" placeholder="Ваш email" required />
+    <textarea name="message" placeholder="Ваше повідомлення..." required></textarea>
+    <button type="submit" class="btn">Відправити</button>
+  </form>
+  <p id="form-status" class="form-status"></p>
+</section>

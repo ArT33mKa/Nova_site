@@ -56,6 +56,7 @@ tovar_db = [
         "price": 4200,
         "desc": "Надійний електричний бойлер з гарантією 5 років.",
         "image": "boiler.jpg",
+        "category": "Бойлера"
     },
     {
         "id": 2,
@@ -63,6 +64,7 @@ tovar_db = [
         "price": 9600,
         "desc": "Енергоефективний котел для будинку на 150 м².",
         "image": "kotol.jpg",
+        "category": "Котли"
     },
     {
         "id": 3,
@@ -70,6 +72,7 @@ tovar_db = [
         "price": 1900,
         "desc": "Якісний змішувач для кухні.",
         "image": "zmyshuvach.jpg",
+        "category": "Змішувачі"
     },
     {
         "id": 4,
@@ -77,8 +80,10 @@ tovar_db = [
         "price": 3100,
         "desc": "Потужний насос для водопостачання.",
         "image": "nasos.jpg",
-    },
+        "category": "Насоси"
+    }
 ]
+
 
 
 # ────────────────────────────────
@@ -105,6 +110,7 @@ def index():
         cart_count=cart_count,
         shop=shop_info,
         user=session.get("user"),
+        show_home_sections=True  # ← для головної
     )
 
 
@@ -150,6 +156,18 @@ def delete_product(product_id):
     tovar_db = [p for p in tovar_db if p["id"] != product_id]
     return redirect(url_for("admin"))
 
+@app.route("/catalog")
+def catalog():
+    products = get_all_products()
+    categories = sorted(set(p.get('category', '') for p in products if 'category' in p))
+    return render_template(
+        "catalog.html",
+        products=products,
+        categories=categories,
+        shop=shop_info,
+        user=session.get("user"),
+        show_home_sections=False  # ← нічого зайвого не показуємо
+    )
 
 @app.route("/admin/add", methods=["GET", "POST"])
 def add_product():
@@ -160,10 +178,12 @@ def add_product():
             "price": int(request.form["price"]),
             "desc": request.form["desc"],
             "image": request.form["image"],
+            "category": request.form["category"]  # 🟢 ОБОВ'ЯЗКОВО
         }
         tovar_db.append(new_product)
         return redirect(url_for("admin"))
-    return render_template("add_product.html", shop=shop_info)
+    return render_template("add_product.html", shop=shop_info, user=session.get("user"))
+
 
 @app.route("/get_session_cart")
 def get_session_cart():

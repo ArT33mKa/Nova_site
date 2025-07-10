@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="container catalog-page">
+  <h2 class="catalog-title">Каталог товарів</h2>
+
+  <!-- 🔍 Пошук -->
+  <div class="search-bar">
+    <input type="text" id="catalogSearch" placeholder="🔍 Пошук товарів..." class="search-input" />
+  </div>
+
+  <!-- 📂 Фільтр -->
+  <div class="filter-bar">
+    <select id="categoryFilter" class="search-input">
+      <option value="">Усі категорії</option>
+      {% for cat in categories %}
+        <option value="{{ cat }}">{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+<div id="productList" class="products">
+  {% for product in products %}
+    <div class="product"
+         data-id="{{ product.id }}"
+         data-name="{{ product.name | lower }}"
+         data-category="{{ product.category }}">
+
+      <a href="{{ url_for('product_detail', product_id=product.id) }}">
+        <img src="{{ url_for('static', filename='img/' ~ product.image) }}" alt="{{ product.name }}">
+      </a>
+
+      <h4>{{ product.name }}</h4>
+      <p>{{ product.price }} грн</p>
+      <button class="btn add-to-cart">Додати в кошик</button>
+    </div>
+  {% endfor %}
+</div>
+<!-- 👇 Фільтрація -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const searchInput = document.getElementById("catalogSearch");
+  const categorySelect = document.getElementById("categoryFilter");
+  const products = document.querySelectorAll("#productList .product");
+
+  function applyFilters() {
+    const query = searchInput.value.toLowerCase();
+    const selectedCategory = categorySelect.value;
+
+    products.forEach(product => {
+      const name = product.dataset.name;
+      const category = product.dataset.category;
+      const matchName = name.includes(query);
+      const matchCategory = !selectedCategory || category === selectedCategory;
+
+      product.style.display = matchName && matchCategory ? "block" : "none";
+    });
+  }
+
+  searchInput.addEventListener("input", applyFilters);
+  categorySelect.addEventListener("change", applyFilters);
+});
+</script>
+{% endblock %}

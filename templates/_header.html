@@ -1,0 +1,27 @@
+<header>
+  <div class="container header-wrapper">
+    <div class="logo-block">
+      <a href="{{ url_for('index') }}" class="logo-inline">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Логотип" class="logo-img" />
+        <span class="logo-text">{{ shop.name }}</span>
+      </a>
+    </div>
+    <nav class="nav-links">
+      <a href="{{ url_for('catalog') }}">Каталог</a>
+      <a href="{{ url_for('index') }}#contact">Як нас знайти</a>
+      <a href="{{ url_for('index') }}#contactForm">Напишіть нам</a>
+    </nav>
+    <div class="header-right">
+      <div class="cart" id="cart-icon">🛒 <span id="cart-count">0</span></div>
+      {% if user %}
+        <div class="user-info">
+          <img src="{{ user.picture }}" class="user-avatar">
+          <span>{{ user.name }}</span>
+          <a href="{{ url_for('logout') }}" class="btn">Вийти</a>
+        </div>
+      {% else %}
+        <button id="open-auth-modal" class="btn login-btn">Увійти</button>
+      {% endif %}
+    </div>
+  </div>
+</header>
