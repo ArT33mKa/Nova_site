@@ -19,24 +19,33 @@
     </select>
   </div>
 
-<div id="productList" class="products">
-  {% for product in products %}
-    <div class="product"
-         data-id="{{ product.id }}"
-         data-name="{{ product.name | lower }}"
-         data-category="{{ product.category }}">
+  <!-- 🛒 Список товарів -->
+  <div id="productList" class="products">
+    {% for product in products %}
+      <div class="product"
+           data-id="{{ product.id }}"
+           data-name="{{ product.name }}"
+           data-price="{{ product.price }}"
+           data-image="{{ url_for('static', filename='img/' ~ product.image) }}"
+           data-category="{{ product.category }}">
 
-      <a href="{{ url_for('product_detail', product_id=product.id) }}">
-        <img src="{{ url_for('static', filename='img/' ~ product.image) }}" alt="{{ product.name }}">
-      </a>
+        <!-- 🔗 Клік по зображенню веде до сторінки товару -->
+        <a href="{{ url_for('product_detail', product_id=product.id) }}">
+          <img src="{{ url_for('static', filename='img/' ~ product.image) }}" alt="{{ product.name }}">
+        </a>
 
-      <h4>{{ product.name }}</h4>
-      <p>{{ product.price }} грн</p>
-      <button class="btn add-to-cart">Додати в кошик</button>
-    </div>
-  {% endfor %}
-</div>
-<!-- 👇 Фільтрація -->
+        <!-- ⭐ Обране -->
+        <button class="favorite-icon">☆</button>
+
+        <h4>{{ product.name }}</h4>
+        <p>{{ product.price }} грн</p>
+        <button class="btn add-to-cart">Додати в кошик</button>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- 🔍 Фільтрація -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("catalogSearch");
@@ -48,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const selectedCategory = categorySelect.value;
 
     products.forEach(product => {
-      const name = product.dataset.name;
+      const name = product.dataset.name.toLowerCase();
       const category = product.dataset.category;
       const matchName = name.includes(query);
       const matchCategory = !selectedCategory || category === selectedCategory;

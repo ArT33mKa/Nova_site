@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="container catalog-page">
+  <h2 class="catalog-title">Обрані товари</h2>
+  <div id="favoritesList" class="products"></div>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const container = document.getElementById("favoritesList");
+  const favorites = JSON.parse(localStorage.getItem("favorites")) || [];
+
+  if (!favorites.length) {
+    container.innerHTML = "<p>У вас ще немає обраних товарів.</p>";
+    return;
+  }
+
+  container.innerHTML = favorites.map(p => `
+    <div class="product">
+      <a href="${p.url}">
+        <img src="${p.image}" alt="${p.name}" />
+      </a>
+      <h4>${p.name}</h4>
+      <p>${p.price} грн</p>
+      <button class="btn add-to-cart" data-id="${p.id}">Додати в кошик</button>
+    </div>
+  `).join("");
+});
+</script>
+{% endblock %}

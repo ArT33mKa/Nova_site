@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="container product-detail">
+
+  <div class="product-detail-column product"
+       data-id="{{ product.id }}"
+       data-name="{{ product.name }}"
+       data-price="{{ product.price }}"
+       data-image="{{ url_for('static', filename='img/' ~ product.image) }}">
+
+    <!-- 🖼️ Зображення товару -->
+    <img src="{{ url_for('static', filename='img/' ~ product.image) }}"
+         alt="{{ product.name }}"
+         class="detail-img" />
+
+    <!-- 📝 Інформація про товар -->
+    <div class="detail-info">
+      <h2>{{ product.name }}</h2>
+      <p class="price">{{ product.price }} грн</p>
+
+      <!-- 🛒 Кнопка "Додати в кошик" -->
+      <button class="btn add-to-cart">Додати в кошик</button>
+
+      <!-- 🔙 Повернення до каталогу -->
+      <a href="{{ url_for('catalog') }}" class="btn" style="margin-top: 1rem;">← Назад до каталогу</a>
+    </div>
+
+  </div>
+
+</section>
+{% endblock %}

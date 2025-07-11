@@ -12,7 +12,10 @@
       <a href="{{ url_for('index') }}#contactForm">Напишіть нам</a>
     </nav>
     <div class="header-right">
-      <div class="cart" id="cart-icon">🛒 <span id="cart-count">0</span></div>
+      <div class="cart" id="cart-icon">🛒<span id="cart-count">0</span></div>
+      <a href="{{ url_for('favorites_page') }}" id="favorites-icon" class="cart">
+        ⭐ <span id="favorites-count">0</span>
+      </a>
       {% if user %}
         <div class="user-info">
           <img src="{{ user.picture }}" class="user-avatar">

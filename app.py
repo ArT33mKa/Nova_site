@@ -130,6 +130,7 @@ def add_to_cart(product_id):
     return redirect(url_for("cart_page"))
 
 
+
 @app.route("/cart")
 def cart_page():
     cart = session.get("cart", [])
@@ -187,7 +188,24 @@ def add_product():
 
 @app.route("/get_session_cart")
 def get_session_cart():
-    return jsonify(cart=session.get("cart", []))
+    cart_ids = session.get("cart", [])
+    products = get_products_by_ids(cart_ids)
+    cart_data = []
+
+    for pid in cart_ids:
+        product = next((p for p in products if p["id"] == pid), None)
+        if product:
+            cart_data.append({
+                "id": product["id"],
+                "name": product["name"],
+                "price": product["price"],
+                "image": product["image"],
+                "qty": cart_ids.count(pid)
+            })
+
+    return jsonify(cart=cart_data)
+
+
 
 # -----------------  GOOGLE OAUTH  -----------------
 @app.route("/google_auth_complete")
@@ -226,19 +244,18 @@ def logout():
 # -----------------  EMAIL (контактна форма)  -----------------
 @app.route("/send_message", methods=["POST"])
 def send_message():
-    name, email, message = (
-        request.form["name"],
-        request.form["email"],
-        request.form["message"],
-    )
+    name = request.form["name"]
+    email = request.form["email"]
+    message = request.form["message"]
 
     smtp_user = "artemcool200911@gmail.com"
     receiver = "artemcool200911@gmail.com"
-    app_password = os.getenv("EMAIL_PASS")
+    app_password = os.getenv("EMAIL_PASS")  # Встановлено в .env
 
     msg = MIMEMultipart()
-    msg["From"], msg["To"] = smtp_user, receiver
-    msg["Subject"] = f"Нове повідомлення від {name}"
+    msg["From"] = smtp_user
+    msg["To"] = receiver
+    msg["Subject"] = f"Нове повідомлення від {name}"
     msg.attach(MIMEText(f"Ім’я: {name}\nEmail: {email}\n\n{message}", "plain"))
 
     try:
@@ -250,6 +267,9 @@ def send_message():
     except Exception as e:
         return jsonify(status="error", message=f"❌ Помилка: {e}"), 500
 
+@app.route("/favorites")
+def favorites_page():
+    return render_template("favorites.html", shop=shop_info, user=session.get("user"))
 
 # ────────────────────────────────
 if __name__ == "__main__":

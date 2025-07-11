@@ -611,3 +611,148 @@ main.container {
   visibility: hidden;
 }
 
+.favorite-icon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.4rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  transition: transform 0.2s;
+}
+
+.favorite-icon.active {
+  color: gold;
+  content: "★";
+}
+.product {
+  position: relative;
+}
+
+.product-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 50px auto;
+  padding: 20px;
+  background-color: #f1f1f1;
+  border-radius: 8px;
+}
+
+
+.product-content {
+  display: flex;
+  gap: 40px;
+  background-color: #f5f6f8;
+  padding: 30px;
+  border-radius: 16px;
+  align-items: flex-start;
+}
+
+.product-left img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* або 'cover' — залежно від бажаного вигляду */
+  border-radius: 12px;
+}
+
+
+.product-image {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.banner-top {
+  position: absolute;
+  top: -30px;
+  left: 0;
+  width: 100%;
+}
+
+.product-right {
+  max-width: 300px;
+  background-color: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.product-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.price {
+  font-size: 22px;
+  color: #111;
+  margin-bottom: 20px;
+}
+
+.delivery-info p {
+  margin: 4px 0;
+}
+
+
+.product-left {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+
+.product-left .image-box {
+  width: 400px;
+  height: 400px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.product-left .image-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-box {
+  width: 100%;
+  max-width: 400px;
+  height: 400px;
+  background-color: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+
+
+.image-box img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.buy-button {
+  background-color: #007bff;
+  color: white;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 20px;
+}
+
+.buy-button:hover {
+  background-color: #0056b3;
+}
+
+.product-description {
+  margin-top: 40px;
+}
