@@ -29,7 +29,12 @@ app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")
 app.config["GOOGLE_OAUTH_CLIENT_ID"] = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+# Нова, правильна версія
+db_uri = os.getenv('DATABASE_URL')
+if db_uri and db_uri.startswith('postgres://'):
+    db_uri = db_uri.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri or 'sqlite:///site.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
