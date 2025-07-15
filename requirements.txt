@@ -4,3 +4,6 @@ requests
 requests-oauthlib
 python-dotenv
 gunicorn
+flask_login
+flask_sqlalchemy
+datetime
