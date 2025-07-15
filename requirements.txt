@@ -4,3 +4,4 @@ requests
 requests-oauthlib
 python-dotenv
 gunicorn
+flask_login
