@@ -1,30 +1,67 @@
-<header>
-  <div class="container header-wrapper">
-    <div class="logo-block">
-      <a href="{{ url_for('index') }}" class="logo-inline">
-        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Логотип" class="logo-img" />
-        <span class="logo-text">{{ shop.name }}</span>
-      </a>
-    </div>
-    <nav class="nav-links">
-      <a href="{{ url_for('catalog') }}">Каталог</a>
-      <a href="{{ url_for('index') }}#contact">Як нас знайти</a>
-      <a href="{{ url_for('index') }}#contactForm">Напишіть нам</a>
-    </nav>
-    <div class="header-right">
-      <div class="cart" id="cart-icon">🛒<span id="cart-count">0</span></div>
-      <a href="{{ url_for('favorites_page') }}" id="favorites-icon" class="cart">
-        ⭐ <span id="favorites-count">0</span>
-      </a>
-      {% if user %}
-        <div class="user-info">
-          <img src="{{ user.picture }}" class="user-avatar">
-          <span>{{ user.name }}</span>
-          <a href="{{ url_for('logout') }}" class="btn">Вийти</a>
+<!-- templates/_header.html (ПРАВИЛЬНА ВЕРСІЯ) -->
+<header class="main-header">
+    <div class="container">
+        <div class="header-top">
+            <div class="logo">
+                <a href="{{ url_for('index') }}" class="logo-link"> <!-- Додали клас для зручності стилізації -->
+                    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Логотип Нова Хвиля" class="logo-image">
+                    <div class="logo-text">
+                        <h1>{{ shop.name }}</h1>
+                        <p>Магазин сантехніки</p>
+                    </div>
+                </a>
+            </div>
+            <div class="header-contacts">
+                <div class="contact-item">
+                    <i class="fas fa-phone"></i>
+                    <div>
+                        {% for phone in shop.phone %}
+                            <a href="tel:{{ phone }}">{{ phone }}</a><br>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="contact-item">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <div>
+                        <span>{{ shop.city }}, {{ shop.address }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
-      {% else %}
-        <button id="open-auth-modal" class="btn login-btn">Увійти</button>
-      {% endif %}
+        <nav class="main-nav">
+            <ul>
+                <!-- Клас 'active' тепер буде працювати на всіх сторінках -->
+                <li><a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}">Головна</a></li>
+                <li><a href="{{ url_for('catalog') }}" class="{{ 'active' if request.endpoint == 'catalog' else '' }}">Каталог</a></li>
+                <li><a href="{{ url_for('index') }}#about">Про нас</a></li>
+                <li><a href="{{ url_for('index') }}#contacts">Контакти</a></li>
+            </ul>
+            <div class="header-actions">
+                {% if current_user.is_authenticated %}
+                    <div class="user-profile">
+                        <span>{{ current_user.username }}</span>
+                        {% if current_user.is_admin %}
+                           <a href="{{ url_for('admin_panel') }}" class="btn btn-sm btn-outline">Адмін</a>
+                        {% endif %}
+                        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline"><i class="fas fa-sign-out-alt"></i></a>
+                    </div>
+                {% else %}
+                    <button id="open-auth-modal" class="btn btn-primary">
+                        <i class="fas fa-user"></i> Увійти
+                    </button>
+                {% endif %}
+
+                <div class="action-icons">
+                    <div id="open-favorites-btn" class="icon-wrapper">
+                        <img src="{{ url_for('static', filename='img/favorite.png') }}" alt="Обране">
+                        <span id="favorites-count" class="badge">0</span>
+                    </div>
+                    <div id="open-cart-btn" class="icon-wrapper">
+                        <img src="{{ url_for('static', filename='img/cart.png') }}" alt="Кошик">
+                        <span id="cart-count" class="badge">0</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
     </div>
-  </div>
 </header>

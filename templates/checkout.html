@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Оформлення замовлення{% endblock %}
+
+{% block content %}
+<div class="container checkout-page">
+    <h1 class="page-title">Оформлення замовлення</h1>
+    <form action="{{ url_for('checkout') }}" method="POST" class="checkout-form">
+        <div class="customer-details">
+            <h4>Контактні дані</h4>
+            <div class="form-group">
+                <label for="customer_name">Ваше ім'я</label>
+                <input type="text" id="customer_name" name="customer_name" required>
+            </div>
+            <div class="form-group">
+                <label for="customer_phone">Номер телефону</label>
+                <input type="tel" id="customer_phone" name="customer_phone" required>
+            </div>
+            
+            <h4>Доставка</h4>
+            <div class="form-group">
+                <select name="delivery_method" required>
+                    <option value="nova_poshta">Нова Пошта (на відділення)</option>
+                    <option value="ukrposhta">Укрпошта</option>
+                    <option value="pickup">Самовивіз з магазину</option>
+                </select>
+            </div>
+
+            <h4>Оплата</h4>
+            <div class="form-group">
+                <select name="payment_method" required>
+                    <option value="cod">Післяплата (при отриманні)</option>
+                    <option value="bank_transfer">Оплата на рахунок</option>
+                </select>
+            </div>
+        </div>
+        <div class="order-summary">
+            <h4>Ваше замовлення</h4>
+            <div id="checkout-cart-summary">
+                <!-- Сюди JS завантажить товари з кошика -->
+            </div>
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Підтвердити замовлення</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+    // JS для завантаження кошика на сторінці оформлення
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/get_cart').then(res => res.json()).then(data => {
+            const container = document.getElementById('checkout-cart-summary');
+            let html = '<ul>';
+            data.items.forEach(item => {
+                html += `<li><span>${item.name} x ${item.quantity}</span> <span>${(item.price * item.quantity).toFixed(2)} грн</span></li>`;
+            });
+            html += `</ul><hr><div class="total"><strong>Всього:</strong> <strong>${data.total.toFixed(2)} грн</strong></div>`;
+            container.innerHTML = html;
+        });
+    });
+</script>
+{% endblock %}

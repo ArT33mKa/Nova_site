@@ -1,12 +1,40 @@
-<footer>
-  <div class="container footer">
-    <p>&copy; 2025 НоваХвиля — сантехніка з душею. Всі права захищено.</p>
-    <p>Контакти:
-      <a href="tel:+380957523258">+38 (095) 752-32-58</a> |
-      Email: novakhvylia@gmail.com
-    </p>
-    <p>Номер власника:
-      <a href="tel:+380506706216">+38 (050) 670-62-16</a>
-    </p>
-  </div>
+<!-- templates/_footer.html -->
+<footer class="main-footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-about">
+                <h3>{{ shop.name }}</h3>
+                <p>Інтернет-магазин сантехніки та обладнання. Якість, надійність.</p>
+                <div class="social-links">
+                    <a href="#"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                    <a href="#"><i class="fab fa-telegram"></i></a>
+                </div>
+            </div>
+
+            <div class="footer-links">
+                <h3>Меню</h3>
+                <ul>
+                    <li><a href="{{ url_for('index') }}">Головна</a></li>
+                    <li><a href="{{ url_for('catalog') }}">Каталог</a></li>
+                    <li><a href="{{ url_for('index') }}#about">Про нас</a></li>
+                    <li><a href="{{ url_for('index') }}#contacts">Контакти</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-contacts">
+                <h3>Контакти</h3>
+                <ul>
+                    <li><i class="fas fa-map-marker-alt"></i> {{ shop.city }}, {{ shop.address }}</li>
+                    <li><i class="fas fa-phone"></i> {{ shop.phone[0] }}</li>
+                    <li><i class="fas fa-envelope"></i> {{ shop.email }}</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <!-- Цей рядок тепер буде працювати завдяки змінам в app.py -->
+            <p>© {{ now.year }} {{ shop.name }}. Всі права захищені.</p>
+        </div>
+    </div>
 </footer>

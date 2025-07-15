@@ -1,0 +1,22 @@
+<div class="product-card" data-id="{{ product.id }}">
+    <div class="product-image">
+        <a href="{{ url_for('product_detail', product_id=product.id) }}">
+            <img src="{{ url_for('static', filename='img/products/' + product.image) }}" alt="{{ product.name }}">
+        </a>
+        <!-- Статус наявності -->
+        {% if product.in_stock %}
+            <div class="stock-status in-stock">В наявності</div>
+        {% else %}
+            <div class="stock-status out-of-stock">Немає в наявності</div>
+        {% endif %}
+        <button class="favorite-btn"><i class="fas fa-star"></i></button>
+    </div>
+    <div class="product-info">
+        <h3><a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a></h3>
+        <p class="product-brand">{{ product.brand }}</p>
+        <div class="product-footer">
+            <span class="price">{{ "%.2f"|format(product.price) }} грн</span>
+            <button class="btn btn-sm add-to-cart" {% if not product.in_stock %}disabled{% endif %}>В кошик</button>
+        </div>
+    </div>
+</div>

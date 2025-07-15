@@ -1,80 +1,93 @@
-<!-- 🏦 Оформлення замовлення -->
-<div id="order-modal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Оформлення замовлення</h3>
-    <div id="order-summary"></div>
-    <form id="orderForm">
-      <input type="text" name="name" placeholder="Ваше  ім'я" required />
-      <input type="tel" name="phone" placeholder="Номер телефону" required />
-      <input type="text" name="address" placeholder="Адреса доставки" required />
-      <button type="submit" class="btn">Підтвердити</button>
-    </form>
-    <button id="close-order-modal" class="btn danger">Закрити</button>
-  </div>
+<!-- templates/_modals.html -->
+
+<!-- ======================================== -->
+<!-- МОДАЛЬНОЕ ОКНО АВТОРИЗАЦИИ               -->
+<!-- ======================================== -->
+<div id="auth-modal" class="modal">
+    <div class="modal-content">
+        <button class="close-modal">×</button>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="login">Вхід</button>
+            <button class="auth-tab" data-tab="register">Реєстрація</button>
+        </div>
+
+        <!-- Форма входа -->
+        <div id="login" class="tab-content active">
+            <form id="loginForm" class="auth-form" method="POST" action="{{ url_for('login') }}">
+                <div class="form-group">
+                    <input type="email" id="loginEmail" name="email" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="loginPassword" name="password" placeholder="Пароль" required>
+                </div>
+                <div id="loginError" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary btn-block">Увійти</button>
+            </form>
+            <div class="auth-divider"><span>або</span></div>
+            <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block">
+                <img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google">
+                Увійти через Google
+            </a>
+        </div>
+
+        <!-- Форма регистрации -->
+        <div id="register" class="tab-content">
+            <form id="registerForm" class="auth-form" method="POST" action="{{ url_for('register') }}">
+                <div class="form-group">
+                    <input type="text" id="registerUsername" name="username" placeholder="Ім'я користувача" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" id="registerEmail" name="email" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="registerPassword" name="password" placeholder="Пароль" required>
+                </div>
+                <div id="registerError" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary btn-block">Зареєструватися</button>
+            </form>
+        </div>
+    </div>
 </div>
 
-<!-- 🎨 Модальне вікно кошика -->
-<div id="cart-sidebar" class="cart-sidebar hidden">
-  <div class="cart-sidebar-content">
-    <h3 class="cart-title">Ваш кошик</h3>
-    <ul id="cart-modal-items" class="cart-modal-items"></ul>
+
+<!-- ======================================== -->
+<!-- БОКОВАЯ ПАНЕЛЬ КОРЗИНЫ                    -->
+<!-- ======================================== -->
+<div id="cart-modal" class="cart-sidebar">
+    <div class="cart-header">
+        <h3>Ваш кошик</h3>
+        <button class="close-modal cart-close">×</button>
+    </div>
+    <div class="cart-body">
+        <div class="cart-items-container">
+            <!-- Содержимое корзины (загружается через JS) -->
+            <div class="empty-cart">
+                <i class="fas fa-shopping-cart" style="font-size: 4rem; color: #e0e0e0;"></i>
+                <p style="margin-top: 1rem;">Ваш кошик порожній</p>
+            </div>
+        </div>
+    </div>
     <div class="cart-footer">
-      <p id="cart-total"><strong>Разом:</strong> 0грн</p>
-      <button id="cart-checkout" class="btn">Оформити</button>
+        <div class="cart-total">
+            <span>Всього:</span>
+            <span id="cart-modal-total">0.00 грн</span>
+        </div>
+        <a href="{{ url_for('cart_page') }}" class="btn btn-primary btn-block">Перейти до оформлення</a>
     </div>
-    <button id="close-cart-sidebar" class="btn danger">Закрити</button>
-  </div>
 </div>
 
-<!-- 🔐 Авторизація -->
-<div id="auth-modal" class="modal hidden">
-  <div class="modal-content auth-window">
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="login">Вхід</button>
-      <button class="tab-btn" data-tab="register">Реєстрація</button>
+
+<!-- ======================================== -->
+<!-- МОДАЛЬНОЕ ОКНО ИЗБРАННОГО                -->
+<!-- ======================================== -->
+<div id="favorites-modal" class="modal">
+    <div class="modal-content" id="favorites-modal-content">
+        <button class="close-modal">×</button>
+        <h3>Обрані товари</h3>
+        <div id="favorites-list-container" class="products-grid">
+            <!-- Сюда JS будет загружать избранные товары -->
+            <p class="text-center" style="grid-column: 1 / -1;">Список обраного порожній.</p>
+        </div>
     </div>
-
-    <div id="login" class="tab-content active">
-      <form id="login-form">
-        <input type="email" placeholder="Email" required />
-        <input type="password" placeholder="Пароль" required />
-        <button type="submit" class="btn">Увійти</button>
-        <button type="button" class="btn google" id="google-login">
-          <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" style="height:18px; margin-right:6px;">
-          Увійти через Google
-        </button>
-      </form>
-    </div>
-
-    <div id="register" class="tab-content">
-      <form id="register-form">
-        <input type="text" placeholder="Ім'я" required />
-        <input type="email" placeholder="Email" required />
-        <input type="password" placeholder="Пароль" required />
-        <button type="submit" class="btn">Зареєструватися</button>
-      </form>
-    </div>
-
-    <button id="close-auth-modal" class="btn danger">Закрити</button>
-  </div>
-</div>
-
-<!-- ✅ Toast повідомлення -->
-<div id="toast" class="toast hidden">✅ Товар додано в кошик</div>
-
-<!-- ℹ️ Модал інформації про товар -->
-<div id="modal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Інформація про товар</h3>
-    <p id="modal-desc"></p>
-    <button id="closeModal" class="btn">Закрити</button>
-  </div>
-</div>
-
-<div id="favorites-modal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Обрані товари</h3>
-    <div id="favorites-list" class="products"></div>
-    <button id="close-favorites-modal" class="btn danger">Закрити</button>
-  </div>
 </div>

@@ -1,32 +1,103 @@
+<!-- templates/product_detail.html -->
+
 {% extends "base.html" %}
+{% block title %}{{ product.name }}{% endblock %}
 
 {% block content %}
-<section class="container product-detail">
-
-  <div class="product-detail-column product"
-       data-id="{{ product.id }}"
-       data-name="{{ product.name }}"
-       data-price="{{ product.price }}"
-       data-image="{{ url_for('static', filename='img/' ~ product.image) }}">
-
-    <!-- 🖼️ Зображення товару -->
-    <img src="{{ url_for('static', filename='img/' ~ product.image) }}"
-         alt="{{ product.name }}"
-         class="detail-img" />
-
-    <!-- 📝 Інформація про товар -->
-    <div class="detail-info">
-      <h2>{{ product.name }}</h2>
-      <p class="price">{{ product.price }} грн</p>
-
-      <!-- 🛒 Кнопка "Додати в кошик" -->
-      <button class="btn add-to-cart">Додати в кошик</button>
-
-      <!-- 🔙 Повернення до каталогу -->
-      <a href="{{ url_for('catalog') }}" class="btn" style="margin-top: 1rem;">← Назад до каталогу</a>
+<div class="container product-detail-page">
+    <div class="breadcrumbs" style="margin-bottom: 20px;">
+        <a href="{{ url_for('index') }}">Головна</a> /
+        <a href="{{ url_for('catalog') }}">Каталог</a> /
+        <span>{{ product.name }}</span>
     </div>
 
-  </div>
+    <!-- ОСНОВНИЙ БЛОК ТОВАРУ -->
+    <!-- Ми додали data-id сюди, щоб JS міг знайти ID товару -->
+    <div class="product-detail-content" data-id="{{ product.id }}">
+        <!-- Ліва колонка: Зображення товару -->
+        <div class="product-image-container">
+            <img src="{{ url_for('static', filename='img/products/' + product.image) }}" alt="{{ product.name }}">
+        </div>
 
-</section>
+        <!-- Права колонка: Інформація та купівля -->
+        <div class="product-info-container">
+            <h1 class="product-title">{{ product.name }}</h1>
+
+            <p class="product-category">Категорія: <a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a></p>
+
+            <div class="product-price-detail">{{ "%.2f"|format(product.price) }} грн</div>
+
+            {% if product.in_stock %}
+                <p class="product-stock-status in-stock"><i class="fas fa-check-circle"></i> Є в наявності</p>
+            {% else %}
+                <p class="product-stock-status out-of-stock"><i class="fas fa-times-circle"></i> Немає в наявності</p>
+            {% endif %}
+
+            <!-- ОНОВЛЕНИЙ БЛОК З КНОПКАМИ -->
+            <div class="product-actions">
+                <button class="btn btn-primary btn-lg add-to-cart" {% if not product.in_stock %}disabled{% endif %}>
+                    <i class="fas fa-shopping-cart"></i>
+                    В кошик
+                </button>
+                <button class="btn btn-lg buy-now-btn" {% if not product.in_stock %}disabled{% endif %}>
+                    Оформити замовлення
+                </button>
+            </div>
+
+            <div class="product-description">
+                <h3>Опис товару</h3>
+                <p>{{ product.description }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- СЕКЦІЯ З ВІДГУКАМИ (тепер вона окремо, нижче) -->
+    <div class="reviews-section">
+        <h3>Відгуки ({{ product.reviews.count() }})</h3>
+
+        <!-- Форма для нового відгуку (тільки для залогінених) -->
+        {% if current_user.is_authenticated %}
+        <div class="review-form-container">
+            <h4>Залишити свій відгук</h4>
+            <!-- Виправлено помилку в шляху до add_review -->
+            <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
+                <div class="form-group rating-input">
+                    <span>Ваша оцінка:</span>
+                    <div class="stars">
+                        <input type="radio" id="star5" name="rating" value="5" required><label for="star5">★</label>
+                        <input type="radio" id="star4" name="rating" value="4"><label for="star4">★</label>
+                        <input type="radio" id="star3" name="rating" value="3"><label for="star3">★</label>
+                        <input type="radio" id="star2" name="rating" value="2"><label for="star2">★</label>
+                        <input type="radio" id="star1" name="rating" value="1"><label for="star1">★</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <textarea name="text" placeholder="Напишіть декілька слів про товар..." class="form-control"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Відправити відгук</button>
+            </form>
+        </div>
+        {% else %}
+        <p>Будь ласка, <a href="#" id="open-auth-modal" class="login-to-review-link">увійдіть</a>, щоб залишити відгук.</p>
+        {% endif %}
+
+        <!-- Список існуючих відгуків -->
+        <div class="reviews-list">
+            {% if reviews %}
+                {% for review in reviews %}
+                <div class="review-item">
+                    <div class="review-header">
+                        <strong>{{ review.author.username }}</strong>
+                        <span class="rating">{% for i in range(review.rating) %}★{% endfor %}{% for i in range(5-review.rating) %}<span style="color:#ddd;">★</span>{% endfor %}</span>
+                    </div>
+                    <p class="review-text">{{ review.text }}</p>
+                    <small class="review-date">{{ review.timestamp.strftime('%d.%m.%Y') }}</small>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>Для цього товару ще немає відгуків. Будьте першим!</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
 {% endblock %}

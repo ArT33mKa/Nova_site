@@ -1,0 +1,51 @@
+<!-- templates/admin_panel.html -->
+{% extends "base.html" %}
+{% block title %}Адмін-панель{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 40px; padding-bottom: 60px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 class="page-title" style="margin-bottom: 0;">Керування товарами</h1>
+        <a href="{{ url_for('add_product') }}" class="btn btn-primary">Додати новий товар</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <table class="table" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="padding: 10px; border: 1px solid #ddd;">Зображення</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">Назва</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">Ціна</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">Категорія</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">В наявності</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">Дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                    <img src="{{ url_for('static', filename='img/products/' + product.image) }}" alt="{{ product.name }}" style="width: 50px; height: 50px; object-fit: contain;">
+                </td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{{ product.name }}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{{ "%.2f"|format(product.price) }} грн</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{{ product.category }}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{% if product.in_stock %}Так{% else %}Ні{% endif %}</td>
+                <td style="padding: 10px; border: 1px solid #ddd; display: flex; gap: 5px;">
+                    <!-- В майбутньому тут буде кнопка редагування -->
+                    <!-- <a href="#" class="btn btn-sm btn-info">Редагувати</a> -->
+                    <a href="{{ url_for('delete_product', product_id=product.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Ви впевнені, що хочете видалити цей товар?')">Видалити</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

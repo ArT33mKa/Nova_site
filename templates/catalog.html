@@ -1,73 +1,118 @@
+<!-- templates/catalog.html -->
 {% extends "base.html" %}
+{% block title %}Каталог товарів{% endblock %}
 
 {% block content %}
-<section class="container catalog-page">
-  <h2 class="catalog-title">Каталог товарів</h2>
+<div class="container catalog-page">
+    <div class="breadcrumbs">
+        <a href="{{ url_for('index') }}">Головна</a> / <span>Каталог</span>
+    </div>
 
-  <!-- 🔍 Пошук -->
-  <div class="search-bar">
-    <input type="text" id="catalogSearch" placeholder="🔍 Пошук товарів..." class="search-input" />
-  </div>
+    <div class="catalog-content">
+        <!-- БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ -->
+        <aside class="filters-sidebar">
+            <form id="filters-form" method="GET" action="{{ url_for('catalog') }}">
 
-  <!-- 📂 Фільтр -->
-  <div class="filter-bar">
-    <select id="categoryFilter" class="search-input">
-      <option value="">Усі категорії</option>
-      {% for cat in categories %}
-        <option value="{{ cat }}">{{ cat }}</option>
-      {% endfor %}
-    </select>
-  </div>
+                <!-- Категорії -->
+                <div class="filter-group">
+                    <h4 class="filter-title">Категорії</h4>
+                    <ul class="category-list">
+                         <li><a href="{{ url_for('catalog') }}" class="filter-link {{ 'active' if not request.args.get('category') else '' }}">Всі категорії</a></li>
+                        {% for cat in shop.categories %}
+                        <li><a href="{{ url_for('catalog', category=cat) }}" class="filter-link {{ 'active' if request.args.get('category') == cat else '' }}">{{ cat }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <hr>
 
-  <!-- 🛒 Список товарів -->
-  <div id="productList" class="products">
-    {% for product in products %}
-      <div class="product"
-           data-id="{{ product.id }}"
-           data-name="{{ product.name }}"
-           data-price="{{ product.price }}"
-           data-image="{{ url_for('static', filename='img/' ~ product.image) }}"
-           data-category="{{ product.category }}">
+                <!-- Інші фільтри -->
+                <div class="filter-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="in_stock" value="true" {% if request.args.get('in_stock') %}checked{% endif %}>
+                        В наявності
+                    </label>
+                </div>
 
-        <!-- 🔗 Клік по зображенню веде до сторінки товару -->
-        <a href="{{ url_for('product_detail', product_id=product.id) }}">
-          <img src="{{ url_for('static', filename='img/' ~ product.image) }}" alt="{{ product.name }}">
-        </a>
+                <div class="filter-group">
+                    <h4 class="filter-title">Ціна, ₴</h4>
+                    <div class="price-inputs">
+                        <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
+                        <span>-</span>
+                        <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
+                    </div>
+                </div>
 
-        <!-- ⭐ Обране -->
-        <button class="favorite-icon">☆</button>
+                <!-- Виробники -->
+                <div class="filter-group">
+                    <h4 class="filter-toggle-btn">Виробник <i class="fas fa-chevron-down"></i></h4>
+                    <div class="brand-filter collapsible">
+                        {% for brand in brands %}
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in request.args.getlist('brand') %}checked{% endif %}>
+                            {{ brand }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
 
-        <h4>{{ product.name }}</h4>
-        <p>{{ product.price }} грн</p>
-        <button class="btn add-to-cart">Додати в кошик</button>
-      </div>
-    {% endfor %}
-  </div>
-</section>
+                <div class="filter-group">
+                    <h4 class="filter-title">Відгуки покупців</h4>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="min_rating" value="4" {% if request.args.get('min_rating') %}checked{% endif %}>
+                        <span class="rating" style="color:#ffc107;">★★★★</span><span style="color:#ddd;">★</span> 4 і вище
+                    </label>
+                </div>
 
-<!-- 🔍 Фільтрація -->
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const searchInput = document.getElementById("catalogSearch");
-  const categorySelect = document.getElementById("categoryFilter");
-  const products = document.querySelectorAll("#productList .product");
+                <button type="submit" class="btn btn-primary btn-block">Застосувати</button>
+                <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути</a>
+            </form>
+        </aside>
 
-  function applyFilters() {
-    const query = searchInput.value.toLowerCase();
-    const selectedCategory = categorySelect.value;
+        <!-- Основний контент з товарами -->
+        <div class="products-container">
+            <h1 class="page-title">Каталог товарів</h1>
+            {% if products.items %}
+                <div class="products-grid">
+                    {% for product in products.items %}
+                        {% include '_product_card.html' %}
+                    {% endfor %}
+                </div>
 
-    products.forEach(product => {
-      const name = product.dataset.name.toLowerCase();
-      const category = product.dataset.category;
-      const matchName = name.includes(query);
-      const matchCategory = !selectedCategory || category === selectedCategory;
+                <!-- Пагінація -->
+                <div class="pagination">
+                    <div class="pagination-controls">
 
-      product.style.display = matchName && matchCategory ? "block" : "none";
-    });
-  }
+                        <!-- Створюємо копію параметрів запиту та видаляємо з неї ключ 'page' -->
+                        {% set query_params = request.args.to_dict() %}
+                        {% do query_params.pop('page', None) %}
 
-  searchInput.addEventListener("input", applyFilters);
-  categorySelect.addEventListener("change", applyFilters);
-});
-</script>
+                        <!-- Посилання на попередню сторінку -->
+                        {% if products.has_prev %}
+                            <a href="{{ url_for('catalog', page=products.prev_num, **query_params) }}" class="page-link">«</a>
+                        {% endif %}
+
+                        <!-- Посилання на номери сторінок -->
+                        {% for page_num in products.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                            {% if page_num %}
+                                <a href="{{ url_for('catalog', page=page_num, **query_params) }}" class="page-link {{ 'active' if products.page == page_num else '' }}">{{ page_num }}</a>
+                            {% else %}
+                                <span class="page-dots">...</span>
+                            {% endif %}
+                        {% endfor %}
+
+                        <!-- Посилання на наступну сторінку -->
+                        {% if products.has_next %}
+                            <a href="{{ url_for('catalog', page=products.next_num, **query_params) }}" class="page-link">»</a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <div style="text-align: center; padding: 50px;">
+                    <h3>Товарів за вашими критеріями не знайдено.</h3>
+                    <p>Спробуйте змінити або скинути фільтри.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
 {% endblock %}
