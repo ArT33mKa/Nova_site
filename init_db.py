@@ -1,4 +1,9 @@
-from app import app, db, User, import_from_prom_xml
+# init_db.py (ПРАВИЛЬНА ВЕРСІЯ)
+
+# Імпортуємо додаток, базу даних та модель User з app.py
+from app import app, db, User
+# Імпортуємо функцію для завантаження товарів з її власного файлу
+from import_products import import_from_prom_xml
 
 
 def initialize_database():
@@ -12,17 +17,19 @@ def initialize_database():
         if not User.query.filter_by(username='admin').first():
             print(">>> Створення адміністратора...")
             admin = User(username='admin', email='artemcool200911@gmail.com', is_admin=True)
-            admin.set_password('admin123')  # Ви можете змінити пароль
+            admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
             print(">>> Адміністратора створено.")
         else:
             print(">>> Адміністратор вже існує.")
 
-        # За бажанням, можна розкоментувати, щоб імпортувати товари при кожному деплої
-        # print(">>> Імпортую товари з Prom.ua...")
-        # import_from_prom_xml()
-        # print(">>> Імпорт товарів завершено.")
+        # Запускаємо імпорт товарів
+        # Ви можете закоментувати наступні 3 рядки, якщо не хочете,
+        # щоб товари імпортувалися при кожному новому деплої.
+        print(">>> Імпортую товари з Prom.ua...")
+        import_from_prom_xml()
+        print(">>> Імпорт товарів завершено.")
 
 
 if __name__ == '__main__':

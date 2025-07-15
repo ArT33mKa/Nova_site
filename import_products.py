@@ -95,7 +95,3 @@ def import_from_prom_xml():
 
     except Exception as e:
         print(f"❌ Сталася критична помилка: {e}")
-
-
-if __name__ == '__main__':
-    import_from_prom_xml()
