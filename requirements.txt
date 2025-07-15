@@ -7,3 +7,4 @@ gunicorn
 flask_login
 flask_sqlalchemy
 datetime
+psycopg2
