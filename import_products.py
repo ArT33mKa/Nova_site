@@ -3,12 +3,11 @@ import xml.etree.ElementTree as ET
 import os
 import shutil
 
-
 # --- НАЛАШТУВАННЯ ШЛЯХІВ ---
-# [ЗМІНЕНО] Вказуємо шляхи до локальних файлів, а не URL
 # Всі шляхи відносно кореня проекту
-CML_FILE_PATH = os.path.join('import_data', 'tovar.cml')
-SOURCE_IMAGES_DIR = os.path.join('import_data', 'img')
+CML_FILE_PATH = os.path.join('import_data', 'import.xml')  # BAS зазвичай називає файл так
+OFFERS_FILE_PATH = os.path.join('import_data', 'offers.xml')  # і вивантажує ціни окремо
+SOURCE_IMAGES_DIR = os.path.join('import_data', 'import_files')  # папка з картинками
 # Папка, куди будуть зберігатися картинки на сайті
 DEST_IMAGES_DIR = os.path.join('static', 'img', 'products')
 
@@ -36,23 +35,23 @@ def copy_local_image(image_filename):
     if not image_filename:
         return "default.jpg"
 
-    source_path = os.path.join(SOURCE_IMAGES_DIR, image_filename)
-    dest_path = os.path.join(DEST_IMAGES_DIR, image_filename)
+    # BAS може передавати шлях типу "import_files/abc.jpg"
+    base_image_name = os.path.basename(image_filename)
+    source_path = os.path.join(SOURCE_IMAGES_DIR, base_image_name)
+    dest_path = os.path.join(DEST_IMAGES_DIR, base_image_name)
 
-    # Не копіюємо, якщо файл вже існує в папці призначення
     if os.path.exists(dest_path):
-        # print(f"     * Зображення '{image_filename}' вже існує.")
-        return image_filename
+        return base_image_name
 
     if os.path.exists(source_path):
         try:
             shutil.copy(source_path, dest_path)
-            print(f"     * Зображення '{image_filename}' успішно скопійовано.")
-            return image_filename
+            print(f"     * Зображення '{base_image_name}' успішно скопійовано.")
+            return base_image_name
         except Exception as e:
             print(f"     ! Помилка копіювання зображення {source_path}: {e}")
     else:
-        print(f"     ! Увага: файл зображення '{image_filename}' не знайдено у '{SOURCE_IMAGES_DIR}'.")
+        print(f"     ! Увага: файл зображення '{base_image_name}' не знайдено у '{SOURCE_IMAGES_DIR}'.")
 
     return "default.jpg"
 
@@ -61,77 +60,67 @@ def import_from_bas():
     """Головна функція для імпорту товарів з локального CML-файлу."""
     from app import app, db, Product
     try:
-        # Перевіряємо, чи існує файл для імпорту
+        # Перевіряємо, чи існує файл з товарами
         if not os.path.exists(CML_FILE_PATH):
-            print(f"❌ КРИТИЧНА ПОМИЛКА: Файл для імпорту не знайдено за шляхом: {CML_FILE_PATH}")
-            print("Переконайтесь, що ви поклали файл вивантаження з BAS в правильну папку.")
+            print(f"❌ ПОМИЛКА: Файл з товарами не знайдено: {CML_FILE_PATH}")
+            return
+        # Перевіряємо, чи існує файл з цінами
+        if not os.path.exists(OFFERS_FILE_PATH):
+            print(f"❌ ПОМИЛКА: Файл з цінами/залишками не знайдено: {OFFERS_FILE_PATH}")
             return
 
-        # Створюємо папку для зображень на сайті, якщо її немає
         os.makedirs(DEST_IMAGES_DIR, exist_ok=True)
 
-        print(f"1. Читання та розбір файлу: {CML_FILE_PATH}")
-        tree = ET.parse(CML_FILE_PATH)
-        root = tree.getroot()
-
-        # [ЗМІНЕНО] Розбираємо ціни та залишки з того ж файлу
-        print("\n2. Обробка цін та залишків...")
+        print("\n2. Обробка цін та залишків з offers.xml...")
         offers_data = {}
-        # Ваш файл містить ціни та залишки всередині тегу <Предложения>
-        for offer in root.findall('.//Предложение'):
-            offer_id = offer.find('Ид').text
+        offers_tree = ET.parse(OFFERS_FILE_PATH)
+        offers_root = offers_tree.getroot()
 
-            # Обробка ціни
+        for offer in offers_root.findall('.//Предложение'):
+            offer_id = offer.find('Ид').text
             price_node = offer.find('.//ЦенаЗаЕдиницу')
             price = float(price_node.text) if price_node is not None and price_node.text else 0.0
 
-            # Обробка наявності (у вашому файлі наявність в <Товар>, а не в <Предложение>)
-            # Тому ми будемо брати її пізніше, а тут поки збережемо ціну
-            offers_data[offer_id] = {'price': price}
+            # Наявність зазвичай вказується як кількість, а не true/false
+            quantity_node = offer.find('Количество')
+            quantity = float(quantity_node.text) if quantity_node is not None and quantity_node.text else 0
 
-        print(f"   -> Знайдено інформацію про ціни для {len(offers_data)} товарних пропозицій.")
+            offers_data[offer_id] = {'price': price, 'in_stock': quantity > 0}
 
-        print("\n3. Обробка основного каталогу товарів та зображень...")
+        print(f"   -> Знайдено інформацію про ціни та наявність для {len(offers_data)} товарів.")
+
+        print("\n3. Обробка каталогу товарів з import.xml...")
         products_to_create = []
-        for item in root.findall('.//Товар'):
+        catalog_tree = ET.parse(CML_FILE_PATH)
+        catalog_root = catalog_tree.getroot()
+
+        for item in catalog_root.findall('.//Товар'):
             item_id = item.find('Ид').text
 
-            # Пропускаємо товари, для яких немає ціни
             if item_id not in offers_data:
-                print(
-                    f"   ! Пропущено товар '{item.find('Наименование').text}' (ID: {item_id}), оскільки для нього не знайдено ціни.")
+                # print(f"   ! Пропущено товар '{item.find('Наименование').text}' (ID: {item_id}), немає ціни.")
                 continue
 
-            name = item.find('Наименование').text.strip() if item.find('Наименование') is not None and item.find(
-                'Наименование').text else 'Без назви'
-
+            name = item.find('Наименование').text.strip() if item.find('Наименование') is not None else 'Без назви'
             description_node = item.find('Описание')
             description = description_node.text.strip() if description_node is not None and description_node.text else 'Опис відсутній.'
 
-            # Виробник (бренд)
             brand = 'Без бренду'
-            brand_node = item.find(".//*[Наименование='Виробник']/../Значение")
-            if brand_node is not None and brand_node.text:
-                brand = brand_node.text.strip()
+            # Пошук властивості "Виробник"
+            for prop in item.findall(".//ЗначениеРеквизита"):
+                if prop.find('Наименование').text == 'Производитель':
+                    brand = prop.find('Значение').text.strip()
+                    break
 
-            # Наявність (in_stock)
-            # У вашому файлі це булеве значення в <ЗначенияСвойства>
-            in_stock = False
-            stock_node = item.find(".//*[Ид='ИД-Наличие']/Значение")
-            if stock_node is not None and stock_node.text:
-                in_stock = stock_node.text.lower() == 'true'
-
-            # Зображення
-            image_filename = "default.jpg"
             image_node = item.find('Картинка')
+            image_filename = "default.jpg"
             if image_node is not None and image_node.text:
                 image_filename = copy_local_image(image_node.text.strip())
 
-            # Збираємо всю інформацію про товар
             product_info = {
                 "name": name,
                 "price": offers_data[item_id]['price'],
-                "in_stock": in_stock,
+                "in_stock": offers_data[item_id]['in_stock'],
                 "description": description,
                 "brand": brand,
                 "image": image_filename,
@@ -142,24 +131,25 @@ def import_from_bas():
                 f"   + Підготовлено товар: {name} (Ціна: {product_info['price']}, Наявність: {product_info['in_stock']})")
 
         if not products_to_create:
-            print("\n! Не знайдено товарів для імпорту. Перевірте ваш CML-файл.")
+            print("\n! Не знайдено товарів для імпорту. Перевірте ваші CML-файли.")
             return
 
         with app.app_context():
-            print(f"\n4. Оновлення бази даних. Знайдено {len(products_to_create)} товарів для імпорту.")
+            print(f"\n4. Оновлення бази даних. Знайдено {len(products_to_create)} товарів.")
             print("   -> Видалення старих товарів...")
-            Product.query.delete()
+            db.session.query(Review).delete()  # Видаляємо старі відгуки разом з товарами
+            db.session.query(Product).delete()
+            db.session.commit()
             print("   -> Додавання нових товарів...")
             db.session.bulk_save_objects(products_to_create)
             db.session.commit()
 
         print(f"\n✅ Успішно імпортовано/оновлено {len(products_to_create)} товарів з BAS!")
 
-    except FileNotFoundError:
-        print(f"❌ КРИТИЧНА ПОМИЛКА: Файл '{CML_FILE_PATH}' не знайдено. Перевірте шлях та ім'я файлу.")
+    except FileNotFoundError as e:
+        print(f"❌ КРИТИЧНА ПОМИЛКА: Файл не знайдено. Перевірте шлях. Помилка: {e}")
     except ET.ParseError as e:
-        print(
-            f"❌ КРИТИЧНА ПОМИЛКА: Не вдалося розпарсити XML/CML-файл. Він може бути пошкодженим або мати неправильний формат. Помилка: {e}")
+        print(f"❌ КРИТИЧНА ПОМИЛКА: Не вдалося розпарсити XML-файл. Він пошкоджений. Помилка: {e}")
     except Exception as e:
         import traceback
         print(f"❌ КРИТИЧНА ПОМИЛКА під час імпорту: {e}")

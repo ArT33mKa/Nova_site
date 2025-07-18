@@ -11,7 +11,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from sqlalchemy import func
 from collections import Counter
-import locale # [НОВЕ] Імпорт для локалізації дати
+import locale  # [НОВЕ] Імпорт для локалізації дати
 
 from flask import request, jsonify
 from import_products import import_from_bas
@@ -90,6 +90,7 @@ class User(db.Model, UserMixin):
     reviews = db.relationship('Review', backref='author', lazy='dynamic')
 
     def set_password(self, password): self.password_hash = generate_password_hash(password)
+
     def check_password(self, password): return check_password_hash(self.password_hash, password)
 
 
@@ -283,10 +284,12 @@ def get_reviews_data(product_id):
         'total_reviews_with_rating': total_with_rating_count
     }
 
+
 @app.route("/product/<int:product_id>/reviews")
 def product_reviews(product_id):
     data = get_reviews_data(product_id)
     return render_template("reviews.html", **data, active_tab='reviews')
+
 
 @app.route("/product/<int:product_id>/questions")
 def product_questions(product_id):
@@ -527,14 +530,11 @@ def checkout():
 # ────────────────────────────────
 #  АДМІН-ПАНЕЛЬ
 # ────────────────────────────────
-
-# [НОВЕ] Маршрут для керування відгуками
 @app.route('/admin/reviews')
 @login_required
 @admin_required
 def admin_reviews():
     page = request.args.get('page', 1, type=int)
-    # Запитуємо всі відгуки та питання, сортуємо за новизною
     all_reviews = Review.query.order_by(Review.timestamp.desc())
     reviews = all_reviews.paginate(page=page, per_page=15, error_out=False)
     return render_template('admin_reviews.html', reviews=reviews)
@@ -554,7 +554,7 @@ def add_product():
         db.session.add(new_product);
         db.session.commit()
         flash(f"Товар '{new_product.name}' успішно додано!", "success")
-        return redirect(url_for('catalog')) # [ВИПРАВЛЕНО]
+        return redirect(url_for('catalog'))
     return render_template("add_product.html")
 
 
@@ -573,28 +573,27 @@ def edit_product(product_id):
         product.in_stock = 'in_stock' in request.form
         db.session.commit()
         flash(f"Товар '{product.name}' успішно оновлено!", "success")
-        return redirect(url_for('catalog')) # [ВИПРАВЛЕНО]
+        return redirect(url_for('catalog'))
 
     return render_template("edit_product.html", product=product)
+
 
 @app.route("/admin/delete_review/<int:review_id>", methods=["POST"])
 @login_required
 @admin_required
 def delete_review(review_id):
     review_to_delete = Review.query.get_or_404(review_id)
-    product_id = review_to_delete.product_id # Зберігаємо ID товару перед видаленням
+    product_id = review_to_delete.product_id
     is_admin_page = 'admin' in request.referrer
     db.session.delete(review_to_delete)
     db.session.commit()
     flash("Запис було успішно видалено.", "success")
-    # Перенаправляємо назад на сторінку, з якої прийшов запит
     if is_admin_page:
         return redirect(url_for('admin_reviews'))
-    # Використовуємо сохраненний ID для повернення на сторінку товару
     return redirect(request.referrer or url_for('product_reviews', product_id=product_id))
 
 
-@app.route("/admin/delete_product/<int:product_id>", methods=["POST"]) # [ВИПРАВЛЕНО] Змінено на POST для безпеки
+@app.route("/admin/delete_product/<int:product_id>", methods=["POST"])
 @login_required
 @admin_required
 def delete_product(product_id):
@@ -602,7 +601,73 @@ def delete_product(product_id):
     flash(f"Товар '{product.name}' було видалено.", "success")
     db.session.delete(product);
     db.session.commit()
-    return redirect(url_for('catalog')) # [ВИПРАВЛЕНО]
+    return redirect(url_for('catalog'))
+
+
+# ────────────────────────────────
+#  ІНТЕГРАЦІЯ З BAS (CommerceML)
+# ────────────────────────────────
+@app.route('/api/1c_exchange', methods=['GET', 'POST'])
+def cml_exchange():
+    """
+    Обробник для запитів від модуля обміну BAS/1C.
+    Працює за протоколом CommerceML.
+    """
+    mode = request.args.get('mode')
+    exchange_type = request.args.get('type')
+    secret_key = os.getenv('BAS_SECRET_KEY')
+    auth = request.authorization
+
+    # --- Перевірка безпеки ---
+    if not secret_key or not auth or auth.username != secret_key:
+        print(f"!!! Спроба несанкціонованого доступу до /api/1c_exchange. IP: {request.remote_addr}")
+        return 'failure\nНевірний ключ авторизації.', 401
+
+    # --- Крок 1: Перевірка з'єднання (checkauth) ---
+    if mode == 'checkauth' and exchange_type == 'catalog':
+        print(">>> BAS: Отримано запит на перевірку авторизації (checkauth)...")
+        return 'success\nPHPSESSID\n12345'
+
+    # --- Крок 2: Ініціалізація обміну (init) ---
+    if mode == 'init' and exchange_type == 'catalog':
+        print(">>> BAS: Отримано запит на ініціалізацію обміну (init)...")
+        return f"zip=no\nfile_limit=104857600"
+
+    # --- Крок 3: Завантаження файлу (file) ---
+    if mode == 'file' and exchange_type == 'catalog':
+        filename = request.args.get('filename')
+        print(f">>> BAS: Отримано запит на завантаження файлу: {filename}")
+
+        # Створюємо папку для даних, якщо її немає
+        import_dir = 'import_data'
+        os.makedirs(import_dir, exist_ok=True)
+
+        # Якщо це папка з картинками, створюємо її
+        if filename.endswith('/'):
+            os.makedirs(os.path.join(import_dir, filename), exist_ok=True)
+            print(f">>> Створено директорію: {filename}")
+            return 'success'
+
+        # Якщо це файл (CML або зображення)
+        file_path = os.path.join(import_dir, filename)
+        try:
+            with open(file_path, 'wb') as f:
+                f.write(request.data)
+            print(f">>> Файл {filename} успішно збережено на сервері.")
+            return 'success'
+        except Exception as e:
+            print(f"❌ Помилка під час збереження файлу від BAS: {e}")
+            return f'failure\nПомилка на сервері: {e}'
+
+    # --- Крок 4: Повідомлення про завершення завантаження (import) ---
+    # Ми не запускаємо імпорт тут, а просто повідомляємо BAS, що все добре.
+    # Імпорт буде запущено вручну через скрипт init_db.py
+    if mode == 'import' and exchange_type == 'catalog':
+        filename = request.args.get('filename')
+        print(f">>> BAS: Завершено завантаження файлу {filename}. Імпорт буде запущено окремо.")
+        return 'success'
+
+    return 'failure\nНевідомий режим або тип обміну.'
 
 
 # ────────────────────────────────
@@ -623,63 +688,6 @@ def send_message():
 @app.route("/favorites")
 def favorites_page(): return render_template("favorites.html")
 
-
-@app.route('/api/1c_exchange', methods=['GET', 'POST'])
-def cml_exchange():
-    """
-    Обробник для запитів від модуля обміну BAS/1C.
-    Працює за протоколом CommerceML.
-    """
-    mode = request.args.get('mode')
-    exchange_type = request.args.get('type')
-
-    # Отримуємо секретний ключ з .env файлу
-    secret_key = os.getenv('BAS_SECRET_KEY')
-    # BAS передає ключ в заголовках авторизації (Basic Auth)
-    auth = request.authorization
-
-    # --- Перевірка безпеки ---
-    # Якщо ключ не налаштовано або не передано - відмовляємо
-    if not secret_key or not auth or auth.username != secret_key:
-        print(f"!!! Спроба несанкціонованого доступу до /api/1c_exchange. IP: {request.remote_addr}")
-        return 'failure\nНевірний ключ авторизації.', 401
-
-    # --- Крок 1: Перевірка з'єднання (checkauth) ---
-    if mode == 'checkauth' and exchange_type == 'catalog':
-        # BAS перевіряє, чи доступний скрипт і чи правильний ключ
-        print(">>> BAS: Отримано запит на перевірку авторизації (checkauth)...")
-        # Відповідаємо успіхом та передаємо назву cookie (можна вигадану)
-        return 'success\nPHPSESSID\n12345'
-
-    # --- Крок 2: Ініціалізація обміну (init) ---
-    if mode == 'init' and exchange_type == 'catalog':
-        # BAS повідомляє про початок завантаження файлів
-        print(">>> BAS: Отримано запит на ініціалізацію обміну (init)...")
-        # Повертаємо налаштування для завантаження файлів
-        return f"zip=no\nfile_limit=104857600"  # zip=no, ліміт файлу 100МБ
-
-    # --- Крок 3: Завантаження файлу (file) ---
-    if mode == 'import' and exchange_type == 'catalog':
-        filename = request.args.get('filename')
-        print(f">>> BAS: Отримано запит на завантаження файлу: {filename}")
-
-        os.makedirs('import_data', exist_ok=True)
-        file_path = os.path.join('import_data', 'tovar.cml')
-
-        try:
-            with open(file_path, 'wb') as f:
-                f.write(request.data)
-            print(f">>> Файл {filename} успішно збережено на сервері.")
-
-            # МИ БІЛЬШЕ НЕ ЗАПУСКАЄМО ІМПОРТ ТУТ.
-            # Просто повертаємо успіх. Імпорт відбудеться при наступному деплої.
-            return 'success'
-
-        except Exception as e:
-            print(f"❌ КРИТИЧНА ПОМИЛКА під час збереження файлу від BAS: {e}")
-            return f'failure\nПомилка на сервері під час збереження файлу: {e}'
-
-    return 'failure\nНевідомий режим або тип обміну.'
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ

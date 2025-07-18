@@ -4,6 +4,8 @@
 from app import app, db, User
 # Імпортуємо нашу нову функцію для завантаження товарів з BAS
 from import_products import import_from_bas
+import os
+
 
 def initialize_database():
     """Створює всі таблиці, адміна та імпортує товари з BAS."""
@@ -23,12 +25,17 @@ def initialize_database():
         else:
             print(">>> 2. Адміністратор вже існує.")
 
+        # Створюємо необхідні папки, якщо їх немає
+        os.makedirs('import_data', exist_ok=True)
+        os.makedirs(os.path.join('static', 'img', 'products'), exist_ok=True)
+
         # Запускаємо імпорт товарів з BAS
-        print("\n" + "="*50)
-        print(">>> 3. ЗАПУСК ІМПОРТУ ТОВАРІВ З ЛОКАЛЬНОГО ФАЙЛУ BAS...")
-        print("="*50)
+        print("\n" + "=" * 50)
+        print(">>> 3. ЗАПУСК ІМПОРТУ ТОВАРІВ З ЛОКАЛЬНИХ ФАЙЛІВ BAS...")
+        print("=" * 50)
         import_from_bas()
         print("\n>>> Процес ініціалізації бази даних повністю завершено! <<<")
+
 
 if __name__ == '__main__':
     initialize_database()
