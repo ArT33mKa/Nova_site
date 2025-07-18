@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }
+        .header { background-color: #0066cc; color: white; padding: 15px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { padding: 25px; background-color: white; border-radius: 0 0 8px 8px; }
+        h2 { color: #0066cc; }
+        .order-details, .customer-details { margin-bottom: 25px; }
+        .order-details th, .order-details td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; }
+        .order-details th { background-color: #f2f2f2; }
+        .total-row td { font-weight: bold; font-size: 1.1em; border-top: 2px solid #333; }
+        .footer { margin-top: 20px; font-size: 0.8em; text-align: center; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>Нове замовлення #{{ order.id }}</h1></div>
+        <div class="content">
+            <h2>Деталі замовлення</h2>
+
+            <div class="customer-details">
+                <p><strong>Ім'я клієнта:</strong> {{ order.customer_name }}</p>
+                <p><strong>Телефон:</strong> {{ order.customer_phone }}</p>
+                <p><strong>Спосіб доставки:</strong> {{ order.delivery_method }}</p>
+                <p><strong>Спосіб оплати:</strong> {{ order.payment_method }}</p>
+            </div>
+
+            <h2>Товари в замовленні</h2>
+            <table class="order-details" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Товар</th>
+                        <th>К-сть</th>
+                        <th>Ціна</th>
+                        <th>Сума</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.product.name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ "%.2f"|format(item.price) }} ₴</td>
+                        <td>{{ "%.2f"|format(item.price * item.quantity) }} ₴</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td colspan="3">Всього до сплати:</td>
+                        <td>{{ "%.2f"|format(order.total_cost) }} ₴</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="footer">
+            <p>Це автоматичне повідомлення з сайту {{ shop.name }}.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,206 +1,70 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ shop.name }} - Кошик</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
-<body>
-    <!-- Header (такий самий як на інших сторінках) -->
-    <header class="main-header">
-        <div class="container">
-            <div class="header-top">
-                <div class="logo">
-                    <a href="{{ url_for('index') }}">
-                        <h1>{{ shop.name }}</h1>
-                        <p>Магазин сантехніки</p>
-                    </a>
-                </div>
-                
-                <div class="header-contacts">
-                    <div class="contact-item">
-                        <i class="fas fa-phone"></i>
-                        <div>
-                            {% for phone in shop.phone %}
-                                <a href="tel:{{ phone }}">{{ phone }}</a><br>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div class="contact-item">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <div>
-                            <span>{{ shop.city }}, {{ shop.address }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <nav class="main-nav">
-                <ul>
-                    <li><a href="{{ url_for('index') }}">Головна</a></li>
-                    <li><a href="{{ url_for('catalog') }}">Каталог</a></li>
-                    <li><a href="#about">Про нас</a></li>
-                    <li><a href="#contacts">Контакти</a></li>
-                </ul>
-                
-                <div class="header-actions">
-                    {% if user %}
-                        <div class="user-profile">
-                            <img src="{{ user.picture }}" alt="{{ user.name }}" class="user-avatar">
-                            <span>{{ user.name }}</span>
-                            <a href="{{ url_for('logout') }}" class="logout-btn"><i class="fas fa-sign-out-alt"></i></a>
-                        </div>
-                    {% else %}
-                        <button id="open-auth-modal" class="auth-btn">
-                            <i class="fas fa-user"></i> Увійти
-                        </button>
-                    {% endif %}
-                    
-                    <div class="action-icons">
-                        <div id="favorites-icon" class="icon-wrapper">
-                            <img src="{{ url_for('static', filename='img/unfavorite.png') }}" alt="Обране">
-                            <span id="favorites-count" class="badge">0</span>
-                        </div>
-                        <div id="cart-icon" class="icon-wrapper">
-                            <img src="{{ url_for('static', filename='img/cart.png') }}" alt="Кошик">
-                            <span id="cart-count" class="badge">0</span>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-        </div>
-    </header>
+{% extends "base.html" %}
+{% block title %}Кошик{% endblock %}
 
-    <!-- Основний вміст сторінки кошика -->
-    <main class="cart-page">
-        <div class="container">
-            <!-- Хлібні крихти -->
-            <div class="breadcrumbs">
-                <a href="{{ url_for('index') }}">Головна</a> / <span>Кошик</span>
-            </div>
-            
-            <h1 class="page-title">Ваш кошик</h1>
-            
-            <div class="cart-content">
-                <!-- Список товарів -->
-                <div class="cart-items-container">
-                    <!-- Тут будуть динамічно завантажуватись товари через JS -->
-                    <div class="cart-loading">
-                        <i class="fas fa-spinner fa-spin"></i> Завантаження кошика...
-                    </div>
-                </div>
-                
-                <!-- Підсумок замовлення -->
-                <div class="cart-summary">
-                    <h3>Підсумок замовлення</h3>
-                    
-                    <div class="summary-row">
-                        <span>Товари:</span>
-                        <span id="subtotal">0 грн</span>
-                    </div>
-                    
-                    <div class="summary-row">
-                        <span>Доставка:</span>
-                        <span>За тарифами перевізника</span>
-                    </div>
-                    
-                    <div class="summary-row total">
-                        <span>До сплати:</span>
-                        <span class="cart-total">0 грн</span>
-                    </div>
-                    
-                    <button id="checkout-btn" class="btn btn-primary btn-block">
-                        Оформити замовлення
-                    </button>
-                    
-                    <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-block">
-                        Продовжити покупки
-                    </a>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Footer (такий самий як на інших сторінках) -->
-    <footer class="main-footer">
-        <div class="container">
-            <div class="footer-grid">
-                <div class="footer-about">
-                    <h3>{{ shop.name }}</h3>
-                    <p>Інтернет-магазин сантехніки та обладнання. Якість, надійність, гарантія.</p>
-                    <div class="social-links">
-                        <a href="#"><i class="fab fa-facebook-f"></i></a>
-                        <a href="#"><i class="fab fa-instagram"></i></a>
-                        <a href="#"><i class="fab fa-telegram"></i></a>
-                    </div>
-                </div>
-                
-                <div class="footer-links">
-                    <h3>Меню</h3>
-                    <ul>
-                        <li><a href="{{ url_for('index') }}">Головна</a></li>
-                        <li><a href="{{ url_for('catalog') }}">Каталог</a></li>
-                        <li><a href="#about">Про нас</a></li>
-                        <li><a href="#contacts">Контакти</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer-contacts">
-                    <h3>Контакти</h3>
-                    <ul>
-                        <li><i class="fas fa-map-marker-alt"></i> {{ shop.city }}, {{ shop.address }}</li>
-                        <li><i class="fas fa-phone"></i> {{ shop.phone[0] }}</li>
-                        <li><i class="fas fa-envelope"></i> {{ shop.email }}</li>
-                    </ul>
-                </div>
-            </div>
-            
-            <div class="footer-bottom">
-                <p>&copy; {{ now.year }} {{ shop.name }}. Всі права захищені.</p>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Модальне вікно оформлення замовлення -->
-    <div class="modal" id="checkout-modal">
-        <div class="modal-content">
-            <button class="close-modal"><i class="fas fa-times"></i></button>
-            <h2>Оформлення замовлення</h2>
-            
-            <form id="checkout-form">
-                <div class="form-group">
-                    <label for="name">Ім'я *</label>
-                    <input type="text" id="name" name="name" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="phone">Телефон *</label>
-                    <input type="tel" id="phone" name="phone" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email">
-                </div>
-                
-                <div class="form-group">
-                    <label for="address">Адреса доставки</label>
-                    <textarea id="address" name="address"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="comment">Коментар до замовлення</label>
-                    <textarea id="comment" name="comment"></textarea>
-                </div>
-                
-                <button type="submit" class="btn btn-primary">Підтвердити замовлення</button>
-            </form>
+{% block content %}
+<header class="page-header">
+    <div class="container">
+        <h1 class="page-title">Ваш кошик</h1>
+        <div class="breadcrumbs">
+            <a href="{{ url_for('index') }}">Головна</a> / <span>Кошик</span>
         </div>
     </div>
+</header>
 
-    <!-- Підключення JavaScript -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+<div class="cart-page container">
+    {% if not cart_items %}
+    <div class="text-center" style="padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
+        <h2>Ваш кошик порожній</h2>
+        <p class="text-secondary mb-4">Схоже, ви ще нічого не додали. Давайте це виправимо!</p>
+        <a href="{{ url_for('catalog') }}" class="btn btn-primary btn-lg">Перейти до каталогу</a>
+    </div>
+    {% else %}
+    <div class="checkout-grid">
+        <div class="cart-items-list">
+            {% for item in cart_items %}
+            <div class="cart-item-row" data-id="{{ item.product.id }}">
+                <div class="cart-item-image">
+                    <a href="{{ url_for('product_detail', product_id=item.product.id) }}">
+                        <img src="{{ url_for('static', filename='img/products/' + item.product.image) }}" alt="{{ item.product.name }}">
+                    </a>
+                </div>
+                <div class="cart-item-details">
+                    <a href="{{ url_for('product_detail', product_id=item.product.id) }}"><strong>{{ item.product.name }}</strong></a>
+                    <div class="text-muted">{{ "%.2f"|format(item.product.price) }} ₴ / шт.</div>
+                </div>
+                <div class="cart-item-quantity-controls">
+                    <!-- [ВИПРАВЛЕНО] Додано data-id для коректної роботи JS -->
+                    <button class="qty-btn minus" data-id="{{ item.product.id }}">-</button>
+                    <span class="quantity-display">{{ item.quantity }}</span>
+                    <button class="qty-btn plus" data-id="{{ item.product.id }}">+</button>
+                </div>
+                <div class="cart-item-price">
+                    <strong id="item-total-{{ item.product.id }}">{{ "%.2f"|format(item.item_total) }} ₴</strong>
+                </div>
+                <div class="cart-item-remove">
+                    <button class="remove-from-cart-btn" data-id="{{ item.product.id }}" title="Видалити">×</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <aside class="cart-summary">
+            <h3>Підсумок</h3>
+            <div class="summary-row">
+                <span>Товари:</span>
+                <span id="summary-subtotal">{{ "%.2f"|format(total_cost) }} ₴</span>
+            </div>
+            <div class="summary-row">
+                <span>Доставка:</span>
+                <span>За тарифами</span>
+            </div>
+            <div class="summary-row total">
+                <span>Всього до сплати:</span>
+                <span id="summary-grand-total">{{ "%.2f"|format(total_cost) }} ₴</span>
+            </div>
+            <a href="{{ url_for('checkout') }}" class="btn btn-primary btn-block btn-lg">Перейти до оформлення</a>
+        </aside>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

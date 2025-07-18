@@ -1,48 +1,27 @@
-<!-- templates/_modals.html -->
-
-<!-- ======================================== -->
-<!-- МОДАЛЬНОЕ ОКНО АВТОРИЗАЦИИ               -->
-<!-- ======================================== -->
+<!-- templates/_modals.html (ОНОВЛЕНА І ВИПРАВЛЕНА ВЕРСІЯ) -->
 <div id="auth-modal" class="modal">
     <div class="modal-content">
         <button class="close-modal">×</button>
-
         <div class="auth-tabs">
             <button class="auth-tab active" data-tab="login">Вхід</button>
             <button class="auth-tab" data-tab="register">Реєстрація</button>
         </div>
 
-        <!-- Форма входа -->
         <div id="login" class="tab-content active">
-            <form id="loginForm" class="auth-form" method="POST" action="{{ url_for('login') }}">
-                <div class="form-group">
-                    <input type="email" id="loginEmail" name="email" placeholder="Email" required>
-                </div>
-                <div class="form-group">
-                    <input type="password" id="loginPassword" name="password" placeholder="Пароль" required>
-                </div>
+            <form id="loginForm" class="auth-form">
+                <div class="form-group"><input type="email" name="email" placeholder="Email" required></div>
+                <div class="form-group"><input type="password" name="password" placeholder="Пароль" required></div>
                 <div id="loginError" class="error-message" style="display: none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">Увійти</button>
             </form>
             <div class="auth-divider"><span>або</span></div>
-            <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block">
-                <img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google">
-                Увійти через Google
-            </a>
+            <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block"><img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"> Увійти через Google</a>
         </div>
 
-        <!-- Форма регистрации -->
         <div id="register" class="tab-content">
-            <form id="registerForm" class="auth-form" method="POST" action="{{ url_for('register') }}">
-                <div class="form-group">
-                    <input type="text" id="registerUsername" name="username" placeholder="Ім'я користувача" required>
-                </div>
-                <div class="form-group">
-                    <input type="email" id="registerEmail" name="email" placeholder="Email" required>
-                </div>
-                <div class="form-group">
-                    <input type="password" id="registerPassword" name="password" placeholder="Пароль" required>
-                </div>
+            <form id="registerForm" class="auth-form">
+                <div class="form-group"><input type="email" name="email" placeholder="Email" required></div>
+                <div class="form-group"><input type="password" name="password" placeholder="Пароль" required></div>
                 <div id="registerError" class="error-message" style="display: none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">Зареєструватися</button>
             </form>
@@ -50,44 +29,34 @@
     </div>
 </div>
 
-
-<!-- ======================================== -->
-<!-- БОКОВАЯ ПАНЕЛЬ КОРЗИНЫ                    -->
-<!-- ======================================== -->
+<!-- БОКОВА ПАНЕЛЬ КОШИКА -->
 <div id="cart-modal" class="cart-sidebar">
     <div class="cart-header">
         <h3>Ваш кошик</h3>
         <button class="close-modal cart-close">×</button>
     </div>
+    <!-- Цей контейнер буде заповнюватись через JS -->
     <div class="cart-body">
         <div class="cart-items-container">
-            <!-- Содержимое корзины (загружается через JS) -->
-            <div class="empty-cart">
-                <i class="fas fa-shopping-cart" style="font-size: 4rem; color: #e0e0e0;"></i>
-                <p style="margin-top: 1rem;">Ваш кошик порожній</p>
-            </div>
+            <!-- Сюди будуть додані товари -->
         </div>
     </div>
     <div class="cart-footer">
         <div class="cart-total">
             <span>Всього:</span>
-            <span id="cart-modal-total">0.00 грн</span>
+            <span id="cart-modal-total">0.00 ₴</span>
         </div>
-        <a href="{{ url_for('cart_page') }}" class="btn btn-primary btn-block">Перейти до оформлення</a>
+        <a href="{{ url_for('checkout') }}" id="checkout-link" class="btn btn-primary btn-block">Оформити замовлення</a>
     </div>
 </div>
 
-
-<!-- ======================================== -->
-<!-- МОДАЛЬНОЕ ОКНО ИЗБРАННОГО                -->
-<!-- ======================================== -->
+<!-- МОДАЛЬНЕ ВІКНО ОБРАНОГО -->
 <div id="favorites-modal" class="modal">
     <div class="modal-content" id="favorites-modal-content">
         <button class="close-modal">×</button>
         <h3>Обрані товари</h3>
         <div id="favorites-list-container" class="products-grid">
-            <!-- Сюда JS будет загружать избранные товары -->
-            <p class="text-center" style="grid-column: 1 / -1;">Список обраного порожній.</p>
+            <!-- Сюди JS буде динамічно додавати товари -->
         </div>
     </div>
 </div>

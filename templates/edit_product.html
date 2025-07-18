@@ -1,0 +1,42 @@
+<!-- templates/edit_product.html (НОВИЙ ФАЙЛ) -->
+{% extends "base.html" %}
+{% block title %}Редагувати товар{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 40px; padding-bottom: 60px; max-width: 700px;">
+    <h1 class="page-title">Редагувати: {{ product.name }}</h1>
+    <form method="POST" class="checkout-form" style="display: block;">
+        <div class="form-group">
+            <label for="name">Назва товару</label>
+            <input type="text" id="name" name="name" class="form-control" value="{{ product.name }}" required>
+        </div>
+        <div class="form-group">
+            <label for="price">Ціна (в грн)</label>
+            <input type="number" id="price" name="price" step="0.01" class="form-control" value="{{ product.price }}" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Опис</label>
+            <textarea id="description" name="description" class="form-control" rows="5" required>{{ product.description }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="image">Назва файлу зображення</label>
+            <input type="text" id="image" name="image" class="form-control" value="{{ product.image }}" required>
+        </div>
+        <div class="form-group">
+            <label for="category">Категорія</label>
+            <input type="text" id="category" name="category" class="form-control" value="{{ product.category }}" required>
+        </div>
+        <div class="form-group">
+            <label for="brand">Виробник (Бренд)</label>
+            <input type="text" id="brand" name="brand" class="form-control" value="{{ product.brand }}" required>
+        </div>
+        <div class="form-group">
+            <label class="checkbox-item">
+                <input type="checkbox" name="in_stock" value="true" {% if product.in_stock %}checked{% endif %}>
+                В наявності
+            </label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg">Оновити товар</button>
+    </form>
+</div>
+{% endblock %}

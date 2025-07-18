@@ -1,4 +1,3 @@
-<!-- templates/catalog.html -->
 {% extends "base.html" %}
 {% block title %}Каталог товарів{% endblock %}
 
@@ -11,66 +10,86 @@
     <div class="catalog-content">
         <!-- БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ -->
         <aside class="filters-sidebar">
+            <h3 class="filter-section-title">Фільтри</h3>
             <form id="filters-form" method="GET" action="{{ url_for('catalog') }}">
 
-                <!-- Категорії -->
+                <div class="filter-group">
+                    <input type="text" name="search" class="form-control" placeholder="Пошук за назвою..." value="{{ request.args.get('search', '') }}">
+                </div>
+
+                {% if categories %}
                 <div class="filter-group">
                     <h4 class="filter-title">Категорії</h4>
-                    <ul class="category-list">
-                         <li><a href="{{ url_for('catalog') }}" class="filter-link {{ 'active' if not request.args.get('category') else '' }}">Всі категорії</a></li>
-                        {% for cat in shop.categories %}
-                        <li><a href="{{ url_for('catalog', category=cat) }}" class="filter-link {{ 'active' if request.args.get('category') == cat else '' }}">{{ cat }}</a></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                <hr>
+                    <div class="category-filter-list">
 
-                <!-- Інші фільтри -->
-                <div class="filter-group">
-                    <label class="checkbox-item">
-                        <input type="checkbox" name="in_stock" value="true" {% if request.args.get('in_stock') %}checked{% endif %}>
-                        В наявності
-                    </label>
-                </div>
+                            <!-- Опція "Усі категорії" -->
+                            <label class="checkbox-item">
+                                <input type="radio" name="category" value=""
+                                       {% if not request.args.get('category') %}checked{% endif %}
+                                       onchange="this.form.submit()">
+                                <strong>Усі категорії</strong>
+                            </label>
+
+                            <!-- Цикл для виводу конкретних категорій -->
+                            {% for cat in categories %}
+                            <label class="checkbox-item">
+                                <input type="radio" name="category" value="{{ cat }}"
+                                       {% if request.args.get('category') == cat %}checked{% endif %}
+                                       onchange="this.form.submit()">
+                                {{ cat }}
+                            </label>
+                            {% endfor %}
+                        </div>
+
+                    </div>
+                    {% endif %}
 
                 <div class="filter-group">
                     <h4 class="filter-title">Ціна, ₴</h4>
                     <div class="price-inputs">
                         <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
-                        <span>-</span>
+                        <span>—</span>
                         <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
                     </div>
                 </div>
 
-                <!-- Виробники -->
+                {% if brands %}
                 <div class="filter-group">
-                    <h4 class="filter-toggle-btn">Виробник <i class="fas fa-chevron-down"></i></h4>
-                    <div class="brand-filter collapsible">
+                    <h4 class="filter-title">Виробник</h4>
+                    <div class="brand-filter-list">
                         {% for brand in brands %}
-                        <label class="checkbox-item">
+                        <label class="checkbox-item brand-item {{ 'hidden' if loop.index > 5 else '' }}">
                             <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in request.args.getlist('brand') %}checked{% endif %}>
                             {{ brand }}
                         </label>
                         {% endfor %}
                     </div>
+                    {% if brands|length > 5 %}
+                    <button type="button" id="show-more-brands-btn" class="btn-link">Показати більше</button>
+                    {% endif %}
                 </div>
+                {% endif %}
 
                 <div class="filter-group">
-                    <h4 class="filter-title">Відгуки покупців</h4>
+                    <h4 class="filter-title">Інші критерії</h4>
                     <label class="checkbox-item">
+                        <input type="checkbox" name="in_stock" value="true" {% if request.args.get('in_stock') %}checked{% endif %}>
+                        В наявності
+                    </label>
+                     <label class="checkbox-item">
                         <input type="checkbox" name="min_rating" value="4" {% if request.args.get('min_rating') %}checked{% endif %}>
-                        <span class="rating" style="color:#ffc107;">★★★★</span><span style="color:#ddd;">★</span> 4 і вище
+                        <span style="color:#ffc107;">★★★★</span><span style="color:#ddd;">★</span> і вище
                     </label>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block">Застосувати</button>
-                <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути</a>
+                <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути все</a>
             </form>
         </aside>
 
         <!-- Основний контент з товарами -->
         <div class="products-container">
-            <h1 class="page-title">Каталог товарів</h1>
+            <h1 class="page-title">{{ request.args.get('category', 'Каталог товарів') }}</h1>
             {% if products.items %}
                 <div class="products-grid">
                     {% for product in products.items %}
@@ -81,33 +100,16 @@
                 <!-- Пагінація -->
                 <div class="pagination">
                     <div class="pagination-controls">
-
-                        <!-- Створюємо копію параметрів запиту та видаляємо з неї ключ 'page' -->
-                        {% set query_params = request.args.to_dict() %}
-                        {% do query_params.pop('page', None) %}
-
-                        <!-- Посилання на попередню сторінку -->
-                        {% if products.has_prev %}
-                            <a href="{{ url_for('catalog', page=products.prev_num, **query_params) }}" class="page-link">«</a>
-                        {% endif %}
-
-                        <!-- Посилання на номери сторінок -->
+                        {% set query_params = request.args.to_dict() %}{% do query_params.pop('page', None) %}
+                        {% if products.has_prev %}<a href="{{ url_for('catalog', page=products.prev_num, **query_params) }}" class="page-link">«</a>{% endif %}
                         {% for page_num in products.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                            {% if page_num %}
-                                <a href="{{ url_for('catalog', page=page_num, **query_params) }}" class="page-link {{ 'active' if products.page == page_num else '' }}">{{ page_num }}</a>
-                            {% else %}
-                                <span class="page-dots">...</span>
-                            {% endif %}
+                            {% if page_num %}<a href="{{ url_for('catalog', page=page_num, **query_params) }}" class="page-link {{ 'active' if products.page == page_num else '' }}">{{ page_num }}</a>{% else %}<span class="page-dots">...</span>{% endif %}
                         {% endfor %}
-
-                        <!-- Посилання на наступну сторінку -->
-                        {% if products.has_next %}
-                            <a href="{{ url_for('catalog', page=products.next_num, **query_params) }}" class="page-link">»</a>
-                        {% endif %}
+                        {% if products.has_next %}<a href="{{ url_for('catalog', page=products.next_num, **query_params) }}" class="page-link">»</a>{% endif %}
                     </div>
                 </div>
             {% else %}
-                <div style="text-align: center; padding: 50px;">
+                <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
                     <h3>Товарів за вашими критеріями не знайдено.</h3>
                     <p>Спробуйте змінити або скинути фільтри.</p>
                 </div>

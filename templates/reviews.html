@@ -1,0 +1,84 @@
+<!-- templates/reviews.html (ОНОВЛЕНО) -->
+{% extends "base.html" %}
+{% block title %}Відгуки про {{ product.name }}{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div class="container">
+        <h1 class="page-title">Відгуки та питання</h1>
+        <div class="breadcrumbs">
+            <a href="{{ url_for('index') }}">Головна</a> /
+            <a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a> /
+            <span>Відгуки</span>
+        </div>
+    </div>
+</header>
+
+<div class="container reviews-page" style="padding-top: 40px; padding-bottom: 60px;">
+    {% include '_review_flash_messages.html' %}
+
+    <div class="reviews-page-grid">
+        <aside class="reviews-summary">
+            {% include '_review_summary_box.html' %}
+        </aside>
+
+        <main class="reviews-main">
+            <div class="tabs">
+                <a href="{{ url_for('product_reviews', product_id=product.id) }}" class="tab-link {% if active_tab == 'reviews' %}active{% endif %}">Відгуки ({{ review_only_count }})</a>
+                <a href="{{ url_for('product_questions', product_id=product.id) }}" class="tab-link {% if active_tab == 'questions' %}active{% endif %}">Питання ({{ questions|length }})</a>
+            </div>
+
+            <div class="reviews-list">
+                {% if reviews %}
+                    {% for review in reviews %}
+                    <div class="review-item" id="review-{{ review.id }}">
+                        <div class="review-header">
+                            <strong class="review-author">{{ review.author_name or (review.author and review.author.username) }}</strong>
+                            {% if review.rating > 0 %}
+                                <span class="rating" style="color: #ffc107;">{% for i in range(review.rating) %}★{% endfor %}<span style="color: #e0e0e0;">{% for i in range(5 - review.rating) %}★{% endfor %}</span></span>
+                            {% endif %}
+                            <small class="review-date">{{ review.timestamp.strftime('%d %B %Y') }}</small>
+                            <!-- [НОВЕ] Кнопка видалення для адміна -->
+                            {% if current_user.is_authenticated and current_user.is_admin %}
+                            <form class="delete-review-form" action="{{ url_for('delete_review', review_id=review.id) }}" method="POST" onsubmit="return confirm('Видалити цей запис?');">
+                                <button type="submit" class="btn-delete-review" title="Видалити"><i class="fas fa-trash-alt"></i></button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        <p class="review-text">{{ review.text }}</p>
+                        <button class="btn btn-sm btn-outline reply-btn" data-review-id="{{ review.id }}">Відповісти</button>
+
+                        <div class="replies-container">
+                             {% for reply in review.replies %}
+                            <div class="review-item reply {% if reply.author and reply.author.is_admin %}admin-reply{% endif %}">
+                                 <div class="review-header">
+                                    <strong class="review-author">{{ reply.author_name or (reply.author and reply.author.username) }}</strong>
+                                    {% if reply.author and reply.author.is_admin %}
+                                        <span class="owner-badge"><i class="fas fa-shield-alt"></i> Власник магазину</span>
+                                    {% endif %}
+                                    <small class="review-date">{{ reply.timestamp.strftime('%d %B %Y') }}</small>
+                                    <!-- [НОВЕ] Кнопка видалення для адміна (для відповідей) -->
+                                    {% if current_user.is_authenticated and current_user.is_admin %}
+                                    <form class="delete-review-form" action="{{ url_for('delete_review', review_id=reply.id) }}" method="POST" onsubmit="return confirm('Видалити цю відповідь?');">
+                                        <button type="submit" class="btn-delete-review" title="Видалити"><i class="fas fa-trash-alt"></i></button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                                <p class="review-text">{{ reply.text }}</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center" style="padding: 40px; background-color: var(--light-color); border-radius: var(--border-radius);">
+                        <p>Для цього товару ще немає відгуків. Будьте першим!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</div>
+
+{% include '_review_modals.html' %}
+{% endblock %}

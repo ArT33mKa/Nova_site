@@ -5,15 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ shop.name }} - {% block title %}{% endblock %}</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon">
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body {% if current_user.is_authenticated and current_user.is_admin %}class="is-admin"{% endif %}>
     {% include '_header.html' %}
 
     <main>
@@ -22,6 +22,11 @@
 
     {% include '_footer.html' %}
     {% include '_modals.html' %}
+
+    <!-- [НОВЕ] Додайте цей скрипт перед main.js -->
+    <script>
+        window.isAdmin = {{ current_user.is_authenticated and current_user.is_admin|tojson }};
+    </script>
 
     <!-- Підключаємо тільки один головний скрипт! -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

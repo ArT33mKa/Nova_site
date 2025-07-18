@@ -2,62 +2,143 @@
 {% block title %}Оформлення замовлення{% endblock %}
 
 {% block content %}
-<div class="container checkout-page">
-    <h1 class="page-title">Оформлення замовлення</h1>
-    <form action="{{ url_for('checkout') }}" method="POST" class="checkout-form">
-        <div class="customer-details">
-            <h4>Контактні дані</h4>
-            <div class="form-group">
-                <label for="customer_name">Ваше ім'я</label>
-                <input type="text" id="customer_name" name="customer_name" required>
-            </div>
-            <div class="form-group">
-                <label for="customer_phone">Номер телефону</label>
-                <input type="tel" id="customer_phone" name="customer_phone" required>
-            </div>
-            
-            <h4>Доставка</h4>
-            <div class="form-group">
-                <select name="delivery_method" required>
-                    <option value="nova_poshta">Нова Пошта (на відділення)</option>
-                    <option value="ukrposhta">Укрпошта</option>
-                    <option value="pickup">Самовивіз з магазину</option>
-                </select>
+<div class="checkout-page-v2">
+    <div class="container">
+        <h1 class="page-title" style="text-align: left; border: none; padding-bottom: 20px;">Оформлення замовлення</h1>
+        <form action="{{ url_for('checkout') }}" method="POST" class="checkout-grid-v2">
+            <!-- Ліва колонка з даними -->
+            <div>
+                <section class="checkout-section">
+                    <div class="checkout-section-header">
+                        <span class="icon">1</span><h4>Контактні дані</h4>
+                    </div>
+                    <div class="form-group">
+                        <label for="customer_name">Ваше повне ім'я</label>
+                        <input type="text" name="customer_name" id="customer_name" required value="{{ current_user.username if current_user.is_authenticated else '' }}" placeholder="Іванов Іван Іванович">
+                    </div>
+                    <div class="form-group">
+                        <label for="customer_phone">Номер телефону</label>
+                        <input type="tel" name="customer_phone" id="customer_phone" required placeholder="+380 XX XXX XX XX">
+                    </div>
+                </section>
+
+                <section class="checkout-section">
+                    <div class="checkout-section-header">
+                        <span class="icon">2</span><h4>Доставка</h4>
+                    </div>
+                    <div class="radio-group">
+                        <label class="radio-option active">
+                            <input type="radio" name="delivery_method" value="Самовивіз" checked>
+                            <div>
+                                <strong>Самовивіз з магазину</strong>
+                                <p>Безкоштовно за адресою: {{ shop.city }}, {{ shop.address }}</p>
+                            </div>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="delivery_method" value="Нова Пошта">
+                             <div>
+                                <strong>Нова Пошта</strong>
+                                <p>За тарифами перевізника. Менеджер уточнить деталі.</p>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="checkout-section">
+                    <div class="checkout-section-header">
+                        <span class="icon">3</span><h4>Оплата</h4>
+                    </div>
+                    <div class="radio-group">
+                        <label class="radio-option active">
+                            <input type="radio" name="payment_method" value="Післяплата" checked>
+                            <div>
+                                <strong>Післяплата (при отриманні)</strong>
+                                <p>Оплата готівкою або карткою у відділенні "Нової Пошти".</p>
+                            </div>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="payment_method" value="Оплата на рахунок">
+                             <div>
+                                <strong>Оплата на рахунок</strong>
+                                <p>Реквізити для оплати будуть надіслані після підтвердження замовлення.</p>
+                            </div>
+                        </label>
+                    </div>
+                </section>
             </div>
 
-            <h4>Оплата</h4>
-            <div class="form-group">
-                <select name="payment_method" required>
-                    <option value="cod">Післяплата (при отриманні)</option>
-                    <option value="bank_transfer">Оплата на рахунок</option>
-                </select>
-            </div>
-        </div>
-        <div class="order-summary">
-            <h4>Ваше замовлення</h4>
-            <div id="checkout-cart-summary">
-                <!-- Сюди JS завантажить товари з кошика -->
-            </div>
-            <button type="submit" class="btn btn-primary btn-block btn-lg">Підтвердити замовлення</button>
-        </div>
-    </form>
+            <!-- Права колонка з підсумком замовлення -->
+            <aside class="order-summary-v2">
+                <section class="checkout-section">
+                    <h4>Ваше замовлення</h4>
+                    <div id="summary-item-list">
+                        <!-- Сюди завантажуються товари через JS -->
+                    </div>
+                    <div class="summary-totals">
+                        <div class="summary-total-row">
+                            <span>Вартість товарів:</span>
+                            <span id="summary-subtotal">...</span>
+                        </div>
+                        <div class="summary-total-row">
+                            <span>Доставка:</span>
+                            <span>За тарифами</span>
+                        </div>
+                        <div class="summary-total-row grand-total">
+                            <span>Разом до сплати:</span>
+                            <span id="summary-grand-total">...</span>
+                        </div>
+                    </div>
+                     <button type="submit" class="btn btn-primary btn-block btn-lg">Підтвердити замовлення</button>
+                </section>
+            </aside>
+        </form>
+    </div>
 </div>
 {% endblock %}
 
-
 {% block extra_js %}
 <script>
-    // JS для завантаження кошика на сторінці оформлення
-    document.addEventListener('DOMContentLoaded', function() {
-        fetch('/get_cart').then(res => res.json()).then(data => {
-            const container = document.getElementById('checkout-cart-summary');
-            let html = '<ul>';
-            data.items.forEach(item => {
-                html += `<li><span>${item.name} x ${item.quantity}</span> <span>${(item.price * item.quantity).toFixed(2)} грн</span></li>`;
-            });
-            html += `</ul><hr><div class="total"><strong>Всього:</strong> <strong>${data.total.toFixed(2)} грн</strong></div>`;
-            container.innerHTML = html;
+document.addEventListener('DOMContentLoaded', function() {
+    // Логіка для вибору опцій доставки/оплати
+    document.querySelectorAll('.radio-group').forEach(group => {
+        group.addEventListener('click', e => {
+            const label = e.target.closest('.radio-option');
+            if (!label) return;
+            // Знімаємо клас active з усіх опцій в групі
+            group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
+            // Додаємо клас active до обраної
+            label.classList.add('active');
+            // Переконуємось, що радіокнопка всередині обрана
+            label.querySelector('input').checked = true;
         });
     });
+
+    // Завантаження даних кошика для підсумку замовлення
+    fetch('/get_cart')
+        .then(res => res.json())
+        .then(data => {
+            const listContainer = document.getElementById('summary-item-list');
+            const subtotalEl = document.getElementById('summary-subtotal');
+            const grandTotalEl = document.getElementById('summary-grand-total');
+
+            listContainer.innerHTML = ''; // Очищаємо контейнер
+            if (data.items.length > 0) {
+                data.items.forEach(item => {
+                    const itemHtml = `
+                        <div class="summary-item">
+                            <img src="/static/img/products/${item.image}" alt="${item.name}">
+                            <div class="summary-item-details">
+                                <div class="name">${item.name}</div>
+                                <div class="price">${item.quantity} x ${item.price.toFixed(2)} ₴</div>
+                            </div>
+                        </div>
+                    `;
+                    listContainer.insertAdjacentHTML('beforeend', itemHtml);
+                });
+            }
+            subtotalEl.textContent = `${data.total.toFixed(2)} ₴`;
+            grandTotalEl.textContent = `${data.total.toFixed(2)} ₴`;
+        });
+});
 </script>
 {% endblock %}

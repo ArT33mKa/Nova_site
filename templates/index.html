@@ -1,109 +1,123 @@
+<!-- templates/index.html -->
 {% extends "base.html" %}
-
 {% block title %}Інтернет магазин сантехніки{% endblock %}
 
 {% block content %}
-    <!-- Hero Section -->
-    <section class="hero" style="background-image: url('{{ url_for('static', filename='img/hero-bg.jpg') }}');">
-        <div class="container">
-            <div class="hero-content">
-                <h2>Професійна сантехніка та обладнання</h2>
-                <p>Якісні товари для вашого дому з гарантією та доставкою</p>
-                <a href="{{ url_for('catalog') }}" class="btn btn-primary">Перейти до каталогу</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Categories Section -->
-    <section class="categories-section">
-        <div class="container">
-            <h2 class="section-title">Категорії товарів</h2>
-            <div class="categories-grid">
-                {% for category in shop.categories %}
-                <div class="category-card">
-                    <div class="category-icon">
-                        <i class="fas fa-{{ 'fire' if category == 'Котли' else 'tint' if category == 'Бойлера' else 'cog' if category == 'Насоси' else 'shower' if category == 'Сантехніка' else 'random' if category == 'Змішувачі' else 'gas-pump' if category == 'Газове обладнання' else 'cogs' }}"></i>
-                    </div>
-                    <h3>{{ category }}</h3>
-                    <a href="{{ url_for('catalog', category=category) }}" class="btn btn-outline btn-sm">Переглянути</a>
+<section class="hero-slider">
+    <div class="slides-container">
+        {% for slide in hero_slides %}
+        <div class="hero-slide {{ 'active' if loop.first else '' }}" style="background-image: url('{{ url_for('static', filename='img/' + slide.image) }}');">
+            <div class="container">
+                <div class="hero-content">
+                    <h2>{{ slide.title }}</h2>
+                    <p>{{ slide.subtitle }}</p>
+                    <a href="{{ url_for('catalog') }}" class="btn btn-primary btn-lg">Перейти до каталогу</a>
                 </div>
-                {% endfor %}
             </div>
         </div>
-    </section>
+        {% endfor %}
+    </div>
+    <div class="slider-nav">
+        <button class="prev-btn">‹</button>
+        <button class="next-btn">›</button>
+    </div>
+    <div class="slider-dots"></div>
+</section>
 
-    <!-- Featured Products -->
-    <section class="featured-products container">
-        <h2 class="section-title">Популярні товари</h2>
-        <div class="products-grid">
-            {% for product in products[:4] %}
-                {% include '_product_card.html' %}
+<!-- Categories Section -->
+<section class="categories-section" style="padding: 80px 0;">
+    <div class="container">
+        <h2 class="section-title">Категорії товарів</h2>
+        <!-- [ВИПРАВЛЕНО] Повертаємось до простого вигляду карток -->
+        <div class="products-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+            {% for category in shop.categories %}
+            <a href="{{ url_for('catalog', category=category.name) }}" class="category-card">
+                <!-- Тепер тут зображення замість іконки-шрифта -->
+                <div class="category-icon-wrapper">
+                    <img src="{{ url_for('static', filename='img/' + category.icon) }}" alt="{{ category.name }}">
+                </div>
+                <h3>{{ category.name }}</h3>
+            </a>
             {% endfor %}
         </div>
-        <div class="text-center" style="margin-top: 40px;">
-            <a href="{{ url_for('catalog') }}" class="btn btn-outline">Дивитись всі товари</a>
-        </div>
-    </section>
+    </div>
+</section>
 
-    <!-- About Section -->
-    <section id="about" class="about-section">
-        <div class="container">
-            <div class="about-content">
-                <div class="about-text">
-                    <h2 class="section-title" style="text-align: left;">Про компанію {{ shop.name }}</h2>
-                    <p>Ми - магазин сантехніки та обладнання, який працює на ринку понад 2-3 років. Наша мета - забезпечити клієнтів якісними товарами за доступними цінами.</p>
-                    <ul class="advantages-list" style="list-style: none; padding-left: 0;">
-                        <li style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fas fa-check" style="color: var(--success-color);"></i> Оригінальна продукція від виробників</li>
-                        <li style="display: flex; align-items: center; gap: 10px;"><i class="fas fa-check" style="color: var(--success-color);"></i> Швидка доставка по всій Україні</li>
-                    </ul>
-                </div>
-                <div class="about-image">
-                    <img src="{{ url_for('static', filename='img/shop.jpg') }}" alt="Про магазин" style="border-radius: var(--border-radius);">
-                </div>
+<!-- Featured Products -->
+<section class="featured-products container" style="padding-bottom: 80px;">
+    <h2 class="section-title">Популярні товари</h2>
+    <div class="products-grid">
+        {% for product in products[:4] %}
+            {% include '_product_card.html' %}
+        {% endfor %}
+    </div>
+    <div class="text-center" style="margin-top: 40px;">
+        <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-lg">Дивитись всі товари</a>
+    </div>
+</section>
+
+<!-- About Section -->
+<section id="about" class="about-section">
+    <div class="container">
+        <div class="about-content">
+            <div class="about-text">
+                <h2 class="section-title" style="text-align: left;">Про компанію {{ shop.name }}</h2>
+                <p>Ми - магазин сантехніки та обладнання, який працює на ринку понад 2-3 років. Наша мета - забезпечити клієнтів якісними товарами за доступними цінами.</p>
+                <ul class="advantages-list" style="list-style: none; padding-left: 0;">
+                    <li style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fas fa-check" style="color: var(--success-color);"></i> Оригінальна продукція від виробників</li>
+                    <li style="display: flex; align-items: center; gap: 10px;"><i class="fas fa-check" style="color: var(--success-color);"></i> Швидка доставка по всій Україні</li>
+                </ul>
+            </div>
+            <div class="about-image">
+                <img src="{{ url_for('static', filename='img/shop.jpg') }}" alt="Про магазин" style="border-radius: var(--border-radius);">
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- Contacts Section -->
-    <section id="contacts" class="contacts-section container">
-        <h2 class="section-title">Контакти</h2>
-        <div class="contacts-grid">
-            <div class="contact-info">
-                <h3><i class="fas fa-map-marker-alt"></i> Наша адреса</h3>
+<!-- Contacts Section -->
+<section id="contacts" class="contacts-section container">
+    <h2 class="section-title">Контакти</h2>
+    <div class="contacts-grid">
+        <div class="contact-info">
+            <h3><i class="fas fa-map-marker-alt"></i> Наша адреса</h3>
+            <!-- [ОНОВЛЕНО] Додано посилання на Google Maps -->
+            <a href="https://www.google.com/maps/search/?api=1&query={{ shop.city }}, {{ shop.address }}" target="_blank" rel="noopener noreferrer">
                 <p>{{ shop.city }}, {{ shop.address }}</p>
+            </a>
 
-                <h3 style="margin-top: 20px;"><i class="fas fa-phone"></i> Телефони</h3>
-                <ul class="phones-list" style="list-style: none; padding-left: 0;">
-                    {% for phone in shop.phone %}
-                        <li><a href="tel:{{ phone }}">{{ phone }}</a></li>
-                    {% endfor %}
-                </ul>
+            <h3 style="margin-top: 20px;"><i class="fas fa-phone"></i> Телефони</h3>
+            <ul class="phones-list" style="list-style: none; padding-left: 0;">
+                {% for phone in shop.phone %}
+                    <li><a href="tel:{{ phone }}">{{ phone }}</a></li>
+                {% endfor %}
+            </ul>
 
-                <h3 style="margin-top: 20px;"><i class="fas fa-envelope"></i> Email</h3>
-                <p><a href="mailto:{{ shop.email }}">{{ shop.email }}</a></p>
+            <h3 style="margin-top: 20px;"><i class="fas fa-envelope"></i> Email</h3>
+            <p><a href="mailto:{{ shop.email }}">{{ shop.email }}</a></p>
 
-                <h3 style="margin-top: 20px;"><i class="fas fa-clock"></i> Графік роботи</h3>
-                <ul class="work-hours" style="list-style: none; padding-left: 0;">
-                    {% for day, hours in shop.hours.items() %}
-                        <li><span>{{ day }}</span> {{ hours }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            <div class="contact-form">
-                <h3>Написати нам</h3>
-                <form id="contactForm">
-                    <div class="form-group">
-                        <input type="text" name="name" placeholder="Ваше ім'я" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="email" name="email" placeholder="Email" required>
-                    </div>
-                    <div class="form-group">
-                        <textarea name="message" placeholder="Ваше повідомлення" required></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Надіслати</button>
-                </form>
-            </div>
+            <h3 style="margin-top: 20px;"><i class="fas fa-clock"></i> Графік роботи</h3>
+            <ul class="work-hours" style="list-style: none; padding-left: 0;">
+                {% for day, hours in shop.hours.items() %}
+                    <li><span>{{ day }}</span> {{ hours }}</li>
+                {% endfor %}
+            </ul>
         </div>
-    </section>
+        <div class="contact-form">
+            <h3>Написати нам</h3>
+            <form id="contactForm">
+                <div class="form-group">
+                    <input type="text" name="name" placeholder="Ваше ім'я" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" name="email" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <textarea name="message" placeholder="Ваше повідомлення" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Надіслати</button>
+            </form>
+        </div>
+    </div>
+</section>
 {% endblock %}

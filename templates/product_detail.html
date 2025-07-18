@@ -1,102 +1,106 @@
-<!-- templates/product_detail.html -->
-
 {% extends "base.html" %}
 {% block title %}{{ product.name }}{% endblock %}
 
 {% block content %}
-<div class="container product-detail-page">
-    <div class="breadcrumbs" style="margin-bottom: 20px;">
-        <a href="{{ url_for('index') }}">Головна</a> /
-        <a href="{{ url_for('catalog') }}">Каталог</a> /
-        <span>{{ product.name }}</span>
+<header class="page-header">
+    <div class="container">
+        <div class="breadcrumbs">
+            <a href="{{ url_for('index') }}">Головна</a> /
+            <a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a> /
+            <span>{{ product.name }}</span>
+        </div>
     </div>
+</header>
 
-    <!-- ОСНОВНИЙ БЛОК ТОВАРУ -->
-    <!-- Ми додали data-id сюди, щоб JS міг знайти ID товару -->
-    <div class="product-detail-content" data-id="{{ product.id }}">
-        <!-- Ліва колонка: Зображення товару -->
-        <div class="product-image-container">
+<div class="container" style="padding-top: 40px; padding-bottom: 60px;">
+    <!-- Головний grid-контейнер сторінки -->
+    <div class="product-detail-grid" data-id="{{ product.id }}">
+
+        <!-- Ліва колонка з зображенням товару -->
+        <div class="product-image-main">
             <img src="{{ url_for('static', filename='img/products/' + product.image) }}" alt="{{ product.name }}">
         </div>
 
-        <!-- Права колонка: Інформація та купівля -->
-        <div class="product-info-container">
+        <!-- Права колонка з інформацією про товар -->
+        <div class="product-info-main">
             <h1 class="product-title">{{ product.name }}</h1>
 
-            <p class="product-category">Категорія: <a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a></p>
+            <!-- Посилання на відгуки з рейтингом -->
+            <a href="{{ url_for('product_reviews', product_id=product.id) }}" class="reviews-summary-link">
+                <span class="rating">
+                    {% set r = product.rating|round|int %}
+                    {% for i in range(r) %}★{% endfor %}{% for i in range(5 - r) %}<span>★</span>{% endfor %}
+                </span>
+                <span class="reviews-count-text">{{ product.reviews.count() }} відгуків/питань</span>
+            </a>
 
-            <div class="product-price-detail">{{ "%.2f"|format(product.price) }} грн</div>
+            <!-- Ціна товару -->
+            <div class="product-price-detail">{{ "%.2f"|format(product.price) }} ₴</div>
 
-            {% if product.in_stock %}
-                <p class="product-stock-status in-stock"><i class="fas fa-check-circle"></i> Є в наявності</p>
-            {% else %}
-                <p class="product-stock-status out-of-stock"><i class="fas fa-times-circle"></i> Немає в наявності</p>
-            {% endif %}
+            <!-- Мета-дані: наявність, бренд, категорія -->
+            <div class="product-meta">
+                <dl>
+                    <div class="meta-item">
+                        <dt>Наявність:</dt>
+                        <dd>
+                            {% if product.in_stock %}
+                                <span class="stock-status in-stock" style="position: static; color: var(--success-color); background: none; font-size: 1rem; padding: 0;">
+                                    <i class="fas fa-check-circle"></i> Є в наявності
+                                </span>
+                            {% else %}
+                                <span class="stock-status out-of-stock" style="position: static; color: var(--danger-color); background: none; font-size: 1rem; padding: 0;">
+                                    <i class="fas fa-times-circle"></i> Немає в наявності
+                                </span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="meta-item">
+                        <dt>Бренд:</dt>
+                        <dd>{{ product.brand }}</dd>
+                    </div>
+                     <div class="meta-item">
+                        <dt>Категорія:</dt>
+                        <dd><a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a></dd>
+                    </div>
+                </dl>
+            </div>
 
-            <!-- ОНОВЛЕНИЙ БЛОК З КНОПКАМИ -->
+            <!-- Кнопки "В кошик" та "Купити зараз" -->
             <div class="product-actions">
-                <button class="btn btn-primary btn-lg add-to-cart" {% if not product.in_stock %}disabled{% endif %}>
-                    <i class="fas fa-shopping-cart"></i>
-                    В кошик
+                <button class="btn btn-primary btn-lg add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
+                    <i class="fas fa-shopping-cart"></i> В кошик
                 </button>
-                <button class="btn btn-lg buy-now-btn" {% if not product.in_stock %}disabled{% endif %}>
-                    Оформити замовлення
+                <button class="btn btn-lg buy-now-btn" data-id="{{ product.id }}" style="background-color: var(--accent-color); color: white;" {% if not product.in_stock %}disabled{% endif %}>
+                    Купити зараз
                 </button>
             </div>
 
-            <div class="product-description">
+            <!-- Опис товару з функцією розгортання -->
+            <div class="product-description" style="margin-top: 40px;">
                 <h3>Опис товару</h3>
-                <p>{{ product.description }}</p>
+                <div id="description-wrapper" class="description-text-wrapper">
+                    {{ product.description | safe }}
+                </div>
+                <button id="toggle-description-btn" class="btn-link" style="display: none; margin-top: 10px;">Читати далі</button>
             </div>
         </div>
     </div>
 
-    <!-- СЕКЦІЯ З ВІДГУКАМИ (тепер вона окремо, нижче) -->
-    <div class="reviews-section">
-        <h3>Відгуки ({{ product.reviews.count() }})</h3>
-
-        <!-- Форма для нового відгуку (тільки для залогінених) -->
-        {% if current_user.is_authenticated %}
-        <div class="review-form-container">
-            <h4>Залишити свій відгук</h4>
-            <!-- Виправлено помилку в шляху до add_review -->
-            <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
-                <div class="form-group rating-input">
-                    <span>Ваша оцінка:</span>
-                    <div class="stars">
-                        <input type="radio" id="star5" name="rating" value="5" required><label for="star5">★</label>
-                        <input type="radio" id="star4" name="rating" value="4"><label for="star4">★</label>
-                        <input type="radio" id="star3" name="rating" value="3"><label for="star3">★</label>
-                        <input type="radio" id="star2" name="rating" value="2"><label for="star2">★</label>
-                        <input type="radio" id="star1" name="rating" value="1"><label for="star1">★</label>
-                    </div>
+    <!-- Секція "Схожі товари" з каруселлю -->
+    <div class="similar-products-section" style="margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--light-gray);">
+        <h2 class="section-title" style="text-align: left; padding-bottom: 20px;">Схожі товари</h2>
+        <div class="carousel-container">
+            <div class="products-carousel">
+                <div class="products-grid-carousel">
+                    {% for p in similar_products %}
+                        {% with product=p %}{% include '_product_card.html' %}{% endwith %}
+                    {% else %}
+                        <p>Схожих товарів не знайдено.</p>
+                    {% endfor %}
                 </div>
-                <div class="form-group">
-                    <textarea name="text" placeholder="Напишіть декілька слів про товар..." class="form-control"></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">Відправити відгук</button>
-            </form>
-        </div>
-        {% else %}
-        <p>Будь ласка, <a href="#" id="open-auth-modal" class="login-to-review-link">увійдіть</a>, щоб залишити відгук.</p>
-        {% endif %}
-
-        <!-- Список існуючих відгуків -->
-        <div class="reviews-list">
-            {% if reviews %}
-                {% for review in reviews %}
-                <div class="review-item">
-                    <div class="review-header">
-                        <strong>{{ review.author.username }}</strong>
-                        <span class="rating">{% for i in range(review.rating) %}★{% endfor %}{% for i in range(5-review.rating) %}<span style="color:#ddd;">★</span>{% endfor %}</span>
-                    </div>
-                    <p class="review-text">{{ review.text }}</p>
-                    <small class="review-date">{{ review.timestamp.strftime('%d.%m.%Y') }}</small>
-                </div>
-                {% endfor %}
-            {% else %}
-                <p>Для цього товару ще немає відгуків. Будьте першим!</p>
-            {% endif %}
+            </div>
+            <button class="carousel-btn carousel-prev-btn">‹</button>
+            <button class="carousel-btn carousel-next-btn">›</button>
         </div>
     </div>
 </div>
