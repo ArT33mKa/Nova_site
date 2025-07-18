@@ -2,7 +2,7 @@
 import xml.etree.ElementTree as ET
 import os
 import shutil
-from app import app, db, Product
+
 
 # --- НАЛАШТУВАННЯ ШЛЯХІВ ---
 # [ЗМІНЕНО] Вказуємо шляхи до локальних файлів, а не URL
@@ -59,6 +59,7 @@ def copy_local_image(image_filename):
 
 def import_from_bas():
     """Головна функція для імпорту товарів з локального CML-файлу."""
+    from app import app, db, Product
     try:
         # Перевіряємо, чи існує файл для імпорту
         if not os.path.exists(CML_FILE_PATH):
