@@ -611,59 +611,90 @@ def delete_product(product_id):
 def cml_exchange():
     """
     Обробник для запитів від модуля обміну BAS/1C.
+    Версія, оптимізована для обробки multipart/form-data.
     """
     mode = request.args.get('mode')
+    key_from_bas = request.args.get('key')
+
+    print(f"\n--- Новий запит від BAS ---")
+    print(f"IP: {request.remote_addr}, Метод: {request.method}")
+    print(f"Параметри: mode={mode}, key={key_from_bas}")
 
     # --- Перевірка безпеки ---
     secret_key_from_env = os.getenv('BAS_SECRET_KEY')
-    key_from_bas = request.args.get('key')
+    if not secret_key_from_env:
+        error_msg = "ПОМИЛКА СЕРВЕРА: BAS_SECRET_KEY не налаштовано в .env!"
+        print(f"!!! {error_msg}")
+        return f"failure\n{error_msg}", 500
 
-    if not secret_key_from_env or secret_key_from_env != key_from_bas:
-        print(f"!!! Спроба несанкціонованого доступу до /api/1c_exchange. IP: {request.remote_addr}")
-        return 'failure\nНевірний ключ авторизації.', 401
+    if secret_key_from_env != key_from_bas:
+        print(f"!!! НЕВІРНИЙ КЛЮЧ АВТОРИЗАЦІЇ. Очікувався '{secret_key_from_env}', отримано '{key_from_bas}'.")
+        return 'failure\nInvalid authorization key.', 401
 
     try:
         if mode == 'checkauth':
-            print(">>> BAS: Отримано запит на перевірку авторизації (checkauth)...")
-            return 'success\nPHPSESSID\n12345'
+            print(">>> BAS [checkauth]: Перевірка авторизації...")
+            response = 'success\nPHPSESSID\n123456789'
+            print(f"   -> Відповідь: success")
+            return response
 
-        if mode == 'init':
-            print(">>> BAS: Отримано запит на ініціалізацію обміну (init)...")
+        elif mode == 'init':
+            print(">>> BAS [init]: Ініціалізація обміну...")
             os.makedirs('import_data', exist_ok=True)
             os.makedirs(os.path.join('import_data', 'img'), exist_ok=True)
-            return f"zip=no\nfile_limit=104857600"
+            response = "zip=no\nfile_limit=104857600"
+            print(f"   -> Відповідь: {response.replace(chr(10), ' ')}")
+            return response
 
-        if mode == 'import':
+        elif mode == 'file':
             filename = request.args.get('filename')
-            print(f">>> BAS: Отримано запит на імпорт файлу: {filename}")
+            print(f">>> BAS [file]: Отримання файлу: {filename}")
 
-            uploaded_file = request.files.get('file')
-            if not uploaded_file:
-                print("!!! ПОМИЛКА: Файл не знайдено в request.files['file'] !!!")
-                return 'failure\nServer error: file not found in request.', 500
-
-            # Зберігаємо файл з фіксованим іменем 'tovar.cml'
-            save_path = os.path.join('import_data', 'tovar.cml')
-            uploaded_file.save(save_path)
-
-            print(f"+++ Файл '{filename}' успішно збережено як 'tovar.cml' +++")
-
-            # Якщо BAS надсилає картинки, вони також будуть у request.files.
-            # Зберігаємо їх в папку import_data/img
+            # BAS надсилає файли в полі 'file' або інших полях, що починаються з 'file'
+            uploaded_file = None
             for field_name, file in request.files.items():
-                if field_name.startswith('file'):  # BAS може надсилати file, file1, file2 і т.д.
-                    if uploaded_file.filename != file.filename:  # Пропускаємо сам cml-файл
-                        image_save_path = os.path.join('import_data', 'img', file.filename)
-                        file.save(image_save_path)
-                        print(f"+++ Збережено картинку: {file.filename} +++")
+                if file and file.filename:
+                    uploaded_file = file
+                    print(f"   -> Знайдено файл у полі '{field_name}': '{file.filename}'")
+                    break
 
+            if not uploaded_file:
+                error_msg = "ПОМИЛКА: BAS надіслав запит на збереження файлу, але файл не знайдено в request.files!"
+                print(f"!!! {error_msg}")
+                return f'failure\n{error_msg}', 400
+
+            # Визначаємо, куди зберігати файл
+            if filename.lower().endswith(('.xml', '.cml')):
+                save_path = os.path.join('import_data', 'tovar.cml')
+                print(f"   -> Це CML-файл. Зберігаємо як 'tovar.cml'.")
+            else:
+                save_path = os.path.join('import_data', 'img', os.path.basename(filename))
+                print(f"   -> Це зображення. Зберігаємо в 'import_data/img/'.")
+
+            uploaded_file.save(save_path)
+            print(f"   +++ Файл '{filename}' успішно збережено.")
             return 'success'
 
-        # Якщо прийшов якийсь інший режим, наприклад 'file', просто відповідаємо успіхом
-        return 'success'
+        elif mode == 'import':
+            print(">>> BAS [import]: Отримано фінальний запит. ЗАПУСК ІМПОРТУ...")
+
+            result = import_from_bas()
+
+            if result.get('status') == 'success':
+                print("   +++ ІМПОРТ ЗАВЕРШЕНО УСПІШНО.")
+                return 'success'
+            else:
+                error_message = result.get('message', 'Невідома помилка імпорту')
+                print(f"   --- ПОМИЛКА ПІД ЧАС ІМПОРТУ: {error_message}")
+                return f"failure\n{error_message}"
+
+        else:
+            print(f"??? BAS: Отримано невідомий режим '{mode}'. Ігноруємо.")
+            return 'success'
 
     except Exception as e:
-        print("\n\nCRITICAL ERROR in cml_exchange: " + str(e))
+        error_msg = f"КРИТИЧНА ПОМИЛКА в cml_exchange: {e}"
+        print(f"\n\n❌❌❌ {error_msg} ❌❌❌\n\n")
         import traceback
         traceback.print_exc()
         return f"failure\nServer Error: {e}", 500
