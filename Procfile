@@ -1,1 +1,1 @@
-web: python test_receiver_render.py
+web: gunicorn app:app

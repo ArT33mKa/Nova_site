@@ -615,11 +615,13 @@ def cml_exchange():
     """
     mode = request.args.get('mode')
     exchange_type = request.args.get('type')
-    secret_key = os.getenv('BAS_SECRET_KEY')
-    auth = request.authorization
 
-    # --- Перевірка безпеки ---
-    if not secret_key or not auth or auth.username != secret_key:
+    # --- Перевірка безпеки (НОВИЙ СПОСІБ) ---
+    # BAS передає ключ як GET-параметр 'key'
+    secret_key_from_env = os.getenv('BAS_SECRET_KEY')
+    key_from_bas = request.args.get('key')
+
+    if not secret_key_from_env or secret_key_from_env != key_from_bas:
         print(f"!!! Спроба несанкціонованого доступу до /api/1c_exchange. IP: {request.remote_addr}")
         return 'failure\nНевірний ключ авторизації.', 401
 
@@ -631,41 +633,43 @@ def cml_exchange():
     # --- Крок 2: Ініціалізація обміну (init) ---
     if mode == 'init' and exchange_type == 'catalog':
         print(">>> BAS: Отримано запит на ініціалізацію обміну (init)...")
+        # Створюємо папку для даних, якщо її немає
+        os.makedirs('import_data', exist_ok=True)
+        os.makedirs(os.path.join('import_data', 'img'), exist_ok=True)  # Папка для картинок
         return f"zip=no\nfile_limit=104857600"
 
     # --- Крок 3: Завантаження файлу (file) ---
+    # Цей режим у вашому випадку не використовується, BAS одразу робить 'import'
+    # Але залишаємо його про всяк випадок
     if mode == 'file' and exchange_type == 'catalog':
-        filename = request.args.get('filename')
-        print(f">>> BAS: Отримано запит на завантаження файлу: {filename}")
+        return 'success'  # Просто кажемо, що все добре
 
-        # Створюємо папку для даних, якщо її немає
-        import_dir = 'import_data'
-        os.makedirs(import_dir, exist_ok=True)
-
-        # Якщо це папка з картинками, створюємо її
-        if filename.endswith('/'):
-            os.makedirs(os.path.join(import_dir, filename), exist_ok=True)
-            print(f">>> Створено директорію: {filename}")
-            return 'success'
-
-        # Якщо це файл (CML або зображення)
-        file_path = os.path.join(import_dir, filename)
-        try:
-            with open(file_path, 'wb') as f:
-                f.write(request.data)
-            print(f">>> Файл {filename} успішно збережено на сервері.")
-            return 'success'
-        except Exception as e:
-            print(f"❌ Помилка під час збереження файлу від BAS: {e}")
-            return f'failure\nПомилка на сервері: {e}'
-
-    # --- Крок 4: Повідомлення про завершення завантаження (import) ---
-    # Ми не запускаємо імпорт тут, а просто повідомляємо BAS, що все добре.
-    # Імпорт буде запущено вручну через скрипт init_db.py
+    # --- Крок 4: Імпорт файлу (import) ---
     if mode == 'import' and exchange_type == 'catalog':
         filename = request.args.get('filename')
-        print(f">>> BAS: Завершено завантаження файлу {filename}. Імпорт буде запущено окремо.")
-        return 'success'
+        print(f">>> BAS: Отримано запит на імпорт файлу: {filename}")
+
+        # --- ОТРИМУЄМО ФАЙЛ (НОВИЙ СПОСІБ) ---
+        uploaded_file = request.files.get('file')
+
+        if not uploaded_file:
+            print(f"❌ Помилка: BAS надіслав запит на імпорт, але не передав файл у полі 'file'.")
+            return 'failure\nФайл не було отримано сервером.'
+
+        # Зберігаємо файл. BAS надсилає тимчасове ім'я, ми збережемо його як tovar.cml
+        file_path = os.path.join('import_data', 'tovar.cml')
+        try:
+            uploaded_file.save(file_path)
+            print(f">>> Файл '{filename}' успішно збережено як 'tovar.cml'.")
+
+            # ВАЖЛИВО: Ми більше не запускаємо імпорт тут.
+            # Ми просто кажемо BAS, що успішно прийняли файл.
+            # Імпорт буде запущено вручну або за розкладом.
+            return 'success'
+
+        except Exception as e:
+            print(f"❌ КРИТИЧНА ПОМИЛКА під час збереження файлу від BAS: {e}")
+            return f'failure\nПомилка на сервері під час збереження файлу: {e}'
 
     return 'failure\nНевідомий режим або тип обміну.'
 
