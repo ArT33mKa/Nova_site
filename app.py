@@ -13,6 +13,9 @@ from sqlalchemy import func
 from collections import Counter
 import locale # [НОВЕ] Імпорт для локалізації дати
 
+from flask import request, jsonify
+from import_products import import_from_bas
+
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
 from flask_dance.consumer.storage.sqla import SQLAlchemyStorage
@@ -620,6 +623,71 @@ def send_message():
 @app.route("/favorites")
 def favorites_page(): return render_template("favorites.html")
 
+
+@app.route('/api/1c_exchange', methods=['GET', 'POST'])
+def cml_exchange():
+    """
+    Обробник для запитів від модуля обміну BAS/1C.
+    Працює за протоколом CommerceML.
+    """
+    mode = request.args.get('mode')
+    exchange_type = request.args.get('type')
+
+    # Отримуємо секретний ключ з .env файлу
+    secret_key = os.getenv('BAS_SECRET_KEY')
+    # BAS передає ключ в заголовках авторизації (Basic Auth)
+    auth = request.authorization
+
+    # --- Перевірка безпеки ---
+    # Якщо ключ не налаштовано або не передано - відмовляємо
+    if not secret_key or not auth or auth.username != secret_key:
+        print(f"!!! Спроба несанкціонованого доступу до /api/1c_exchange. IP: {request.remote_addr}")
+        return 'failure\nНевірний ключ авторизації.', 401
+
+    # --- Крок 1: Перевірка з'єднання (checkauth) ---
+    if mode == 'checkauth' and exchange_type == 'catalog':
+        # BAS перевіряє, чи доступний скрипт і чи правильний ключ
+        print(">>> BAS: Отримано запит на перевірку авторизації (checkauth)...")
+        # Відповідаємо успіхом та передаємо назву cookie (можна вигадану)
+        return 'success\nPHPSESSID\n12345'
+
+    # --- Крок 2: Ініціалізація обміну (init) ---
+    if mode == 'init' and exchange_type == 'catalog':
+        # BAS повідомляє про початок завантаження файлів
+        print(">>> BAS: Отримано запит на ініціалізацію обміну (init)...")
+        # Повертаємо налаштування для завантаження файлів
+        return f"zip=no\nfile_limit=104857600"  # zip=no, ліміт файлу 100МБ
+
+    # --- Крок 3: Завантаження файлу (file) ---
+    if mode == 'import' and exchange_type == 'catalog':
+        filename = request.args.get('filename')
+        print(f">>> BAS: Отримано запит на завантаження файлу: {filename}")
+
+        # Створюємо папку для даних, якщо її немає
+        os.makedirs('import_data', exist_ok=True)
+        # Зберігаємо отриманий файл, перезаписуючи старий tovar.cml
+        file_path = os.path.join('import_data', 'tovar.cml')
+
+        try:
+            # Дані файлу передаються в тілі POST-запиту
+            with open(file_path, 'wb') as f:
+                f.write(request.data)
+            print(f">>> Файл успішно збережено: {file_path}")
+
+            # Запускаємо нашу функцію імпорту, яка обробить цей файл
+            print(">>> Запуск основного скрипта імпорту товарів...")
+            import_from_bas()
+            print(">>> Імпорт завершено.")
+
+            # Повертаємо BAS повідомлення про успіх
+            return 'success'
+
+        except Exception as e:
+            print(f"❌ КРИТИЧНА ПОМИЛКА під час обміну з BAS: {e}")
+            # Повертаємо BAS повідомлення про помилку
+            return f'failure\nПомилка на сервері під час обробки файлу: {e}'
+
+    return 'failure\nНевідомий режим або тип обміну.'
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ

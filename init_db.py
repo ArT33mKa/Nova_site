@@ -19,14 +19,16 @@ def initialize_database():
             admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
-            print(">>> Адміністратора створено.")
+            print(">>> Адміністратора створено. (Логін: admin, Пароль: admin123)")
         else:
             print(">>> 2. Адміністратор вже існує.")
 
         # Запускаємо імпорт товарів з BAS
-        print("\n>>> 3. ЗАПУСК ІМПОРТУ ТОВАРІВ З BAS...")
+        print("\n" + "="*50)
+        print(">>> 3. ЗАПУСК ІМПОРТУ ТОВАРІВ З ЛОКАЛЬНОГО ФАЙЛУ BAS...")
+        print("="*50)
         import_from_bas()
-        print(">>> Імпорт товарів завершено.")
+        print("\n>>> Процес ініціалізації бази даних повністю завершено! <<<")
 
 if __name__ == '__main__':
     initialize_database()
