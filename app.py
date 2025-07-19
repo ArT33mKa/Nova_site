@@ -630,14 +630,28 @@ def send_message():
 @app.route("/favorites")
 def favorites_page(): return render_template("favorites.html")
 
-IMPORT_DATA_DIR = 'import_data'
+DATA_DIR = os.getenv('RENDER_DISK_PATH', '/var/data/cml_import')
+IMPORT_DATA_DIR = DATA_DIR
 SOURCE_IMAGES_DIR = os.path.join(IMPORT_DATA_DIR, 'img')
 CML_FILE_PATH = os.path.join(IMPORT_DATA_DIR, 'tovar.cml')
 
+# Створюємо папки при старті додатку, якщо їх немає
+os.makedirs(SOURCE_IMAGES_DIR, exist_ok=True)
+
 def clear_import_dir():
     """Очищує папку для імпорту перед новим завантаженням."""
+    # Видаляємо лише вміст, а не саму папку
     if os.path.exists(IMPORT_DATA_DIR):
-        shutil.rmtree(IMPORT_DATA_DIR)
+        for filename in os.listdir(IMPORT_DATA_DIR):
+            file_path = os.path.join(IMPORT_DATA_DIR, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                print(f'Помилка при видаленні {file_path}. Причина: {e}')
+    # Перестворюємо папку для зображень
     os.makedirs(SOURCE_IMAGES_DIR, exist_ok=True)
     print(">>> Папку import_data очищено.")
 
