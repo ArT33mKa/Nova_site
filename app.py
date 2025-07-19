@@ -621,15 +621,28 @@ def cml_exchange():
     print(f"Параметри: mode={mode}, key={key_from_bas}")
 
     # --- Перевірка безпеки ---
-    secret_key_from_env = os.getenv('BAS_SECRET_KEY')
-    if not secret_key_from_env:
-        error_msg = "ПОМИЛКА СЕРВЕРА: BAS_SECRET_KEY не налаштовано в .env!"
+    BAS_USER = os.getenv('BAS_USER')
+    BAS_PASS = os.getenv('BAS_PASS')
+
+    # Перевіряємо, чи налаштували ми логін/пароль на сервері
+    if not BAS_USER or not BAS_PASS:
+        error_msg = "ПОМИЛКА СЕРВЕРА: BAS_USER або BAS_PASS не налаштовано в змінних оточення!"
         print(f"!!! {error_msg}")
         return f"failure\n{error_msg}", 500
 
-    if secret_key_from_env != key_from_bas:
-        print(f"!!! НЕВІРНИЙ КЛЮЧ АВТОРИЗАЦІЇ. Очікувався '{secret_key_from_env}', отримано '{key_from_bas}'.")
-        return 'failure\nInvalid authorization key.', 401
+    # Перевіряємо, чи програма BAS надіслала нам логін/пароль
+    if not request.authorization:
+        print("!!! ЗАПИТ БЕЗ АВТОРИЗАЦІЇ. Доступ заборонено.")
+        # Повідомляємо BAS, що потрібна авторизація
+        return 'failure\nAuthorization required.', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'}
+
+    # Перевіряємо, чи правильні логін та пароль надіслала програма BAS
+    is_authorized = (request.authorization.username == BAS_USER and
+                     request.authorization.password == BAS_PASS)
+
+    if not is_authorized:
+        print(f"!!! НЕВІРНИЙ ЛОГІН/ПАРОЛЬ. Отримано: {request.authorization.username}. Доступ заборонено.")
+        return 'failure\nInvalid username or password.', 401
 
     try:
         if mode == 'checkauth':
