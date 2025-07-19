@@ -668,7 +668,6 @@ def cml_exchange():
             filename = request.args.get('filename')
             print(f">>> BAS [file]: Отримання файлу: {filename}")
 
-            # BAS надсилає файли в полі 'file' або інших полях, що починаються з 'file'
             uploaded_file = None
             for field_name, file in request.files.items():
                 if file and file.filename:
@@ -681,14 +680,25 @@ def cml_exchange():
                 print(f"!!! {error_msg}")
                 return f'failure\n{error_msg}', 400
 
-            # Визначаємо, куди зберігати файл
+            # --- ОСЬ ГОЛОВНЕ ВИПРАВЛЕННЯ ---
+            # Визначаємо, куди зберігати файл, І СТВОРЮЄМО ПОТРІБНІ ПАПКИ
+            # ------------------------------------
+
+            # Базова папка для всіх тимчасових даних від BAS
+            IMPORT_DATA_ROOT = 'import_data'
+            os.makedirs(IMPORT_DATA_ROOT, exist_ok=True)  # Створюємо головну папку, якщо її немає
+
             if filename.lower().endswith(('.xml', '.cml')):
-                save_path = os.path.join('import_data', 'tovar.cml')
+                save_path = os.path.join(IMPORT_DATA_ROOT, 'tovar.cml')
                 print(f"   -> Це CML-файл. Зберігаємо як 'tovar.cml'.")
             else:
-                save_path = os.path.join('import_data', 'img', os.path.basename(filename))
-                print(f"   -> Це зображення. Зберігаємо в 'import_data/img/'.")
+                # Це зображення, воно має йти в підпапку 'img'
+                images_dir = os.path.join(IMPORT_DATA_ROOT, 'img')
+                os.makedirs(images_dir, exist_ok=True)  # Створюємо папку для зображень
+                save_path = os.path.join(images_dir, os.path.basename(filename))
+                print(f"   -> Це зображення. Зберігаємо в '{images_dir}'.")
 
+            # Тепер ми впевнені, що папка існує, і можемо спокійно зберігати
             uploaded_file.save(save_path)
             print(f"   +++ Файл '{filename}' успішно збережено.")
             return 'success'
