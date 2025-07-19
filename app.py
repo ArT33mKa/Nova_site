@@ -12,12 +12,9 @@ from datetime import datetime
 from sqlalchemy import func
 from collections import Counter
 import locale  # [НОВЕ] Імпорт для локалізації дати
-import shutil
-from werkzeug.utils import secure_filename
-from import_products import process_cml_import, get_cml_file_info
-
 
 from flask import request, jsonify
+from import_products import import_from_bas
 
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
@@ -610,6 +607,97 @@ def delete_product(product_id):
 # ────────────────────────────────
 #  ІНТЕГРАЦІЯ З BAS (CommerceML)
 # ────────────────────────────────
+@app.route('/api/1c_exchange', methods=['GET', 'POST'])
+def cml_exchange():
+    """
+    Обробник для запитів від модуля обміну BAS/1C.
+    Версія, оптимізована для обробки multipart/form-data.
+    """
+    mode = request.args.get('mode')
+    key_from_bas = request.args.get('key')
+
+    print(f"\n--- Новий запит від BAS ---")
+    print(f"IP: {request.remote_addr}, Метод: {request.method}")
+    print(f"Параметри: mode={mode}, key={key_from_bas}")
+
+    # --- Перевірка безпеки ---
+    secret_key_from_env = os.getenv('BAS_SECRET_KEY')
+    if not secret_key_from_env:
+        error_msg = "ПОМИЛКА СЕРВЕРА: BAS_SECRET_KEY не налаштовано в .env!"
+        print(f"!!! {error_msg}")
+        return f"failure\n{error_msg}", 500
+
+    if secret_key_from_env != key_from_bas:
+        print(f"!!! НЕВІРНИЙ КЛЮЧ АВТОРИЗАЦІЇ. Очікувався '{secret_key_from_env}', отримано '{key_from_bas}'.")
+        return 'failure\nInvalid authorization key.', 401
+
+    try:
+        if mode == 'checkauth':
+            print(">>> BAS [checkauth]: Перевірка авторизації...")
+            response = 'success\nPHPSESSID\n123456789'
+            print(f"   -> Відповідь: success")
+            return response
+
+        elif mode == 'init':
+            print(">>> BAS [init]: Ініціалізація обміну...")
+            os.makedirs('import_data', exist_ok=True)
+            os.makedirs(os.path.join('import_data', 'img'), exist_ok=True)
+            response = "zip=no\nfile_limit=104857600"
+            print(f"   -> Відповідь: {response.replace(chr(10), ' ')}")
+            return response
+
+        elif mode == 'file':
+            filename = request.args.get('filename')
+            print(f">>> BAS [file]: Отримання файлу: {filename}")
+
+            # BAS надсилає файли в полі 'file' або інших полях, що починаються з 'file'
+            uploaded_file = None
+            for field_name, file in request.files.items():
+                if file and file.filename:
+                    uploaded_file = file
+                    print(f"   -> Знайдено файл у полі '{field_name}': '{file.filename}'")
+                    break
+
+            if not uploaded_file:
+                error_msg = "ПОМИЛКА: BAS надіслав запит на збереження файлу, але файл не знайдено в request.files!"
+                print(f"!!! {error_msg}")
+                return f'failure\n{error_msg}', 400
+
+            # Визначаємо, куди зберігати файл
+            if filename.lower().endswith(('.xml', '.cml')):
+                save_path = os.path.join('import_data', 'tovar.cml')
+                print(f"   -> Це CML-файл. Зберігаємо як 'tovar.cml'.")
+            else:
+                save_path = os.path.join('import_data', 'img', os.path.basename(filename))
+                print(f"   -> Це зображення. Зберігаємо в 'import_data/img/'.")
+
+            uploaded_file.save(save_path)
+            print(f"   +++ Файл '{filename}' успішно збережено.")
+            return 'success'
+
+        elif mode == 'import':
+            print(">>> BAS [import]: Отримано фінальний запит. ЗАПУСК ІМПОРТУ...")
+
+            result = import_from_bas()
+
+            if result.get('status') == 'success':
+                print("   +++ ІМПОРТ ЗАВЕРШЕНО УСПІШНО.")
+                return 'success'
+            else:
+                error_message = result.get('message', 'Невідома помилка імпорту')
+                print(f"   --- ПОМИЛКА ПІД ЧАС ІМПОРТУ: {error_message}")
+                return f"failure\n{error_message}"
+
+        else:
+            print(f"??? BAS: Отримано невідомий режим '{mode}'. Ігноруємо.")
+            return 'success'
+
+    except Exception as e:
+        error_msg = f"КРИТИЧНА ПОМИЛКА в cml_exchange: {e}"
+        print(f"\n\n❌❌❌ {error_msg} ❌❌❌\n\n")
+        import traceback
+        traceback.print_exc()
+        return f"failure\nServer Error: {e}", 500
 
 
 # ────────────────────────────────
@@ -630,106 +718,6 @@ def send_message():
 @app.route("/favorites")
 def favorites_page(): return render_template("favorites.html")
 
-DATA_DIR = os.getenv('RENDER_DISK_PATH', '/var/data/cml_import')
-IMPORT_DATA_DIR = DATA_DIR
-SOURCE_IMAGES_DIR = os.path.join(IMPORT_DATA_DIR, 'img')
-CML_FILE_PATH = os.path.join(IMPORT_DATA_DIR, 'tovar.cml')
-
-# Створюємо папки при старті додатку, якщо їх немає
-os.makedirs(SOURCE_IMAGES_DIR, exist_ok=True)
-
-def clear_import_dir():
-    """Очищує папку для імпорту перед новим завантаженням."""
-    # Видаляємо лише вміст, а не саму папку
-    if os.path.exists(IMPORT_DATA_DIR):
-        for filename in os.listdir(IMPORT_DATA_DIR):
-            file_path = os.path.join(IMPORT_DATA_DIR, filename)
-            try:
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            except Exception as e:
-                print(f'Помилка при видаленні {file_path}. Причина: {e}')
-    # Перестворюємо папку для зображень
-    os.makedirs(SOURCE_IMAGES_DIR, exist_ok=True)
-    print(">>> Папку import_data очищено.")
-
-
-@app.route('/webhook/cml-import', methods=['POST'])
-def webhook_cml_import():
-    """
-    Головний веб-хук для прийому даних від BAS.
-    Приймає multipart/form-data запит з файлами.
-    """
-    # 1. Перевірка безпеки (простий ключ з URL)
-    auth_key = request.args.get('key')
-    expected_key = os.getenv('CML_IMPORT_KEY')
-
-    if not expected_key or auth_key != expected_key:
-        print(f"!!! СПРОБА НЕСАНКЦІОНОВАНОГО ДОСТУПУ до CML-import. Ключ: {auth_key}")
-        return jsonify(status="error", message="Authentication failed"), 403
-
-    # 2. Очищення папки для імпорту
-    clear_import_dir()
-
-    # 3. Збереження файлів
-    files = request.files.getlist('file')
-    if not files:
-        return jsonify(status="error", message="No files in request"), 400
-
-    cml_file_found = False
-    for file_storage in files:
-        filename = secure_filename(file_storage.filename)
-        # Пропускаємо порожні імена файлів
-        if not filename:
-            continue
-
-        if filename.lower().endswith(('.xml', '.cml')):
-            file_storage.save(CML_FILE_PATH)
-            cml_file_found = True
-            print(f">>> Збережено CML файл: {filename} як tovar.cml")
-        elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
-            image_path = os.path.join(SOURCE_IMAGES_DIR, filename)
-            file_storage.save(image_path)
-            print(f">>> Збережено зображення: {filename}")
-        else:
-            print(f"--- Пропущено невідомий тип файлу: {filename}")
-
-    if not cml_file_found:
-        return jsonify(status="error", message="CML/XML file not found in upload"), 400
-
-    # 4. Запуск обробки даних
-    try:
-        summary = process_cml_import(app, db, Product)
-        print(">>> Імпорт з CML успішно завершено.")
-        return jsonify(status="success", message="Import successful", summary=summary)
-    except Exception as e:
-        print(f"!!! ПОМИЛКА під час імпорту CML: {e}")
-        return jsonify(status="error", message=f"Error during import processing: {str(e)}"), 500
-
-@app.route('/admin/import', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def admin_import_page():
-    """Сторінка в адмін-панелі для керування імпортом."""
-    if request.method == 'POST':
-        try:
-            # Запуск імпорту вручну
-            summary = process_cml_import(app, db, Product)
-            flash(f"Імпорт успішно завершено! {summary}", 'success')
-        except FileNotFoundError:
-             flash("Помилка: Файл для імпорту (tovar.cml) не знайдено. Спочатку завантажте його з BAS.", 'danger')
-        except Exception as e:
-            flash(f"Під час імпорту сталася помилка: {e}", 'danger')
-        return redirect(url_for('admin_import_page'))
-
-    # Інформація про останній завантажений файл
-    cml_info = get_cml_file_info()
-    import_key = os.getenv('CML_IMPORT_KEY', 'НЕ ВСТАНОВЛЕНО!')
-    webhook_url = f"{request.url_root}webhook/cml-import?key={import_key}"
-
-    return render_template('admin_import.html', cml_info=cml_info, webhook_url=webhook_url)
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ

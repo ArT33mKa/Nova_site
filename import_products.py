@@ -19,18 +19,11 @@ DEST_IMAGES_DIR = os.path.join('static', 'img', 'products')
 def get_category_by_name(product_name):
     """Визначає категорію товару за ключовими словами в назві."""
     product_name_lower = product_name.lower()
-    # Розширена мапа для кращого розпізнавання
     keyword_map = {
-        'полив': 'ПОЛИВОЧНА СИСТЕМА', 'зрошення': 'ПОЛИВОЧНА СИСТЕМА', 'кран': 'ПОЛИВОЧНА СИСТЕМА',
-        'насос': 'НАСОСИ',
-        'бойлер': 'БОЙЛЕРА', 'водонагрівач': 'БОЙЛЕРА',
-        'змішувач': 'ЗМІШУВАЧІ',
-        'витяжка': 'ВИТЯЖКИ',
-        'колонка': 'КОЛОНКИ',
-        'рушникосушка': 'СУШКА ДЛЯ РУШНИКІВ', 'сушка для рушників': 'СУШКА ДЛЯ РУШНИКІВ',
-        'запчастини': 'ЗАПЧАСТИНИ ДО ГАЗ ОБЛАДНАННЯ',
-        'котел': 'КОТЛИ ТА ОБІГРІВАЧІ',
-        'радіатор': 'КОТЛИ ТА ОБІГРІВАЧІ'
+        'полив': 'ПОЛИВОЧНА СИСТЕМА', 'насос': 'НАСОСИ', 'бойлер': 'БОЙЛЕРА',
+        'водонагрівач': 'БОЙЛЕРА', 'змішувач': 'ЗМІШУВАЧІ', 'витяжка': 'ВИТЯЖКИ',
+        'колонка': 'КОЛОНКИ', 'сушка для рушників': 'СУШКА ДЛЯ РУШНИКІВ',
+        'запчастини до газ': 'ЗАПЧАСТИНИ ДО ГАЗ ОБЛАДНАННЯ'
     }
     for keyword, category_name in keyword_map.items():
         if keyword in product_name_lower:
@@ -47,9 +40,6 @@ def copy_local_image(image_filename):
         return "default.jpg"
 
     source_path = os.path.join(SOURCE_IMAGES_DIR, image_filename)
-
-    # Створюємо папку призначення, якщо її немає
-    os.makedirs(DEST_IMAGES_DIR, exist_ok=True)
     dest_path = os.path.join(DEST_IMAGES_DIR, image_filename)
 
     if not os.path.exists(source_path):
@@ -70,103 +60,8 @@ def copy_local_image(image_filename):
         return "default.jpg"
 
 
-def process_cml_import(app, db, Product):
-    """
-    Головна функція для обробки CML файлу та оновлення БД.
-    Викликається після того, як всі файли завантажено.
-    """
-    if not os.path.exists(CML_FILE_PATH):
-        raise FileNotFoundError("Файл tovar.cml не знайдено в папці import_data")
-
-    tree = ET.parse(CML_FILE_PATH)
-    root = tree.getroot()
-
-    # Словник для зберігання існуючих товарів для швидкого доступу
-    existing_products = {p.name: p for p in Product.query.all()}
-
-    products_added = 0
-    products_updated = 0
-    products_skipped = 0
-
-    # Простір імен може бути різним, тому шукаємо гнучко
-    products_xml = root.findall('.//Товары/Товар')
-    if not products_xml:
-        # Спроба знайти з простором імен (часто буває в CML)
-        ns_map = {'cml': 'urn:1C.ru:commerceml_2'}
-        products_xml = root.findall('.//cml:Товары/cml:Товар', ns_map)
-
-    print(f"Знайдено {len(products_xml)} товарів у CML файлі.")
-
-    for product_node in products_xml:
-        # Використовуємо .text для безпечного отримання значення
-        name_node = product_node.find('.//Наименование')
-        name = name_node.text.strip() if name_node is not None and name_node.text else None
-
-        if not name:
-            products_skipped += 1
-            continue
-
-        price_node = product_node.find('.//ЦенаЗаЕдиницу')
-        price = float(price_node.text) if price_node is not None and price_node.text else 0.0
-
-        description_node = product_node.find('.//Описание')
-        description = description_node.text.strip() if description_node is not None and description_node.text else ''
-
-        image_node = product_node.find('.//Картинка')
-        image_filename = image_node.text.strip() if image_node is not None and image_node.text else None
-
-        # Обробка характеристик (для бренду)
-        brand = "Без бренду"
-        properties_node = product_node.find('.//ЗначенияСвойств')
-        if properties_node is not None:
-            for prop in properties_node.findall('.//ЗначениеСвойства'):
-                prop_id_node = prop.find('.//Ид')
-                prop_value_node = prop.find('.//Значение')
-                # Тут припускаємо, що ID характеристики "Производитель" нам відомий, або шукаємо по назві
-                # Для прикладу шукаємо назву "Производитель" в довіднику властивостей
-                if prop_id_node is not None and prop_value_node is not None and "производитель" in prop_id_node.text.lower():
-                    brand = prop_value_node.text.strip()
-                    break
-
-        final_image = copy_local_image(image_filename)
-
-        # Оновлення або створення товару
-        product = existing_products.get(name)
-        if product:
-            # Оновлюємо існуючий товар
-            product.price = price
-            product.description = description
-            product.image = final_image
-            product.category = get_category_by_name(name)
-            product.brand = brand
-            product.in_stock = True  # Вважаємо, що всі товари з вигрузки є в наявності
-            products_updated += 1
-            print(f"  Оновлено: {name}")
-        else:
-            # Створюємо новий товар
-            new_product = Product(
-                name=name,
-                price=price,
-                description=description,
-                image=final_image,
-                category=get_category_by_name(name),
-                brand=brand,
-                in_stock=True
-            )
-            db.session.add(new_product)
-            products_added += 1
-            print(f"  Додано: {name}")
-
-    with app.app_context():
-        db.session.commit()
-
-    summary = f"Додано: {products_added}, Оновлено: {products_updated}, Пропущено: {products_skipped}."
-    print(f">>> Звіт по імпорту: {summary}")
-    return summary
-
-
 def get_cml_file_info():
-    """Повертає інформацію про файл імпорту для адмін-панелі."""
+    """Повертає інформацію про файл імпорту."""
     if not os.path.exists(CML_FILE_PATH):
         return None
     try:
@@ -178,3 +73,130 @@ def get_cml_file_info():
     except Exception as e:
         print(f"Помилка отримання інформації про файл: {e}")
         return None
+
+
+def import_from_bas():
+    """Головна функція для імпорту товарів з CML-файлу."""
+    # Імпортуємо тут, щоб уникнути циклічних залежностей
+    from app import app, db, Product
+
+    try:
+        print(">>> ЗАПУСК ІМПОРТУ ТОВАРІВ З BAS...")
+        if not os.path.exists(CML_FILE_PATH):
+            error_msg = f"ПОМИЛКА: Файл для імпорту не знайдено: {CML_FILE_PATH}"
+            print(error_msg)
+            return {"status": "error", "message": error_msg}
+
+        os.makedirs(DEST_IMAGES_DIR, exist_ok=True)
+
+        print(f"1. Читання та розбір файлу: {CML_FILE_PATH}")
+        tree = ET.parse(CML_FILE_PATH)
+        root = tree.getroot()
+        ns = {'cml': 'urn:1C.ru:commerceml_2'}  # Namespace для CommerceML 2
+
+        # --- Обробка цін та залишків ---
+        print("2. Обробка пропозицій (ціни та залишки)...")
+        offers_data = {}
+        for offer in root.findall('.//cml:Предложение', ns) or root.findall('.//Предложение'):
+            offer_id = offer.find('cml:Ид', ns) or offer.find('Ид')
+            if offer_id is None: continue
+
+            offer_id_text = offer_id.text
+            offers_data[offer_id_text] = {}
+
+            price_node = offer.find('.//cml:ЦенаЗаЕдиницу', ns) or offer.find('.//ЦенаЗаЕдиницу')
+            offers_data[offer_id_text]['price'] = float(
+                price_node.text) if price_node is not None and price_node.text else 0.0
+
+            stock_node = offer.find('cml:Количество', ns) or offer.find('Количество')
+            stock_quantity = float(stock_node.text) if stock_node is not None and stock_node.text else 0
+            offers_data[offer_id_text]['in_stock'] = stock_quantity > 0
+
+        print(f"   -> Знайдено інформацію про ціни/залишки для {len(offers_data)} товарних пропозицій.")
+
+        # --- Обробка каталогу товарів ---
+        print("3. Обробка каталогу товарів...")
+        products_to_process = []
+        catalog_node = root.find('cml:Каталог', ns) or root.find('Каталог')
+        if catalog_node is None:
+            return {"status": "error", "message": "Не знайдено тег <Каталог> у CML файлі."}
+
+        for item in catalog_node.findall('.//cml:Товар', ns) or catalog_node.findall('.//Товар'):
+            item_id_node = item.find('cml:Ид', ns) or item.find('Ид')
+            if item_id_node is None: continue
+
+            item_id = item_id_node.text
+            offer_details = offers_data.get(item_id)
+
+            if not offer_details:
+                # print(f"   ! Пропущено товар (ID: {item_id}), оскільки для нього не знайдено ціни/залишку.")
+                continue
+
+            name_node = item.find('cml:Наименование', ns) or item.find('Наименование')
+            name = name_node.text.strip() if name_node is not None and name_node.text else 'Без назви'
+
+            description_node = item.find('cml:Описание', ns) or item.find('Описание')
+            description = description_node.text.strip() if description_node is not None and description_node.text else ''
+
+            brand = 'Без бренду'
+            # Пошук реквізиту "Виробник"
+            for prop_val in item.findall('.//cml:ЗначениеРеквизита', ns) or item.findall('.//ЗначениеРеквизита'):
+                if (prop_val.find('cml:Наименование', ns) or prop_val.find('Наименование')).text == 'Виробник':
+                    brand_node = prop_val.find('cml:Значение', ns) or prop_val.find('Значение')
+                    if brand_node is not None and brand_node.text:
+                        brand = brand_node.text.strip()
+                    break
+
+            image_filename = "default.jpg"
+            image_node = item.find('cml:Картинка', ns) or item.find('Картинка')
+            if image_node is not None and image_node.text:
+                image_filename = copy_local_image(image_node.text.strip())
+
+            product_info = {
+                "name": name,
+                "price": offer_details.get('price', 0.0),
+                "in_stock": offer_details.get('in_stock', False),
+                "description": description,
+                "brand": brand,
+                "image": image_filename,
+                "category": get_category_by_name(name)
+            }
+            products_to_process.append(product_info)
+            print(
+                f"   + Підготовлено товар: {name} (Ціна: {product_info['price']}, Наявність: {product_info['in_stock']})")
+
+        if not products_to_process:
+            message = "У CML-файлі не знайдено товарів для імпорту або для них відсутні ціни."
+            print(f"! {message}")
+            return {"status": "warning", "message": message}
+
+        with app.app_context():
+            print("4. Оновлення бази даних...")
+            print("   -> Видалення старих товарів та пов'язаних відгуків...")
+            # Каскадне видалення повинно видалити і відгуки (залежить від налаштувань моделі)
+            Product.query.delete()
+            db.session.commit()
+
+            print("   -> Створення нових товарів...")
+            new_products_obj = [Product(**p) for p in products_to_process]
+            db.session.bulk_save_objects(new_products_obj)
+            db.session.commit()
+
+        success_msg = f"Успішно імпортовано/оновлено {len(products_to_process)} товарів."
+        print(f"✅ {success_msg}")
+        return {"status": "success", "message": success_msg}
+
+    except FileNotFoundError:
+        error_msg = f"КРИТИЧНА ПОМИЛКА: Файл '{CML_FILE_PATH}' не знайдено."
+        print(f"❌ {error_msg}")
+        return {"status": "error", "message": error_msg}
+    except ET.ParseError as e:
+        error_msg = f"КРИТИЧНА ПОМИЛКА: Не вдалося розпарсити XML. Файл пошкоджено. Помилка: {e}"
+        print(f"❌ {error_msg}")
+        return {"status": "error", "message": error_msg}
+    except Exception as e:
+        import traceback
+        error_msg = f"КРИТИЧНА ПОМИЛКА під час імпорту: {e}"
+        print(f"❌ {error_msg}")
+        traceback.print_exc()
+        return {"status": "error", "message": error_msg}
