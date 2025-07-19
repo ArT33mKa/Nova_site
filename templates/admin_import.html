@@ -1,0 +1,55 @@
+<!-- templates/admin_import.html (НОВИЙ ФАЙЛ) -->
+{% extends "base.html" %}
+{% block title %}Імпорт товарів з BAS{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div class="container">
+        <h1 class="page-title">Імпорт товарів з BAS/1C</h1>
+    </div>
+</header>
+<div class="container" style="padding-top: 40px; padding-bottom: 60px; max-width: 800px;">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" style="background-color: {% if category == 'success' %}#d4edda{% else %}#f8d7da{% endif %}; color: {% if category == 'success' %}#155724{% else %}#721c24{% endif %}; padding: 15px; border-radius: var(--border-radius); margin-bottom: 20px;">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="checkout-section">
+        <div class="checkout-section-header">
+            <span class="icon">1</span><h4>Налаштування в BAS</h4>
+        </div>
+        <p>Для автоматичного завантаження товарів, вкажіть у вашому модулі обміну в BAS наступну адресу (URL):</p>
+        <div class="form-group">
+            <label for="webhook_url">URL для веб-хука:</label>
+            <input type="text" id="webhook_url" value="{{ webhook_url }}" readonly class="form-control" style="background: #f0f0f0;">
+        </div>
+        <p><strong>Важливо:</strong> ключ безпеки є частиною URL. Не передавайте цю адресу третім особам.</p>
+    </div>
+
+    <div class="checkout-section">
+        <div class="checkout-section-header">
+            <span class="icon">2</span><h4>Статус завантаження</h4>
+        </div>
+        {% if cml_info %}
+            <p><strong>Останнє успішне завантаження файлу з BAS:</strong></p>
+            <ul>
+                <li><strong>Час:</strong> {{ cml_info.mtime.strftime('%d %B %Y, %H:%M:%S') }}</li>
+                <li><strong>Розмір файлу:</strong> {{ cml_info.size_kb }} KB</li>
+            </ul>
+            <form action="{{ url_for('admin_import_page') }}" method="POST" onsubmit="return confirm('Ви впевнені, що хочете запустити імпорт? Це може змінити дані про товари на сайті.');">
+                <button type="submit" class="btn btn-primary btn-lg" style="margin-top: 20px;">Запустити імпорт вручну</button>
+            </form>
+        {% else %}
+            <p>На сервері ще немає файлів для імпорту. Спочатку виконайте вивантаження товарів з вашої програми BAS.</p>
+            <p>Після першого успішного завантаження тут з'явиться інформація про файл та кнопка для ручного запуску.</p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
