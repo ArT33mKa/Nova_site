@@ -608,17 +608,22 @@ def delete_product(product_id):
 #  ІНТЕГРАЦІЯ З BAS (CommerceML)
 # ────────────────────────────────
 @app.route('/api/1c_exchange', methods=['GET', 'POST'])
+# А цей декоратор приймає запити з /catalog, які надсилає ваш модуль
+@app.route('/api/1c_exchange/catalog', methods=['GET', 'POST'])
 def cml_exchange():
     """
     Обробник для запитів від модуля обміну BAS/1C.
-    Версія, оптимізована для обробки multipart/form-data.
+    Тепер працює для обох типів URL.
     """
     mode = request.args.get('mode')
-    key_from_bas = request.args.get('key')
+
+    # Видаляємо стару змінну, яка більше не потрібна
+    # key_from_bas = request.args.get('key')
 
     print(f"\n--- Новий запит від BAS ---")
     print(f"IP: {request.remote_addr}, Метод: {request.method}")
-    print(f"Параметри: mode={mode}, key={key_from_bas}")
+    print(f"URL: {request.url}")  # Додамо логування URL для діагностики
+    print(f"Параметри: mode={mode}")
 
     # --- Перевірка безпеки ---
     BAS_USER = os.getenv('BAS_USER')
