@@ -14,7 +14,6 @@ from collections import Counter
 import locale  # [НОВЕ] Імпорт для локалізації дати
 
 from flask import request, jsonify
-from import_products import import_from_bas
 
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
@@ -26,23 +25,17 @@ from flask_dance.consumer.storage.sqla import SQLAlchemyStorage
 try:
     locale.setlocale(locale.LC_TIME, 'uk_UA.UTF-8')
 except locale.Error:
-    print("ПОПЕРЕДЖЕННЯ: Локаль 'uk_UA.UTF-8' не знайдено. Дати можуть відображатися англійською.")
+    print("ПОПЕРЕДЖЕННЯ: Локал 'uk_UA.UTF-8' не знайдено. Дати можуть відображатися англійською.")
 
 load_dotenv()
 app = Flask(__name__)
 app.jinja_env.add_extension('jinja2.ext.do')
 app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")
 
-app.config["GOOGLE_OAUTH_CLIENT_ID"] = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
-app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
-
-db_uri = os.getenv('DATABASE_URL')
-if db_uri and db_uri.startswith('postgres://'):
-    db_uri = db_uri.replace('postgres://', 'postgresql://', 1)
-app.config['SQLALCHEMY_DATABASE_URI'] = db_uri or 'sqlite:///site.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 db = SQLAlchemy(app)
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Будь ласка, увійдіть, щоб виконати цю дію."
@@ -602,130 +595,6 @@ def delete_product(product_id):
     db.session.delete(product);
     db.session.commit()
     return redirect(url_for('catalog'))
-
-
-# ────────────────────────────────
-#  ІНТЕГРАЦІЯ З BAS (CommerceML)
-# ────────────────────────────────
-@app.route('/api/1c_exchange', methods=['GET', 'POST'])
-# А цей декоратор приймає запити з /catalog, які надсилає ваш модуль
-@app.route('/api/1c_exchange/catalog', methods=['GET', 'POST'])
-def cml_exchange():
-    """
-    Обробник для запитів від модуля обміну BAS/1C.
-    Тепер працює для обох типів URL.
-    """
-    mode = request.args.get('mode')
-
-    # Видаляємо стару змінну, яка більше не потрібна
-    # key_from_bas = request.args.get('key')
-
-    print(f"\n--- Новий запит від BAS ---")
-    print(f"IP: {request.remote_addr}, Метод: {request.method}")
-    print(f"URL: {request.url}")  # Додамо логування URL для діагностики
-    print(f"Параметри: mode={mode}")
-
-    # --- Перевірка безпеки ---
-    BAS_USER = os.getenv('BAS_USER')
-    BAS_PASS = os.getenv('BAS_PASS')
-
-    # Перевіряємо, чи налаштували ми логін/пароль на сервері
-    if not BAS_USER or not BAS_PASS:
-        error_msg = "ПОМИЛКА СЕРВЕРА: BAS_USER або BAS_PASS не налаштовано в змінних оточення!"
-        print(f"!!! {error_msg}")
-        return f"failure\n{error_msg}", 500
-
-    # Перевіряємо, чи програма BAS надіслала нам логін/пароль
-    if not request.authorization:
-        print("!!! ЗАПИТ БЕЗ АВТОРИЗАЦІЇ. Доступ заборонено.")
-        # Повідомляємо BAS, що потрібна авторизація
-        return 'failure\nAuthorization required.', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'}
-
-    # Перевіряємо, чи правильні логін та пароль надіслала програма BAS
-    is_authorized = (request.authorization.username == BAS_USER and
-                     request.authorization.password == BAS_PASS)
-
-    if not is_authorized:
-        print(f"!!! НЕВІРНИЙ ЛОГІН/ПАРОЛЬ. Отримано: {request.authorization.username}. Доступ заборонено.")
-        return 'failure\nInvalid username or password.', 401
-
-    try:
-        if mode == 'checkauth':
-            print(">>> BAS [checkauth]: Перевірка авторизації...")
-            response = 'success\nPHPSESSID\n123456789'
-            print(f"   -> Відповідь: success")
-            return response
-
-        elif mode == 'init':
-            print(">>> BAS [init]: Ініціалізація обміну...")
-            os.makedirs('import_data', exist_ok=True)
-            os.makedirs(os.path.join('import_data', 'img'), exist_ok=True)
-            response = "zip=no\nfile_limit=104857600"
-            print(f"   -> Відповідь: {response.replace(chr(10), ' ')}")
-            return response
-
-        elif mode == 'file':
-            filename = request.args.get('filename')
-            print(f">>> BAS [file]: Отримання файлу: {filename}")
-
-            uploaded_file = None
-            for field_name, file in request.files.items():
-                if file and file.filename:
-                    uploaded_file = file
-                    print(f"   -> Знайдено файл у полі '{field_name}': '{file.filename}'")
-                    break
-
-            if not uploaded_file:
-                error_msg = "ПОМИЛКА: BAS надіслав запит на збереження файлу, але файл не знайдено в request.files!"
-                print(f"!!! {error_msg}")
-                return f'failure\n{error_msg}', 400
-
-            # --- ОСЬ ГОЛОВНЕ ВИПРАВЛЕННЯ ---
-            # Визначаємо, куди зберігати файл, І СТВОРЮЄМО ПОТРІБНІ ПАПКИ
-            # ------------------------------------
-
-            # Базова папка для всіх тимчасових даних від BAS
-            IMPORT_DATA_ROOT = 'import_data'
-            os.makedirs(IMPORT_DATA_ROOT, exist_ok=True)  # Створюємо головну папку, якщо її немає
-
-            if filename.lower().endswith(('.xml', '.cml')):
-                save_path = os.path.join(IMPORT_DATA_ROOT, 'tovar.cml')
-                print(f"   -> Це CML-файл. Зберігаємо як 'tovar.cml'.")
-            else:
-                # Це зображення, воно має йти в підпапку 'img'
-                images_dir = os.path.join(IMPORT_DATA_ROOT, 'img')
-                os.makedirs(images_dir, exist_ok=True)  # Створюємо папку для зображень
-                save_path = os.path.join(images_dir, os.path.basename(filename))
-                print(f"   -> Це зображення. Зберігаємо в '{images_dir}'.")
-
-            # Тепер ми впевнені, що папка існує, і можемо спокійно зберігати
-            uploaded_file.save(save_path)
-            print(f"   +++ Файл '{filename}' успішно збережено.")
-            return 'success'
-
-        elif mode == 'import':
-            print(">>> BAS [import]: Отримано фінальний запит. ЗАПУСК ІМПОРТУ...")
-
-            result = import_from_bas()
-
-            if result.get('status') == 'success':
-                print("   +++ ІМПОРТ ЗАВЕРШЕНО УСПІШНО.")
-                return 'success'
-            else:
-                error_message = result.get('message', 'Невідома помилка імпорту')
-                print(f"   --- ПОМИЛКА ПІД ЧАС ІМПОРТУ: {error_message}")
-                return f"failure\n{error_message}"
-
-        else:
-            print(f"??? BAS: Отримано невідомий режим '{mode}'. Ігноруємо.")
-            return 'success'
-
-    except Exception as e:
-        error_msg = f"КРИТИЧНА ПОМИЛКА в cml_exchange: {e}"
-        print(f"\n\n❌❌❌ {error_msg} ❌❌❌\n\n")
-        import traceback
-        traceback.print_exc()
-        return f"failure\nServer Error: {e}", 500
 
 
 # ────────────────────────────────
