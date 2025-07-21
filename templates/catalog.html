@@ -53,23 +53,6 @@
                     </div>
                 </div>
 
-                {% if brands %}
-                <div class="filter-group">
-                    <h4 class="filter-title">Виробник</h4>
-                    <div class="brand-filter-list">
-                        {% for brand in brands %}
-                        <label class="checkbox-item brand-item {{ 'hidden' if loop.index > 5 else '' }}">
-                            <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in request.args.getlist('brand') %}checked{% endif %}>
-                            {{ brand }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    {% if brands|length > 5 %}
-                    <button type="button" id="show-more-brands-btn" class="btn-link">Показати більше</button>
-                    {% endif %}
-                </div>
-                {% endif %}
-
                 <div class="filter-group">
                     <h4 class="filter-title">Інші критерії</h4>
                     <label class="checkbox-item">

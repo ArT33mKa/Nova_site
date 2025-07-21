@@ -98,7 +98,6 @@ class Product(db.Model):
     description = db.Column(db.Text)
     image = db.Column(db.String(100))
     category = db.Column(db.String(100))
-    brand = db.Column(db.String(50))
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
     reviews_count = db.Column(db.Integer, default=0)
@@ -223,14 +222,11 @@ def catalog():
         query = query.filter(Product.price <= max_price)
     if request.args.get('min_rating'):
         query = query.filter(Product.rating >= 4.0)
-    if brands := request.args.getlist('brand'):
-        query = query.filter(Product.brand.in_([b.strip() for b in brands]))
 
     products = query.paginate(page=page, per_page=9, error_out=False)
-    brands = [b[0] for b in db.session.query(Product.brand).distinct().order_by(Product.brand).all() if b[0]]
     categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0]]
 
-    return render_template('catalog.html', products=products, brands=brands, categories=categories)
+    return render_template('catalog.html', products=products, categories=categories)
 
 
 @app.route("/product/<int:product_id>")
@@ -255,7 +251,7 @@ def get_products_by_ids():
 
     products_data = [
         {
-            'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'brand': p.brand,
+            'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image,
             'in_stock': p.in_stock, 'url': url_for('product_detail', product_id=p.id)
         } for p in products
     ]
@@ -545,7 +541,7 @@ def add_product():
         new_product = Product(
             name=request.form['name'], price=float(request.form['price']),
             description=request.form['description'], image=request.form['image'],
-            category=request.form['category'], brand=request.form['brand'],
+            category=request.form['category'],
             in_stock='in_stock' in request.form
         )
         db.session.add(new_product);
@@ -566,7 +562,6 @@ def edit_product(product_id):
         product.description = request.form['description']
         product.image = request.form['image']
         product.category = request.form['category']
-        product.brand = request.form['brand']
         product.in_stock = 'in_stock' in request.form
         db.session.commit()
         flash(f"Товар '{product.name}' успішно оновлено!", "success")
@@ -720,7 +715,7 @@ def bas_import():
                 updated_count += 1
             else:
                 db.session.add(Product(name=name, price=price, description=description, category=category, image=image,
-                                       in_stock=in_stock, brand="Не вказано"))
+                                       in_stock=in_stock,))
                 added_count += 1
 
         db.session.commit()

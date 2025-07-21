@@ -27,10 +27,6 @@
             <input type="text" id="category" name="category" class="form-control" value="{{ product.category }}" required>
         </div>
         <div class="form-group">
-            <label for="brand">Виробник (Бренд)</label>
-            <input type="text" id="brand" name="brand" class="form-control" value="{{ product.brand }}" required>
-        </div>
-        <div class="form-group">
             <label class="checkbox-item">
                 <input type="checkbox" name="in_stock" value="true" {% if product.in_stock %}checked{% endif %}>
                 В наявності

@@ -37,7 +37,6 @@
     <!-- Інформація про товар -->
     <div class="product-info">
         <h3><a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a></h3>
-        <p class="product-brand">{{ product.brand }}</p>
         <div class="product-footer">
             <span class="price">{{ "%.2f"|format(product.price) }} ₴</span>
             <button class="btn btn-sm add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
