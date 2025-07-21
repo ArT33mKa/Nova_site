@@ -620,6 +620,107 @@ def send_message():
 def favorites_page(): return render_template("favorites.html")
 
 
+import xml.etree.ElementTree as ET
+from werkzeug.exceptions import Unauthorized
+
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = os.getenv('BAS_API_KEY')
+        # Ключ може передаватися або в заголовку, або як параметр запиту
+        provided_key = request.headers.get('X-API-KEY') or request.args.get('api_key')
+
+        if not api_key or provided_key != api_key:
+            print(f"ПОМИЛКА: Неправильний або відсутній ключ API. Отримано: {provided_key}")
+            # Використовуємо стандартний виняток для помилки авторизації
+            raise Unauthorized("Невірний або відсутній ключ API.")
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+@app.route('/api/bas_import', methods=['POST'])
+@require_api_key
+def bas_import():
+    """
+    Приймає XML-дані від BAS, оновлює/додає товари.
+    Очікує XML в тілі POST-запиту.
+    """
+    if not request.data:
+        return jsonify({"status": "error", "message": "Запит не містить даних."}), 400
+
+    try:
+        xml_data = request.data.decode('utf-8')
+        root = ET.fromstring(xml_data)
+
+        # Припущення щодо структури XML. Можливо, знадобиться коригування.
+        # Наприклад, <Товари> -> <Товар> або <Каталог> -> <Продукт>
+        products_xml = root.findall('.//Товар')
+        if not products_xml:
+            # Спробуємо інший поширений варіант
+            products_xml = root.findall('.//item')
+
+        if not products_xml:
+            return jsonify({"status": "error", "message": "Не знайдено товари у XML-файлі. Перевірте структуру."}), 400
+
+        updated_count = 0
+        added_count = 0
+
+        for item_xml in products_xml:
+            # Назви тегів - це припущення. Їх треба буде узгодити з реальним файлом від BAS.
+            name = item_xml.findtext('Наименование', default='Без назви').strip()
+            price_text = item_xml.findtext('Цена', default='0').replace(',', '.')
+            description = item_xml.findtext('Описание', default='').strip()
+            brand = item_xml.findtext('Бренд', default='Без бренду').strip()
+            # У BAS залишок може називатися 'Количество' або 'Остаток'
+            stock_text = item_xml.findtext('Количество', default='0')
+
+            try:
+                price = float(re.match(r"[\d.]+", price_text).group(0))
+                in_stock = int(stock_text) > 0
+            except (ValueError, AttributeError):
+                price = 0.0
+                in_stock = False
+
+            # Перевіряємо, чи існує товар з такою назвою
+            product = Product.query.filter_by(name=name).first()
+
+            if product:
+                # Оновлюємо існуючий товар
+                product.price = price
+                product.description = description
+                product.brand = brand
+                product.in_stock = in_stock
+                # Категорію та зображення залишаємо без змін, оскільки їх може не бути в вигрузці
+                updated_count += 1
+            else:
+                # Створюємо новий товар
+                product = Product(
+                    name=name,
+                    price=price,
+                    description=description,
+                    brand=brand,
+                    in_stock=in_stock,
+                    category="Новинки з BAS",  # Можна встановити категорію за замовчуванням
+                    image="default.jpg"  # І зображення за замовчуванням
+                )
+                db.session.add(product)
+                added_count += 1
+
+        db.session.commit()
+
+        message = f"Імпорт завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
+        print(message)
+        return jsonify({"status": "success", "message": message})
+
+    except ET.ParseError:
+        return jsonify({"status": "error", "message": "Помилка парсингу XML."}), 400
+    except Exception as e:
+        db.session.rollback()  # Відкочуємо зміни в разі будь-якої іншої помилки
+        print(f"Критична помилка під час імпорту з BAS: {e}")
+        return jsonify({"status": "error", "message": f"Внутрішня помилка сервера: {e}"}), 500
+
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
 # ────────────────────────────────
