@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 {% block title %}Незавершені товари{% endblock %}
 
@@ -34,7 +35,7 @@
         <button type="submit" class="btn btn-primary btn-sm">Застосувати</button>
         <a href="{{ url_for('admin_unfinished') }}" class="btn btn-outline btn-sm">Скинути</a>
     </form>
-    
+
     <!-- Таблиця з товарами -->
     {% if products.items %}
     <p>Знайдено товарів: <strong>{{ products.total }}</strong></p>
@@ -84,9 +85,25 @@
             {% endfor %}
         </tbody>
     </table>
-    <!-- Пагінація -->
+    <!-- [ВИПРАВЛЕНО] Пагінація для незавершених товарів -->
     <div class="pagination">
-        ... (скопіюйте блок пагінації з файлу admin_reviews.html, замінивши url_for('admin_reviews', ...) на url_for('admin_unfinished', ...))
+        <div class="pagination-controls">
+            {% set query_params = request.args.to_dict() %}
+            {% do query_params.pop('page', None) %}
+            {% if products.has_prev %}
+                <a href="{{ url_for('admin_unfinished', page=products.prev_num, **query_params) }}" class="page-link">«</a>
+            {% endif %}
+            {% for page_num in products.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    <a href="{{ url_for('admin_unfinished', page=page_num, **query_params) }}" class="page-link {{ 'active' if products.page == page_num else '' }}">{{ page_num }}</a>
+                {% else %}
+                    <span class="page-dots">...</span>
+                {% endif %}
+            {% endfor %}
+            {% if products.has_next %}
+                <a href="{{ url_for('admin_unfinished', page=products.next_num, **query_params) }}" class="page-link">»</a>
+            {% endif %}
+        </div>
     </div>
     {% else %}
     <div class="text-center" style="padding: 40px; background-color: var(--light-color); border-radius: var(--border-radius);">

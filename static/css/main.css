@@ -519,11 +519,13 @@ img {
     color: var(--dark-color);
 }
 
-/* Products Grid & Product Card */
+/* [ЗМІНЕНО] Products Grid & Product Card */
 .products-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 30px;
+    /* Зменшуємо minmax, щоб більше карток вмістилось в ряд.
+       На широкому екрані (~1200px) це дозволить розмістити 5 карток. */
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px; /* Трохи зменшимо відступ */
 }
 
 .product-card {
@@ -544,10 +546,12 @@ img {
 
 .product-image {
     position: relative;
-    height: 220px;
+    /* [ЗМІНЕНО] Зменшуємо висоту блоку з зображенням */
+    height: 180px;
     overflow: hidden;
     background-color: #f5f5f5;
 }
+
 
 .product-image img {
     width: 100%;
@@ -604,14 +608,14 @@ img {
 }
 
 .product-info {
-    padding: 20px;
+    padding: 15px; /* Трохи зменшимо відступи */
     flex-grow: 1;
     display: flex;
     flex-direction: column;
 }
 
 .product-info h3 {
-    font-size: 1.1rem;
+    font-size: 1rem; /* Трохи зменшимо шрифт назви */
     margin-bottom: 10px;
     flex-grow: 1;
 }
@@ -636,7 +640,7 @@ img {
 .price {
     font-weight: 700;
     color: var(--primary-color);
-    font-size: 1.2rem;
+    font-size: 1.1rem; /* Трохи зменшимо шрифт ціни */
 }
 
 /* About Section */
@@ -1134,6 +1138,7 @@ img {
     }
 
     .products-grid {
+        /* [ЗМІНЕНО] Для планшетів та мобільних пристроїв залишаємо гнучку сітку */
         grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     }
 
@@ -2677,80 +2682,6 @@ main {
     background: none;
     border: none;
     font-size: 1.5rem;
-    color: var(--gray-color);
-    cursor: pointer;
-    line-height: 1;
-    padding: 5px;
-    transition: color 0.2s;
-}
-
-.btn-delete-review:hover {
-    color: var(--danger-color);
-}
-
-.admin-product-actions {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 3;
-    display: flex;
-    gap: 8px;
-}
-
-.admin-action-btn {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    color: white;
-    font-size: 0.9rem;
-    text-decoration: none;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    transition: all 0.2s ease;
-    border: none;
-    cursor: pointer;
-}
-
-.admin-action-btn.edit-btn {
-    background-color: var(--primary-color);
-}
-.admin-action-btn.edit-btn:hover {
-    background-color: var(--secondary-color);
-}
-
-.admin-action-btn.delete-btn {
-    background-color: var(--danger-color);
-}
-.admin-action-btn.delete-btn:hover {
-    background-color: #c82333;
-}
-
-.admin-action-btn i {
-    color: white;
-    pointer-events: none; /* Щоб клік спрацьовував на кнопці/формі */
-}
-
-
-/* Кнопка видалення відгуку/питання */
-.review-header {
-    position: relative;
-    padding-right: 40px; /* Залишаємо місце для кнопки */
-}
-
-.delete-review-form {
-    position: absolute;
-    top: 50%;
-    right: 0;
-    transform: translateY(-50%);
-    margin: 0;
-}
-
-.btn-delete-review {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
     color: var(--gray-color);
     cursor: pointer;
     line-height: 1;

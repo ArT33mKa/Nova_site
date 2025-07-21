@@ -9,7 +9,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from collections import Counter
 import requests
 import locale  # [НОВЕ] Імпорт для локалізації дати
@@ -209,13 +209,23 @@ def index():
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
-    query = Product.query
+
+    # [НОВЕ] Фільтруємо "готові" товари для публічного каталогу.
+    # Показуємо тільки ті, що є в наявності, мають опис та фото.
+    query = Product.query.filter(
+        Product.in_stock == True,
+        and_(Product.description != None, Product.description != ''),
+        Product.image != 'default_tovar.jpg'
+    )
+
+    # Далі застосовуємо фільтри, які вибрав користувач
     if search_query := request.args.get('search', ''):
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
     if category_arg := request.args.get('category'):
         query = query.filter(Product.category == category_arg.strip())
-    if request.args.get('in_stock'):
-        query = query.filter(Product.in_stock == True)
+    # Фільтр по 'in_stock' вже не потрібен, бо ми його застосували вище для всіх
+    # if request.args.get('in_stock'):
+    #     query = query.filter(Product.in_stock == True)
     if min_price := request.args.get('min_price', type=float):
         query = query.filter(Product.price >= min_price)
     if max_price := request.args.get('max_price', type=float):
@@ -223,7 +233,9 @@ def catalog():
     if request.args.get('min_rating'):
         query = query.filter(Product.rating >= 4.0)
 
-    products = query.paginate(page=page, per_page=9, error_out=False)
+    # [ЗМІНЕНО] Встановлюємо 25 товарів на сторінку (5 рядків по 5 товарів)
+    products = query.paginate(page=page, per_page=25, error_out=False)
+
     categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0]]
 
     return render_template('catalog.html', products=products, categories=categories)
@@ -641,6 +653,7 @@ def admin_unfinished():
 
     return render_template('admin_unfinished.html', products=products, counts=counts)
 
+
 # ────────────────────────────────
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
 # ────────────────────────────────
@@ -689,6 +702,7 @@ def upload_image_debug():
     except Exception as e:
         print(f"HTTP UPLOAD: Критична помилка при збереженні файлу: {e}")
         return f"failure: {e}", 500
+
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
@@ -777,7 +791,7 @@ def bas_import():
                 updated_count += 1
             else:
                 db.session.add(Product(name=name, price=price, description=description, category=category, image=image,
-                                       in_stock=in_stock,))
+                                       in_stock=in_stock, ))
                 added_count += 1
 
         db.session.commit()
@@ -791,6 +805,7 @@ def bas_import():
         error_details = traceback.format_exc()
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
+
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
