@@ -12,7 +12,7 @@ from datetime import datetime
 from sqlalchemy import func
 from collections import Counter
 import locale  # [НОВЕ] Імпорт для локалізації дати
-
+import re
 from flask import request, jsonify
 
 from flask_dance.contrib.google import make_google_blueprint, google
