@@ -4,13 +4,14 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from sqlalchemy import func
 from collections import Counter
+import requests
 import locale  # [НОВЕ] Імпорт для локалізації дати
 import re
 
@@ -627,13 +628,13 @@ def admin_unfinished():
     if request.args.get('no_description'):
         query = query.filter((Product.description == None) | (Product.description == ''))
     if request.args.get('no_image'):
-        query = query.filter(Product.image == 'default_tovar.png')
+        query = query.filter(Product.image == 'default_tovar.jpg')
 
     # Рахуємо статистику до пагінації
     counts = {
         'no_stock': Product.query.filter(Product.in_stock == False).count(),
         'no_description': Product.query.filter((Product.description == None) | (Product.description == '')).count(),
-        'no_image': Product.query.filter(Product.image == 'default_tovar.png').count()
+        'no_image': Product.query.filter(Product.image == 'default_tovar.jpg').count()
     }
 
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
@@ -644,8 +645,6 @@ def admin_unfinished():
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
 # ────────────────────────────────
 from lxml import etree as lxml_etree  # Імпортуємо нову бібліотеку
-from werkzeug.exceptions import Unauthorized
-import requests
 import os
 
 
@@ -671,32 +670,38 @@ def handle_bas_handshake():
 @require_api_key
 def bas_import():
     if 'file' not in request.files:
-        return Response("failure\nFile part is missing in the request.", status=400, mimetype='text/plain')
+        return "failure\nFile part is missing in the request.", 400
 
     cml_file = request.files['file']
     if cml_file.filename == '':
-        return Response("failure\nNo selected file.", status=400, mimetype='text/plain')
+        return "failure\nNo selected file.", 400
 
     print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку з lxml...")
 
     try:
         raw_data = cml_file.read()
 
+        # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Використовуємо lxml, який може відновлюватися після помилок
+        # Створюємо парсер, який буде намагатися виправити помилки в XML
         parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
         try:
+            # Спробуємо спочатку UTF-8
             root = lxml_etree.fromstring(raw_data, parser=lxml_etree.XMLParser(recover=True, encoding='utf-8'))
             print("Info: Файл успішно розібрано з кодуванням UTF-8.")
         except Exception:
+            # Якщо не вийшло, використовуємо windows-1251
             root = lxml_etree.fromstring(raw_data, parser=parser)
             print("Info: Файл успішно розібрано з кодуванням windows-1251.")
 
+        # Видаляємо неймспейси, використовуючи можливості lxml
         for elem in root.getiterator():
             if '}' in elem.tag:
                 elem.tag = elem.tag.split('}', 1)[1]
 
+        # Подальша логіка залишається такою ж, але працює з об'єктами lxml
         catalog_node = root.find('.//Каталог')
         if catalog_node is None:
-            return Response("failure\nНе знайдено тег <Каталог>.", status=400, mimetype='text/plain')
+            return "failure\nНе знайдено тег <Каталог>.", 400
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
@@ -706,16 +711,13 @@ def bas_import():
             if not product_id: continue
 
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
-            # Якщо ви видалили 'brand' з моделі Product, цей код правильний
-            # Якщо 'brand' залишився, потрібно додати: brand="Не вказано"
-
             description = (product_node.findtext('Описание') or '').strip()
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
 
             image_node = product_node.find('Картинка')
-            image = image_node.text.strip() if image_node is not None and image_node.text else 'default_tovar.png'
+            image = image_node.text.strip() if image_node is not None and image_node.text else 'default_tovar.jpg'
 
             price = 0.0
             offer_node = catalog_node.find(f".//Предложение[Ид='{product_id}']")
@@ -737,24 +739,20 @@ def bas_import():
                 updated_count += 1
             else:
                 db.session.add(Product(name=name, price=price, description=description, category=category, image=image,
-                                       in_stock=in_stock))
+                                       in_stock=in_stock,))
                 added_count += 1
 
         db.session.commit()
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)
-
-        # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Створюємо ідеально чисту відповідь
-        return Response("success", mimetype='text/plain')
+        return "success"
 
     except Exception as e:
         db.session.rollback()
         import traceback
         error_details = traceback.format_exc()
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
-
-        # Надсилаємо просту відповідь про помилку
-        return Response(f"failure\n{e}", status=500, mimetype='text/plain')
+        return f"failure\nВнутрішня помилка сервера: {e}", 500
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
