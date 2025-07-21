@@ -644,8 +644,7 @@ def require_api_key(f):
 @require_api_key
 def bas_import():
     """
-    Приймає XML-дані від BAS, оновлює/додає товари.
-    Очікує XML в тілі POST-запиту.
+    Приймає CommerceML (.cml) дані від BAS, оновлює/додає товари.
     """
     if not request.data:
         return jsonify({"status": "error", "message": "Запит не містить даних."}), 400
@@ -654,71 +653,98 @@ def bas_import():
         xml_data = request.data.decode('utf-8')
         root = ET.fromstring(xml_data)
 
-        # Припущення щодо структури XML. Можливо, знадобиться коригування.
-        # Наприклад, <Товари> -> <Товар> або <Каталог> -> <Продукт>
-        products_xml = root.findall('.//Товар')
-        if not products_xml:
-            # Спробуємо інший поширений варіант
-            products_xml = root.findall('.//item')
+        # CommerceML часто використовує неймспейси, що ускладнює пошук.
+        # Ця функція допоможе нам ігнорувати їх для спрощення.
+        def get_tag_name(element):
+            return element.tag.split('}')[-1]
 
-        if not products_xml:
-            return jsonify({"status": "error", "message": "Не знайдено товари у XML-файлі. Перевірте структуру."}), 400
+        # Крок 1: Збираємо всі товари та їх дані (назва, опис) в словник.
+        # Ключем буде унікальний ID товару.
+        products_catalog = {}
+        catalog_node = root.find('.//Каталог')
+        if catalog_node is not None:
+            for product_node in catalog_node.findall('.//Товар'):
+                product_id = product_node.findtext('Ид')
+                if not product_id:
+                    continue
+
+                products_catalog[product_id] = {
+                    'name': product_node.findtext('Наименование', 'Без назви').strip(),
+                    'description': product_node.findtext('Описание', '').strip(),
+                    'brand': product_node.findtext('Изготовитель/Бренд', 'Без бренду').strip()  # Назва може бути іншою
+                }
+
+        # Крок 2: Проходимо по пропозиціях (ціни та залишки).
+        offers_package = root.find('.//ПакетПредложений')
+        if offers_package is None:
+            return jsonify({"status": "error", "message": "Не знайдено блок <ПакетПредложений> у файлі."}), 400
 
         updated_count = 0
         added_count = 0
 
-        for item_xml in products_xml:
-            # Назви тегів - це припущення. Їх треба буде узгодити з реальним файлом від BAS.
-            name = item_xml.findtext('Наименование', default='Без назви').strip()
-            price_text = item_xml.findtext('Цена', default='0').replace(',', '.')
-            description = item_xml.findtext('Описание', default='').strip()
-            brand = item_xml.findtext('Бренд', default='Без бренду').strip()
-            # У BAS залишок може називатися 'Количество' або 'Остаток'
-            stock_text = item_xml.findtext('Количество', default='0')
+        for offer_node in offers_package.findall('.//Предложение'):
+            offer_id = offer_node.findtext('Ид')
+            if not offer_id or offer_id not in products_catalog:
+                continue  # Пропускаємо пропозицію, якщо для неї немає товару в каталозі
 
+            # Отримуємо ціну
+            price_node = offer_node.find('.//Цена')
+            price = 0.0
+            if price_node is not None:
+                price_text = price_node.findtext('ЦенаЗаЕдиницу', '0').replace(',', '.')
+                try:
+                    price = float(re.match(r"[\d.]+", price_text).group(0))
+                except (ValueError, AttributeError):
+                    price = 0.0
+
+            # Отримуємо залишок
+            stock_text = offer_node.findtext('Количество', '0')
             try:
-                price = float(re.match(r"[\d.]+", price_text).group(0))
                 in_stock = int(stock_text) > 0
-            except (ValueError, AttributeError):
-                price = 0.0
+            except ValueError:
                 in_stock = False
 
-            # Перевіряємо, чи існує товар з такою назвою
-            product = Product.query.filter_by(name=name).first()
+            # Отримуємо дані про товар зі словника, який ми створили на кроці 1
+            product_data = products_catalog[offer_id]
+            product_name = product_data['name']
+
+            # Перевіряємо, чи існує вже такий товар
+            product = Product.query.filter_by(name=product_name).first()
 
             if product:
-                # Оновлюємо існуючий товар
+                # Оновлюємо існуючий
                 product.price = price
-                product.description = description
-                product.brand = brand
+                product.description = product_data['description']
+                product.brand = product_data['brand']
                 product.in_stock = in_stock
-                # Категорію та зображення залишаємо без змін, оскільки їх може не бути в вигрузці
                 updated_count += 1
             else:
-                # Створюємо новий товар
+                # Створюємо новий
                 product = Product(
-                    name=name,
+                    name=product_name,
                     price=price,
-                    description=description,
-                    brand=brand,
+                    description=product_data['description'],
+                    brand=product_data['brand'],
                     in_stock=in_stock,
-                    category="Новинки з BAS",  # Можна встановити категорію за замовчуванням
-                    image="default.jpg"  # І зображення за замовчуванням
+                    category="Новинки з BAS",
+                    image="default.jpg"
                 )
                 db.session.add(product)
                 added_count += 1
 
         db.session.commit()
-
-        message = f"Імпорт завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
+        message = f"Імпорт CommerceML завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)
         return jsonify({"status": "success", "message": message})
 
-    except ET.ParseError:
-        return jsonify({"status": "error", "message": "Помилка парсингу XML."}), 400
+    except ET.ParseError as e:
+        print(f"Помилка парсингу CML: {e}")
+        return jsonify({"status": "error", "message": f"Помилка парсингу CML: {e}"}), 400
     except Exception as e:
-        db.session.rollback()  # Відкочуємо зміни в разі будь-якої іншої помилки
+        db.session.rollback()
+        import traceback
         print(f"Критична помилка під час імпорту з BAS: {e}")
+        traceback.print_exc()
         return jsonify({"status": "error", "message": f"Внутрішня помилка сервера: {e}"}), 500
 
 # ────────────────────────────────
