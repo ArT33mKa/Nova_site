@@ -654,62 +654,49 @@ def bas_import():
 
     try:
         xml_data = cml_file.read().decode('utf-8')
+        # Видаляємо неймспейси з XML, щоб уникнути проблем з пошуком
+        xml_data = re.sub(r' xmlns="[^"]+"', '', xml_data, count=1)
         root = ET.fromstring(xml_data)
 
-        # [ВИПРАВЛЕНО] Логіка для роботи з неймспейсами (головна зміна!)
-        ns_map = {}
-        if '}' in root.tag:
-            namespace = root.tag.split('}')[0][1:]
-            ns_map['ns'] = namespace
-            print(f"Знайдено неймспейс: {namespace}")
-
-        def find_element(parent, path):
-            return parent.find(path, ns_map)
-
-        def findall_elements(parent, path):
-            return parent.findall(path, ns_map)
-
-        def find_text(parent, path, default=''):
-            el = parent.find(path, ns_map)
-            return el.text.strip() if el is not None and el.text else default
-
-        # Подальша логіка використовує нові функції для пошуку
+        # [ВИПРАВЛЕНО] Тепер шукаємо теги за їх простою назвою, без префіксів
         products_catalog = {}
-        catalog_node = find_element(root, './/ns:Каталог')
+        catalog_node = root.find('.//Каталог')
         if catalog_node is None:
             print("ПОМИЛКА: Не знайдено тег <Каталог> у CML-файлі.")
             return "failure\nНе знайдено тег <Каталог>.", 400
 
-        for product_node in findall_elements(catalog_node, './/ns:Товар'):
-            product_id = find_text(product_node, 'ns:Ид')
+        for product_node in catalog_node.findall('.//Товар'):
+            product_id = product_node.findtext('Ид')
             if not product_id: continue
 
-            brand_name = find_text(find_element(product_node, 'ns:Изготовитель'), 'ns:Наименование', 'Без бренду')
+            brand_node = product_node.find('Изготовитель')
+            brand_name = brand_node.findtext('Наименование', 'Без бренду') if brand_node is not None else 'Без бренду'
 
             products_catalog[product_id] = {
-                'name': find_text(product_node, 'ns:Наименование', 'Без назви'),
-                'description': find_text(product_node, 'ns:Описание', ''),
-                'brand': brand_name
+                'name': product_node.findtext('Наименование', 'Без назви').strip(),
+                'description': product_node.findtext('Описание', '').strip(),
+                'brand': brand_name.strip()
             }
 
-        offers_package = find_element(root, './/ns:ПакетПредложений')
+        offers_package = root.find('.//ПакетПредложений')
         if offers_package is None:
             print("ПОМИЛКА: Не знайдено тег <ПакетПредложений> у CML-файлі.")
             return "failure\nНе знайдено тег <ПакетПредложений>.", 400
 
         updated_count, added_count = 0, 0
-        for offer_node in findall_elements(offers_package, './/ns:Предложение'):
-            offer_id = find_text(offer_node, 'ns:Ид')
+        for offer_node in offers_package.findall('.//Предложение'):
+            offer_id = offer_node.findtext('Ид')
             if not offer_id or offer_id not in products_catalog: continue
 
-            price_text = find_text(find_element(offer_node, './/ns:Цена'), 'ns:ЦенаЗаЕдиницу', '0').replace(',', '.')
+            price_node = offer_node.find('.//Цена')
+            price_text = price_node.findtext('ЦенаЗаЕдиницу', '0') if price_node is not None else '0'
             price = 0.0
             try:
-                price = float(re.match(r"[\d.]+", price_text).group(0))
+                price = float(re.match(r"[\d.]+", price_text.replace(',', '.')).group(0))
             except (ValueError, AttributeError):
                 pass
 
-            stock_text = find_text(offer_node, 'ns:Количество', '0')
+            stock_text = offer_node.findtext('Количество', '0')
             try:
                 in_stock = int(stock_text) > 0
             except ValueError:
