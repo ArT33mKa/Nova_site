@@ -631,6 +631,11 @@ from werkzeug.exceptions import Unauthorized
 import requests
 import os
 
+import xml.etree.ElementTree as ET
+from werkzeug.exceptions import Unauthorized
+import requests
+import os  # Переконайтесь, що os імпортовано на початку файлу
+
 
 def require_api_key(f):
     @wraps(f)
@@ -644,114 +649,101 @@ def require_api_key(f):
     return decorated_function
 
 
+# Цей маршрут працює правильно, залишаємо його
 @app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
 def handle_bas_handshake():
     print("BAS: пройдено етап handshake.")
-    return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"  # 20 MB
+    return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
 
-# [ПОВНІСТЮ ОНОВЛЕНО] Головний обробник, що розрізняє файли
+# [ГОЛОВНЕ ВИПРАВЛЕННЯ] Один обробник для POST запиту, який просто очікує файл
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    filename = request.args.get('filename')
+    # Перевіряємо, чи надіслано файл у полі 'file'
+    if 'file' not in request.files:
+        print("ПОМИЛКА: Запит не містить файлу в полі 'file'.")
+        return "failure\nFile part is missing in the request.", 400
 
-    # --- Етап 1: Прийом та збереження файлу (це може бути або картинка, або CML) ---
-    if filename:
-        # Перевіряємо, чи це зображення за розширенням
-        if any(filename.lower().endswith(ext) for ext in ['.jpeg', '.jpg', '.png', '.gif']):
-            upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
-            os.makedirs(upload_folder, exist_ok=True)
-            file_path = os.path.join(upload_folder, filename)
+    cml_file = request.files['file']
+    if cml_file.filename == '':
+        return "failure\nNo selected file.", 400
 
-            # request.data містить бінарні дані файлу
-            with open(file_path, 'wb') as f:
-                f.write(request.data)
+    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку...")
 
-            print(f"BAS: Успішно завантажено та збережено зображення '{filename}'.")
-            # Повідомляємо BAS про успіх
-            return "success"
-
-        # Якщо це CML-файл, який передається таким же чином
-        elif filename.lower().endswith('.cml'):
-            # Зберігаємо дані CML в сесії для наступного кроку
-            try:
-                session['cml_data'] = request.data.decode('utf-8')
-            except UnicodeDecodeError:
-                session['cml_data'] = request.data.decode('windows-1251')
-            print(f"BAS: Отримано CML файл '{filename}', збережено в сесії.")
-            return "success"
-
-    # --- Етап 2: Обробка CML-файлу після команди "import" ---
-    mode = request.args.get('mode')
-    if mode == 'import':
-        xml_data = session.get('cml_data')
-        if not xml_data:
-            return "failure\nНемає даних CML в сесії для імпорту. Можливо, файл не було надіслано.", 400
-
-        print("BAS: Запущено фінальну обробку CML з сесії.")
+    try:
+        # Обробка кодування
+        raw_data = cml_file.read()
         try:
-            # Обробка CML, як і раніше
-            xml_data = re.sub(r' xmlns="[^"]+"', '', xml_data, count=1)
-            root = ET.fromstring(xml_data)
+            xml_data = raw_data.decode('utf-8')
+        except UnicodeDecodeError:
+            print("Попередження: Не вдалося декодувати як UTF-8. Спроба декодування як windows-1251.")
+            xml_data = raw_data.decode('windows-1251', errors='replace')
 
-            catalog_node = root.find('.//Каталог')
-            if catalog_node is None:
-                return "failure\nНе знайдено тег <Каталог>.", 400
+        # Видалення неймспейсів
+        xml_data = re.sub(r' xmlns="[^"]+"', '', xml_data, count=1)
+        root = ET.fromstring(xml_data)
 
-            groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
+        catalog_node = root.find('.//Каталог')
+        if catalog_node is None:
+            print("ПОМИЛКА: Не знайдено тег <Каталог>.")
+            return "failure\nНе знайдено тег <Каталог>.", 400
 
-            updated_count, added_count = 0, 0
-            for product_node in catalog_node.findall('.//Товар'):
-                product_id = product_node.findtext('Ид')
-                if not product_id: continue
+        groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
-                name = product_node.findtext('Наименование', 'Без назви').strip()
-                description = product_node.findtext('Описание', '').strip()
-                group_id = product_node.find('.//Группы/Ид').text if product_node.find(
-                    './/Группы/Ид') is not None else None
-                category = groups.get(group_id, "Загальна")
-                image = product_node.findtext('Картинка', 'default.jpg').strip()
+        updated_count, added_count = 0, 0
+        for product_node in catalog_node.findall('.//Товар'):
+            product_id = product_node.findtext('Ид')
+            if not product_id: continue
 
-                price = 0.0
-                offer_node = catalog_node.find(f".//Предложение[Ид='{product_id}']")
-                if offer_node:
-                    price_text = offer_node.findtext('.//ЦенаЗаЕдиницу', '0').replace(',', '.')
-                    try:
-                        price = float(re.match(r"[\d.]+", price_text).group(0))
-                    except (ValueError, AttributeError):
-                        pass
+            name = product_node.findtext('Наименование', 'Без назви').strip()
+            description = product_node.findtext('Описание', '').strip()
+            group_id = product_node.find('.//Группы/Ид').text if product_node.find('.//Группы/Ид') is not None else None
+            category = groups.get(group_id, "Загальна")
 
-                in_stock = False
-                stock_prop = product_node.find(f".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
-                if stock_prop is not None and stock_prop.text:
-                    in_stock = stock_prop.text.lower() == 'true'
+            # [НОВЕ] Обробка зображення з умовою за замовчуванням
+            image_node = product_node.find('Картинка')
+            if image_node is not None and image_node.text:
+                image = image_node.text.strip()
+            else:
+                image = 'default_tovar.jpg'  # Ваше фото за замовчуванням
 
-                product = Product.query.filter_by(name=name).first()
-                if product:
-                    product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image, in_stock
-                    updated_count += 1
-                else:
-                    db.session.add(
-                        Product(name=name, price=price, description=description, category=category, image=image,
-                                in_stock=in_stock, brand="Не вказано"))
-                    added_count += 1
+            price = 0.0
+            offer_node = catalog_node.find(f".//Предложение[Ид='{product_id}']")
+            if offer_node:
+                price_text = offer_node.findtext('.//ЦенаЗаЕдиницу', '0').replace(',', '.')
+                try:
+                    price = float(re.match(r"[\d.]+", price_text).group(0))
+                except (ValueError, AttributeError):
+                    pass
 
-            db.session.commit()
-            session.pop('cml_data', None)
-            message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
-            print(message)
-            return f"success\n{message}"
+            in_stock = False
+            stock_prop = product_node.find(f".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
+            if stock_prop is not None and stock_prop.text:
+                in_stock = stock_prop.text.lower() == 'true'
 
-        except Exception as e:
-            session.pop('cml_data', None)
-            db.session.rollback()
-            import traceback
-            error_details = traceback.format_exc()
-            print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
-            return f"failure\nВнутрішня помилка сервера: {e}", 500
+            product = Product.query.filter_by(name=name).first()
+            if product:
+                product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image, in_stock
+                updated_count += 1
+                print(f"Оновлено товар: {name}")
+            else:
+                db.session.add(Product(name=name, price=price, description=description, category=category, image=image,
+                                       in_stock=in_stock, brand="Не вказано"))
+                added_count += 1
+                print(f"Додано новий товар: {name}")
 
-    return "failure\nНевідомий запит або відсутній параметр 'mode=import' для фіналізації.", 400
+        db.session.commit()
+        message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
+        print(message)
+        return f"success\n{message}"
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
+        return f"failure\nВнутрішня помилка сервера: {e}", 500
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
