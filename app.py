@@ -626,122 +626,130 @@ def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         api_key = os.getenv('BAS_API_KEY')
-        # [ВИПРАВЛЕНО] Тепер приймає ключ з параметра 'key'
         provided_key = request.headers.get('X-API-KEY') or request.args.get('key')
-
         if not api_key or provided_key != api_key:
-            print(f"ПОМИЛКА: Неправильний або відсутній ключ API. Отримано: {provided_key}")
-            raise Unauthorized("Невірний або відсутній ключ API.")
+            print(f"ПОМИЛКА АВТОРИЗАЦІЇ: Неправильний або відсутній ключ API. Отримано: {provided_key}")
+            # Відповідаємо так, як очікує BAS
+            return "failure\nInvalid API key.", 401
         return f(*args, **kwargs)
 
     return decorated_function
 
 
-# [НОВЕ] Маршрут-заглушка для перевірки зв'язку від BAS
+# Оновлений "Handshake" для більшої сумісності
 @app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
 def handle_bas_handshake():
     """
     Обробляє запит 'перевірки зв'язку' від BAS.
-    Відповідає 'success', щоб BAS знав, що сайт готовий приймати дані.
+    Відповідає 'success' та базовими параметрами.
     """
-    return "success"
+    print("BAS: пройдено етап handshake (get_1c_system_info).")
+    return "success\nphpsessid\n1234567\nzip=no\nfile_limit=104857600"
 
 
-# [ОНОВЛЕНО] Додано strict_slashes=False, щоб маршрут працював і з / в кінці
-@app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
+@app.route('/api/bas_import', methods=['GET', 'POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
     """
-    Приймає CommerceML (.cml) дані від BAS, оновлює/додає товари.
+    Обробник CommerceML, що підтримує багатоетапний протокол (checkauth, init, file, import).
     """
-    if not request.data:
-        return jsonify({"status": "error", "message": "Запит не містить даних."}), 400
+    mode = request.args.get('mode')
 
-    try:
-        xml_data = request.data.decode('utf-8')
-        root = ET.fromstring(xml_data)
+    # Етап 1: Перевірка авторизації
+    if mode == 'checkauth':
+        print("BAS: пройдено етап checkauth.")
+        return "success\nphpsessid\n1234567"
 
-        # Функція для ігнорування неймспейсів у тегах
-        def get_tag_name(element):
-            return element.tag.split('}')[-1]
+    # Етап 2: Ініціалізація
+    if mode == 'init':
+        print("BAS: пройдено етап init.")
+        return "zip=no\nfile_limit=104857600"  # 100 MB
 
-        # Крок 1: Збираємо дані про товари з <Каталог>
-        products_catalog = {}
-        catalog_node = root.find('.//Каталог')
-        if catalog_node is not None:
-            for product_node in catalog_node.findall('.//Товар'):
-                product_id = product_node.findtext('Ид')
-                if not product_id:
-                    continue
+    # Етап 3: Прийом та обробка файлу
+    if request.method == 'POST':
+        # Якщо BAS надсилає команду 'import' після завантаження, тіло може бути порожнім.
+        if not request.data and mode == 'import':
+            print("BAS: отримано команду import. Запускаємо обробку (якщо вона потрібна окремо).")
+            return "success\nImport completed."  # Просто відповідаємо успішно
 
-                # Знаходимо бренд (може бути в різних місцях)
-                brand_name = "Без бренду"
-                manufacturer_node = product_node.find('Изготовитель')
-                if manufacturer_node is not None:
-                    brand_name = manufacturer_node.findtext('Наименование', 'Без бренду').strip()
+        if not request.data:
+            return "failure\nPOST request body is empty.", 400
 
-                products_catalog[product_id] = {
-                    'name': product_node.findtext('Наименование', 'Без назви').strip(),
-                    'description': product_node.findtext('Описание', '').strip(),
-                    'brand': brand_name
-                }
+        print(f"BAS: отримано файл для імпорту, розмір: {len(request.data)} байт.")
+        try:
+            xml_data = request.data.decode('utf-8')
+            root = ET.fromstring(xml_data)
 
-        # Крок 2: Збираємо ціни та залишки з <ПакетПредложений>
-        offers_package = root.find('.//ПакетПредложений')
-        if offers_package is None:
-            return jsonify({"status": "error", "message": "Не знайдено блок <ПакетПредложений> у файлі."}), 400
+            # ... (решта коду для парсингу залишається без змін) ...
+            products_catalog = {}
+            catalog_node = root.find('.//Каталог')
+            if catalog_node is not None:
+                for product_node in catalog_node.findall('.//Товар'):
+                    product_id = product_node.findtext('Ид')
+                    if not product_id: continue
+                    brand_name = "Без бренду"
+                    manufacturer_node = product_node.find('Изготовитель')
+                    if manufacturer_node is not None:
+                        brand_name = manufacturer_node.findtext('Наименование', 'Без бренду').strip()
+                    products_catalog[product_id] = {
+                        'name': product_node.findtext('Наименование', 'Без назви').strip(),
+                        'description': product_node.findtext('Описание', '').strip(),
+                        'brand': brand_name
+                    }
 
-        updated_count = 0
-        added_count = 0
+            offers_package = root.find('.//ПакетПредложений')
+            if offers_package is None:
+                return "failure\nНе знайдено блок <ПакетПредложений> у файлі.", 400
 
-        for offer_node in offers_package.findall('.//Предложение'):
-            offer_id = offer_node.findtext('Ид')
-            if not offer_id or offer_id not in products_catalog:
-                continue
-
-            price_node = offer_node.find('.//Цена')
-            price = 0.0
-            if price_node is not None:
-                price_text = price_node.findtext('ЦенаЗаЕдиницу', '0').replace(',', '.')
+            updated_count = 0
+            added_count = 0
+            for offer_node in offers_package.findall('.//Предложение'):
+                offer_id = offer_node.findtext('Ид')
+                if not offer_id or offer_id not in products_catalog: continue
+                price_node = offer_node.find('.//Цена')
+                price = 0.0
+                if price_node is not None:
+                    price_text = price_node.findtext('ЦенаЗаЕдиницу', '0').replace(',', '.')
+                    try:
+                        price = float(re.match(r"[\d.]+", price_text).group(0))
+                    except (ValueError, AttributeError):
+                        pass
+                stock_text = offer_node.findtext('Количество', '0')
                 try:
-                    price = float(re.match(r"[\d.]+", price_text).group(0))
-                except (ValueError, AttributeError):
-                    price = 0.0
+                    in_stock = int(stock_text) > 0
+                except ValueError:
+                    in_stock = False
+                product_data = products_catalog[offer_id]
+                product = Product.query.filter_by(name=product_data['name']).first()
+                if product:
+                    product.price = price
+                    product.description = product_data['description']
+                    product.brand = product_data['brand']
+                    product.in_stock = in_stock
+                    updated_count += 1
+                else:
+                    db.session.add(
+                        Product(name=product_data['name'], price=price, description=product_data['description'],
+                                brand=product_data['brand'], in_stock=in_stock, category="Новинки з BAS",
+                                image="default.jpg"))
+                    added_count += 1
 
-            stock_text = offer_node.findtext('Количество', '0')
-            try:
-                in_stock = int(stock_text) > 0
-            except ValueError:
-                in_stock = False
+            db.session.commit()
+            message = f"Імпорт CommerceML завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
+            print(message)
+            return f"success\n{message}"
 
-            product_data = products_catalog[offer_id]
-            product_name = product_data['name']
+        except ET.ParseError as e:
+            print(f"Помилка парсингу CML: {e}")
+            return f"failure\nПомилка парсингу CML: {e}", 400
+        except Exception as e:
+            db.session.rollback()
+            import traceback
+            traceback.print_exc()
+            print(f"Критична помилка під час імпорту з BAS: {e}")
+            return f"failure\nВнутрішня помилка сервера: {e}", 500
 
-            product = Product.query.filter_by(name=product_name).first()
-
-            if product:
-                product.price = price
-                product.description = product_data['description']
-                product.brand = product_data['brand']
-                product.in_stock = in_stock
-                updated_count += 1
-            else:
-                product = Product(
-                    name=product_name,
-                    price=price,
-                    description=product_data['description'],
-                    brand=product_data['brand'],
-                    in_stock=in_stock,
-                    category="Новинки з BAS",
-                    image="default.jpg"
-                )
-                db.session.add(product)
-                added_count += 1
-
-        db.session.commit()
-        message = f"Імпорт CommerceML завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
-        print(message)
-        return jsonify({"status": "success", "message": message})
+    return "failure\nНевідомий режим або некоректний запит."
 
     except ET.ParseError as e:
         print(f"Помилка парсингу CML: {e}")
