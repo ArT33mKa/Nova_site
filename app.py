@@ -751,16 +751,6 @@ def bas_import():
 
     return "failure\nНевідомий режим або некоректний запит."
 
-    except ET.ParseError as e:
-        print(f"Помилка парсингу CML: {e}")
-        return jsonify({"status": "error", "message": f"Помилка парсингу CML: {e}"}), 400
-    except Exception as e:
-        db.session.rollback()
-        import traceback
-        print(f"Критична помилка під час імпорту з BAS: {e}")
-        traceback.print_exc()
-        return jsonify({"status": "error", "message": f"Внутрішня помилка сервера: {e}"}), 500
-
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
 # ────────────────────────────────
