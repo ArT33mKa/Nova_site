@@ -651,7 +651,6 @@ def handle_bas_handshake():
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    # Перевіряємо, чи надіслано файл у полі 'file'
     if 'file' not in request.files:
         print("ПОМИЛКА: Запит не містить файлу в полі 'file'.")
         return "failure\nFile part is missing in the request.", 400
@@ -663,8 +662,17 @@ def bas_import():
     print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку...")
 
     try:
-        xml_data = cml_file.read().decode('utf-8')
-        # Видаляємо можливі неймспейси для надійного пошуку
+        # Читаємо файл як бінарні дані
+        raw_data = cml_file.read()
+
+        # [ВИПРАВЛЕНО] Пробуємо декодувати в UTF-8, а якщо не вийде - в windows-1251
+        try:
+            xml_data = raw_data.decode('utf-8')
+        except UnicodeDecodeError:
+            print("Попередження: Не вдалося декодувати як UTF-8. Спроба декодування як windows-1251.")
+            xml_data = raw_data.decode('windows-1251')
+
+        # Подальша логіка залишається без змін
         xml_data = re.sub(r' xmlns="[^"]+"', '', xml_data, count=1)
         root = ET.fromstring(xml_data)
 
