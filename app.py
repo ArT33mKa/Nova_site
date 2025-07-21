@@ -641,34 +641,6 @@ def admin_unfinished():
 
     return render_template('admin_unfinished.html', products=products, counts=counts)
 
-
-# ────────────────────────────────
-#  ДІАГНОСТИЧНИЙ МАРШРУТ ДЛЯ ЗАВАНТАЖЕННЯ ФОТО (HTTP)
-# ────────────────────────────────
-@app.route('/upload_image', methods=['POST'])
-def upload_image_debug():
-    filename = request.args.get('filename')
-    if not filename:
-        print("HTTP UPLOAD: Запит прийшов, але без імені файлу.")
-        return "failure: filename parameter is missing", 400
-
-    print(f"HTTP UPLOAD: Отримано запит на завантаження файлу '{filename}'!")
-
-    try:
-        upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, filename)
-
-        with open(file_path, 'wb') as f:
-            f.write(request.data)
-
-        print(f"HTTP UPLOAD: Файл '{filename}' успішно збережено!")
-        return "success"
-
-    except Exception as e:
-        print(f"HTTP UPLOAD: Критична помилка при збереженні файлу: {e}")
-        return f"failure: {e}", 500
-
 # ────────────────────────────────
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
 # ────────────────────────────────
@@ -698,6 +670,20 @@ def handle_bas_handshake():
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
+    filename = request.args.get('filename')
+
+    # --- Прийом та збереження файлу зображення ---
+    if filename and any(filename.lower().endswith(ext) for ext in ['.jpeg', '.jpg', '.png', '.gif']):
+        upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
+        os.makedirs(upload_folder, exist_ok=True)
+        file_path = os.path.join(upload_folder, filename)
+
+        with open(file_path, 'wb') as f:
+            f.write(request.data)
+
+        print(f"BAS Image Upload: Успішно збережено '{filename}'.")
+        return "success"
+
     if 'file' not in request.files:
         return "failure\nFile part is missing in the request.", 400
 
