@@ -747,7 +747,7 @@ def bas_import():
         db.session.commit()
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)
-        return f"success\n{message}"
+        return "success"
 
     except Exception as e:
         db.session.rollback()
