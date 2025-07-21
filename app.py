@@ -1,3 +1,4 @@
+// PASTE_CONTENT_HERE: app.py
 import os
 import smtplib
 from email.mime.text import MIMEText
@@ -202,7 +203,8 @@ def index():
          'subtitle': 'Від найкращих виробників'},
         {'image': 'kotly.jpg', 'title': 'Все для систем опалення', 'subtitle': 'Котли, бойлери та комплектуючі'}
     ]
-    products = Product.query.order_by(Product.id.desc()).limit(4).all()
+    # [ЗМІНЕНО] Вибираємо 5 товарів для головної, щоб заповнити ряд
+    products = Product.query.order_by(Product.id.desc()).limit(5).all()
     return render_template("index.html", products=products, hero_slides=hero_slides)
 
 
@@ -244,8 +246,15 @@ def catalog():
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
-    similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id).limit(
-        4).all()
+    # [ЗМІНЕНО] Завантажуємо 5 схожих товарів замість 4
+    similar_products = Product.query.filter(
+        Product.category == product.category,
+        Product.id != product.id,
+        # [ДОДАНО] Схожі товари також мають бути "готовими"
+        Product.in_stock == True,
+        and_(Product.description != None, Product.description != ''),
+        Product.image != 'default_tovar.jpg'
+    ).limit(5).all()
     return render_template("product_detail.html", product=product, similar_products=similar_products)
 
 
@@ -614,10 +623,18 @@ def delete_product(product_id):
 @app.route("/send_message", methods=["POST"])
 def send_message():
     form = request.form
-    subject = f"Нове повідомлення від {form.get('name')}"
-    body = f"Ім'я: {form.get('name')}\nEmail: {form.get('email')}\n\nПовідомлення:\n{form.get('message')}"
+    # [ВИПРАВЛЕНО] Готуємо дані для шаблону
+    form_data = {
+        'name': form.get('name'),
+        'email': form.get('email'),
+        'message': form.get('message')
+    }
+    subject = f"Нове повідомлення з сайту від {form_data['name']}"
 
-    if send_email(os.getenv("SMTP_USER"), subject, body):
+    # [ВИПРАВЛЕНО] Рендеримо HTML-шаблон замість простого тексту
+    html_body = render_template('email/contact_form_notification.html', data=form_data, shop=shop_info)
+
+    if send_email(os.getenv("SMTP_USER"), subject, html_body):
         return jsonify(status="success", message="✅ Повідомлення успішно надіслано!")
     else:
         return jsonify(status="error", message="❌ Помилка сервера при відправці повідомлення."), 500
