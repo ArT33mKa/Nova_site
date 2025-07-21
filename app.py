@@ -666,6 +666,29 @@ def handle_bas_handshake():
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
 
+@app.route('/upload_image', methods=['POST'])
+def upload_image_debug():
+    filename = request.args.get('filename')
+    if not filename:
+        print("HTTP UPLOAD: Запит прийшов, але без імені файлу.")
+        return "failure: filename parameter is missing", 400
+
+    print(f"HTTP UPLOAD: Отримано запит на завантаження файлу '{filename}'!")
+
+    try:
+        upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
+        os.makedirs(upload_folder, exist_ok=True)
+        file_path = os.path.join(upload_folder, filename)
+
+        with open(file_path, 'wb') as f:
+            f.write(request.data)
+
+        print(f"HTTP UPLOAD: Файл '{filename}' успішно збережено!")
+        return "success"
+
+    except Exception as e:
+        print(f"HTTP UPLOAD: Критична помилка при збереженні файлу: {e}")
+        return f"failure: {e}", 500
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
