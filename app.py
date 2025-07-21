@@ -4,7 +4,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, Response
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
@@ -13,7 +13,6 @@ from sqlalchemy import func
 from collections import Counter
 import locale  # [НОВЕ] Імпорт для локалізації дати
 import re
-from flask import request, jsonify
 
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
@@ -672,38 +671,32 @@ def handle_bas_handshake():
 @require_api_key
 def bas_import():
     if 'file' not in request.files:
-        return "failure\nFile part is missing in the request.", 400
+        return Response("failure\nFile part is missing in the request.", status=400, mimetype='text/plain')
 
     cml_file = request.files['file']
     if cml_file.filename == '':
-        return "failure\nNo selected file.", 400
+        return Response("failure\nNo selected file.", status=400, mimetype='text/plain')
 
     print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку з lxml...")
 
     try:
         raw_data = cml_file.read()
 
-        # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Використовуємо lxml, який може відновлюватися після помилок
-        # Створюємо парсер, який буде намагатися виправити помилки в XML
         parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
         try:
-            # Спробуємо спочатку UTF-8
             root = lxml_etree.fromstring(raw_data, parser=lxml_etree.XMLParser(recover=True, encoding='utf-8'))
             print("Info: Файл успішно розібрано з кодуванням UTF-8.")
         except Exception:
-            # Якщо не вийшло, використовуємо windows-1251
             root = lxml_etree.fromstring(raw_data, parser=parser)
             print("Info: Файл успішно розібрано з кодуванням windows-1251.")
 
-        # Видаляємо неймспейси, використовуючи можливості lxml
         for elem in root.getiterator():
             if '}' in elem.tag:
                 elem.tag = elem.tag.split('}', 1)[1]
 
-        # Подальша логіка залишається такою ж, але працює з об'єктами lxml
         catalog_node = root.find('.//Каталог')
         if catalog_node is None:
-            return "failure\nНе знайдено тег <Каталог>.", 400
+            return Response("failure\nНе знайдено тег <Каталог>.", status=400, mimetype='text/plain')
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
@@ -713,6 +706,9 @@ def bas_import():
             if not product_id: continue
 
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
+            # Якщо ви видалили 'brand' з моделі Product, цей код правильний
+            # Якщо 'brand' залишився, потрібно додати: brand="Не вказано"
+
             description = (product_node.findtext('Описание') or '').strip()
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
@@ -741,20 +737,24 @@ def bas_import():
                 updated_count += 1
             else:
                 db.session.add(Product(name=name, price=price, description=description, category=category, image=image,
-                                       in_stock=in_stock,))
+                                       in_stock=in_stock))
                 added_count += 1
 
         db.session.commit()
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)
-        return "success"
+
+        # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Створюємо ідеально чисту відповідь
+        return Response("success", mimetype='text/plain')
 
     except Exception as e:
         db.session.rollback()
         import traceback
         error_details = traceback.format_exc()
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
-        return f"failure\nВнутрішня помилка сервера: {e}", 500
+
+        # Надсилаємо просту відповідь про помилку
+        return Response(f"failure\n{e}", status=500, mimetype='text/plain')
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
