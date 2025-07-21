@@ -14,8 +14,6 @@ from collections import Counter
 import locale  # [НОВЕ] Імпорт для локалізації дати
 import re
 from flask import request, jsonify
-import xml.etree.ElementTree as ET
-from werkzeug.exceptions import Unauthorized
 
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
@@ -622,6 +620,14 @@ def send_message():
 def favorites_page(): return render_template("favorites.html")
 
 
+# ────────────────────────────────
+#  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 4.0 (з обробкою зображень)
+# ────────────────────────────────
+import xml.etree.ElementTree as ET
+from werkzeug.exceptions import Unauthorized
+import requests
+
+
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -640,94 +646,113 @@ def handle_bas_handshake():
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=104857600"
 
 
+# [ОНОВЛЕНО] Приймає файли зображень
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    if 'file' not in request.files:
-        return "failure\nFile part is missing in the request.", 400
+    mode = request.args.get('mode')
+    filename = request.args.get('filename')
 
-    cml_file = request.files['file']
-    if cml_file.filename == '':
-        return "failure\nNo selected file.", 400
+    # Етап 1: Прийом файлу зображення або CML
+    if mode == 'file':
+        # Перевіряємо, чи це зображення
+        if filename and any(filename.lower().endswith(ext) for ext in ['.jpeg', '.jpg', '.png', '.gif']):
+            upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
+            os.makedirs(upload_folder, exist_ok=True)
+            file_path = os.path.join(upload_folder, filename)
 
-    print(f"BAS: Отримано файл '{cml_file.filename}' для імпорту.")
+            with open(file_path, 'wb') as f:
+                f.write(request.data)
 
-    try:
-        xml_data = cml_file.read().decode('utf-8')
-        # Видаляємо неймспейси з XML, щоб уникнути проблем з пошуком
-        xml_data = re.sub(r' xmlns="[^"]+"', '', xml_data, count=1)
-        root = ET.fromstring(xml_data)
+            print(f"BAS: Завантажено зображення '{filename}'.")
+            return "success"
 
-        # [ВИПРАВЛЕНО] Тепер шукаємо теги за їх простою назвою, без префіксів
-        products_catalog = {}
-        catalog_node = root.find('.//Каталог')
-        if catalog_node is None:
-            print("ПОМИЛКА: Не знайдено тег <Каталог> у CML-файлі.")
-            return "failure\nНе знайдено тег <Каталог>.", 400
+        # Якщо це CML файл
+        elif 'file' in request.files:
+            cml_file = request.files['file']
+            # Зберігаємо CML файл тимчасово для подальшої обробки
+            session['cml_data'] = cml_file.read().decode('utf-8')
+            print(f"BAS: Отримано CML файл '{cml_file.filename}', збережено в сесії.")
+            return "success"
+        else:
+            return "failure\nUnknown file type or missing file.", 400
 
-        for product_node in catalog_node.findall('.//Товар'):
-            product_id = product_node.findtext('Ид')
-            if not product_id: continue
+    # Етап 2: Обробка CML файлу, який ми зберегли в сесії
+    if mode == 'import':
+        xml_data = session.get('cml_data')
+        if not xml_data:
+            return "failure\nNo CML data found in session to import.", 400
 
-            brand_node = product_node.find('Изготовитель')
-            brand_name = brand_node.findtext('Наименование', 'Без бренду') if brand_node is not None else 'Без бренду'
+        print("BAS: Запущено обробку CML з сесії.")
+        try:
+            xml_data = re.sub(r' xmlns="[^"]+"', '', xml_data, count=1)
+            root = ET.fromstring(xml_data)
 
-            products_catalog[product_id] = {
-                'name': product_node.findtext('Наименование', 'Без назви').strip(),
-                'description': product_node.findtext('Описание', '').strip(),
-                'brand': brand_name.strip()
-            }
+            # [ВИПРАВЛЕНО] Тепер шукаємо <Предложения> всередині <Каталог>
+            catalog_node = root.find('.//Каталог')
+            if catalog_node is None:
+                return "failure\nНе знайдено тег <Каталог>.", 400
 
-        offers_package = root.find('.//ПакетПредложений')
-        if offers_package is None:
-            print("ПОМИЛКА: Не знайдено тег <ПакетПредложений> у CML-файлі.")
-            return "failure\nНе знайдено тег <ПакетПредложений>.", 400
+            # Створюємо словник категорій для подальшого використання
+            groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
-        updated_count, added_count = 0, 0
-        for offer_node in offers_package.findall('.//Предложение'):
-            offer_id = offer_node.findtext('Ид')
-            if not offer_id or offer_id not in products_catalog: continue
+            # Об'єднуємо збір даних про товар, ціну та наявність
+            updated_count, added_count = 0, 0
+            for product_node in catalog_node.findall('.//Товар'):
+                product_id = product_node.findtext('Ид')
+                if not product_id: continue
 
-            price_node = offer_node.find('.//Цена')
-            price_text = price_node.findtext('ЦенаЗаЕдиницу', '0') if price_node is not None else '0'
-            price = 0.0
-            try:
-                price = float(re.match(r"[\d.]+", price_text.replace(',', '.')).group(0))
-            except (ValueError, AttributeError):
-                pass
+                name = product_node.findtext('Наименование', 'Без назви').strip()
+                description = product_node.findtext('Описание', '').strip()
 
-            stock_text = offer_node.findtext('Количество', '0')
-            try:
-                in_stock = int(stock_text) > 0
-            except ValueError:
+                # Отримуємо категорію
+                group_id = product_node.find('.//Группы/Ид').text if product_node.find(
+                    './/Группы/Ид') is not None else None
+                category = groups.get(group_id, "Загальна")
+
+                # Отримуємо зображення
+                image = product_node.findtext('Картинка', 'default.jpg').strip()
+
+                # Отримуємо ціну з відповідної пропозиції
+                price = 0.0
+                offer_node = catalog_node.find(f".//Предложение[Ид='{product_id}']")
+                if offer_node:
+                    price_text = offer_node.findtext('.//ЦенаЗаЕдиницу', '0').replace(',', '.')
+                    try:
+                        price = float(re.match(r"[\d.]+", price_text).group(0))
+                    except (ValueError, AttributeError):
+                        pass
+
+                # Отримуємо наявність
                 in_stock = False
+                stock_prop = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
+                if stock_prop is not None:
+                    in_stock = stock_prop.text.lower() == 'true'
 
-            product_data = products_catalog[offer_id]
-            product = Product.query.filter_by(name=product_data['name']).first()
-            if product:
-                product.price, product.description, product.brand, product.in_stock = price, product_data[
-                    'description'], product_data['brand'], in_stock
-                updated_count += 1
-            else:
-                db.session.add(Product(name=product_data['name'], price=price, description=product_data['description'],
-                                       brand=product_data['brand'], in_stock=in_stock, category="Новинки з BAS",
-                                       image="default.jpg"))
-                added_count += 1
+                product = Product.query.filter_by(name=name).first()
+                if product:
+                    product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image, in_stock
+                    updated_count += 1
+                else:
+                    db.session.add(
+                        Product(name=name, price=price, description=description, category=category, image=image,
+                                in_stock=in_stock))
+                    added_count += 1
 
-        db.session.commit()
-        message = f"Імпорт CommerceML завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
-        print(message)
-        return f"success\n{message}"
+            db.session.commit()
+            session.pop('cml_data', None)  # Очищуємо сесію
+            message = f"Імпорт CommerceML завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
+            print(message)
+            return f"success\n{message}"
 
-    except ET.ParseError as e:
-        print(f"Помилка парсингу CML: {e}")
-        return f"failure\nПомилка парсингу CML: {e}", 400
-    except Exception as e:
-        db.session.rollback()
-        import traceback
-        traceback.print_exc()
-        print(f"Критична помилка під час імпорту з BAS: {e}")
-        return f"failure\nВнутрішня помилка сервера: {e}", 500
+        except Exception as e:
+            session.pop('cml_data', None)
+            db.session.rollback()
+            import traceback
+            traceback.print_exc()
+            return f"failure\nВнутрішня помилка сервера: {e}", 500
+
+    return "failure\nНевідомий режим або некоректний запит."
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
