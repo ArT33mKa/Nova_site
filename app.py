@@ -615,6 +615,32 @@ def send_message():
 def favorites_page(): return render_template("favorites.html")
 
 
+@app.route('/admin/unfinished')
+@login_required
+@admin_required
+def admin_unfinished():
+    page = request.args.get('page', 1, type=int)
+    query = Product.query
+
+    # Застосовуємо фільтри
+    if request.args.get('no_stock'):
+        query = query.filter(Product.in_stock == False)
+    if request.args.get('no_description'):
+        query = query.filter((Product.description == None) | (Product.description == ''))
+    if request.args.get('no_image'):
+        query = query.filter(Product.image == 'default_tovar.png')
+
+    # Рахуємо статистику до пагінації
+    counts = {
+        'no_stock': Product.query.filter(Product.in_stock == False).count(),
+        'no_description': Product.query.filter((Product.description == None) | (Product.description == '')).count(),
+        'no_image': Product.query.filter(Product.image == 'default_tovar.png').count()
+    }
+
+    products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
+
+    return render_template('admin_unfinished.html', products=products, counts=counts)
+
 # ────────────────────────────────
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
 # ────────────────────────────────

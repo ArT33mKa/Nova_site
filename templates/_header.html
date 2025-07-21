@@ -35,6 +35,9 @@
             <ul>
                 <li><a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}">Головна</a></li>
                 <li><a href="{{ url_for('catalog') }}" class="{{ 'active' if request.endpoint == 'catalog' else '' }}">Каталог</a></li>
+                {% if current_user.is_authenticated and current_user.is_admin %}
+                    <li class="admin-link"><a href="{{ url_for('admin_unfinished') }}" class="{{ 'active' if request.endpoint == 'admin_unfinished' else '' }}">Незавершені</a></li>
+                {% endif %}
                 <li><a href="{{ url_for('index') }}#about">Про нас</a></li>
                 <li><a href="{{ url_for('index') }}#contacts">Контакти</a></li>
             </ul>
