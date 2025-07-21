@@ -628,83 +628,93 @@ def require_api_key(f):
         api_key = os.getenv('BAS_API_KEY')
         provided_key = request.headers.get('X-API-KEY') or request.args.get('key')
         if not api_key or provided_key != api_key:
-            print(f"ПОМИЛКА АВТОРИЗАЦІЇ: Неправильний або відсутній ключ API. Отримано: {provided_key}")
             return "failure\nInvalid API key.", 401
         return f(*args, **kwargs)
 
     return decorated_function
 
 
-# Цей маршрут працює правильно, залишаємо його без змін
 @app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
 def handle_bas_handshake():
     print("BAS: пройдено етап handshake (get_1c_system_info).")
-    # Відповідь, яка задовольняє більшість модулів обміну
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=104857600"
 
 
-# [ПОВНІСТЮ ОНОВЛЕНО] Цей маршрут тепер приймає файли multipart/form-data
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    """
-    Приймає CML-файл від BAS через multipart/form-data.
-    """
-    # Перевіряємо, чи був надісланий файл у полі з назвою 'file'
     if 'file' not in request.files:
-        print("ПОМИЛКА: BAS надіслав запит, але не прикріпив файл у полі 'file'.")
         return "failure\nFile part is missing in the request.", 400
 
     cml_file = request.files['file']
-
     if cml_file.filename == '':
         return "failure\nNo selected file.", 400
 
     print(f"BAS: Отримано файл '{cml_file.filename}' для імпорту.")
 
     try:
-        # Читаємо вміст файлу і декодуємо його
         xml_data = cml_file.read().decode('utf-8')
         root = ET.fromstring(xml_data)
 
-        # Подальша логіка парсингу залишається такою ж, бо вона правильна для CML
-        products_catalog = {}
-        catalog_node = root.find('.//Каталог')
-        if catalog_node is not None:
-            for product_node in catalog_node.findall('.//Товар'):
-                product_id = product_node.findtext('Ид')
-                if not product_id: continue
-                brand_name = "Без бренду"
-                manufacturer_node = product_node.find('Изготовитель')
-                if manufacturer_node is not None:
-                    brand_name = manufacturer_node.findtext('Наименование', 'Без бренду').strip()
-                products_catalog[product_id] = {
-                    'name': product_node.findtext('Наименование', 'Без назви').strip(),
-                    'description': product_node.findtext('Описание', '').strip(),
-                    'brand': brand_name
-                }
+        # [ВИПРАВЛЕНО] Логіка для роботи з неймспейсами (головна зміна!)
+        ns_map = {}
+        if '}' in root.tag:
+            namespace = root.tag.split('}')[0][1:]
+            ns_map['ns'] = namespace
+            print(f"Знайдено неймспейс: {namespace}")
 
-        offers_package = root.find('.//ПакетПредложений')
+        def find_element(parent, path):
+            return parent.find(path, ns_map)
+
+        def findall_elements(parent, path):
+            return parent.findall(path, ns_map)
+
+        def find_text(parent, path, default=''):
+            el = parent.find(path, ns_map)
+            return el.text.strip() if el is not None and el.text else default
+
+        # Подальша логіка використовує нові функції для пошуку
+        products_catalog = {}
+        catalog_node = find_element(root, './/ns:Каталог')
+        if catalog_node is None:
+            print("ПОМИЛКА: Не знайдено тег <Каталог> у CML-файлі.")
+            return "failure\nНе знайдено тег <Каталог>.", 400
+
+        for product_node in findall_elements(catalog_node, './/ns:Товар'):
+            product_id = find_text(product_node, 'ns:Ид')
+            if not product_id: continue
+
+            brand_name = find_text(find_element(product_node, 'ns:Изготовитель'), 'ns:Наименование', 'Без бренду')
+
+            products_catalog[product_id] = {
+                'name': find_text(product_node, 'ns:Наименование', 'Без назви'),
+                'description': find_text(product_node, 'ns:Описание', ''),
+                'brand': brand_name
+            }
+
+        offers_package = find_element(root, './/ns:ПакетПредложений')
         if offers_package is None:
-            return "failure\nНе знайдено блок <ПакетПредложений> у файлі.", 400
+            print("ПОМИЛКА: Не знайдено тег <ПакетПредложений> у CML-файлі.")
+            return "failure\nНе знайдено тег <ПакетПредложений>.", 400
 
         updated_count, added_count = 0, 0
-        for offer_node in offers_package.findall('.//Предложение'):
-            offer_id = offer_node.findtext('Ид')
+        for offer_node in findall_elements(offers_package, './/ns:Предложение'):
+            offer_id = find_text(offer_node, 'ns:Ид')
             if not offer_id or offer_id not in products_catalog: continue
-            price_node = offer_node.find('.//Цена')
+
+            price_text = find_text(find_element(offer_node, './/ns:Цена'), 'ns:ЦенаЗаЕдиницу', '0').replace(',', '.')
             price = 0.0
-            if price_node is not None:
-                price_text = price_node.findtext('ЦенаЗаЕдиницу', '0').replace(',', '.')
-                try:
-                    price = float(re.match(r"[\d.]+", price_text).group(0))
-                except (ValueError, AttributeError):
-                    pass
-            stock_text = offer_node.findtext('Количество', '0')
+            try:
+                price = float(re.match(r"[\d.]+", price_text).group(0))
+            except (ValueError, AttributeError):
+                pass
+
+            stock_text = find_text(offer_node, 'ns:Количество', '0')
             try:
                 in_stock = int(stock_text) > 0
             except ValueError:
                 in_stock = False
+
             product_data = products_catalog[offer_id]
             product = Product.query.filter_by(name=product_data['name']).first()
             if product:
@@ -720,7 +730,6 @@ def bas_import():
         db.session.commit()
         message = f"Імпорт CommerceML завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)
-        # Відповідаємо BAS так, як він очікує
         return f"success\n{message}"
 
     except ET.ParseError as e:
