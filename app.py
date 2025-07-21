@@ -623,18 +623,10 @@ def favorites_page(): return render_template("favorites.html")
 # ────────────────────────────────
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
 # ────────────────────────────────
-# ────────────────────────────────
-#  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 6.0 (з прийомом зображень)
-# ────────────────────────────────
-import xml.etree.ElementTree as ET
+from lxml import etree as lxml_etree  # Імпортуємо нову бібліотеку
 from werkzeug.exceptions import Unauthorized
 import requests
 import os
-
-import xml.etree.ElementTree as ET
-from werkzeug.exceptions import Unauthorized
-import requests
-import os  # Переконайтесь, що os імпортовано на початку файлу
 
 
 def require_api_key(f):
@@ -649,42 +641,47 @@ def require_api_key(f):
     return decorated_function
 
 
-# Цей маршрут працює правильно, залишаємо його
 @app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
 def handle_bas_handshake():
     print("BAS: пройдено етап handshake.")
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
 
-# [ГОЛОВНЕ ВИПРАВЛЕННЯ] Один обробник для POST запиту, який просто очікує файл
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
     if 'file' not in request.files:
-        print("ПОМИЛКА: Запит не містить файлу в полі 'file'.")
         return "failure\nFile part is missing in the request.", 400
 
     cml_file = request.files['file']
     if cml_file.filename == '':
         return "failure\nNo selected file.", 400
 
-    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку...")
+    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку з lxml...")
 
     try:
         raw_data = cml_file.read()
+
+        # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Використовуємо lxml, який може відновлюватися після помилок
+        # Створюємо парсер, який буде намагатися виправити помилки в XML
+        parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
         try:
-            xml_data = raw_data.decode('utf-8')
-        except UnicodeDecodeError:
-            print("Попередження: Не вдалося декодувати як UTF-8. Спроба декодування як windows-1251.")
-            # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Додаємо errors='replace' для ігнорування помилок кодування
-            xml_data = raw_data.decode('windows-1251', errors='replace')
+            # Спробуємо спочатку UTF-8
+            root = lxml_etree.fromstring(raw_data, parser=lxml_etree.XMLParser(recover=True, encoding='utf-8'))
+            print("Info: Файл успішно розібрано з кодуванням UTF-8.")
+        except Exception:
+            # Якщо не вийшло, використовуємо windows-1251
+            root = lxml_etree.fromstring(raw_data, parser=parser)
+            print("Info: Файл успішно розібрано з кодуванням windows-1251.")
 
-        xml_data = re.sub(r' xmlns="[^"]+"', '', xml_data, count=1)
-        root = ET.fromstring(xml_data)
+        # Видаляємо неймспейси, використовуючи можливості lxml
+        for elem in root.getiterator():
+            if '}' in elem.tag:
+                elem.tag = elem.tag.split('}', 1)[1]
 
+        # Подальша логіка залишається такою ж, але працює з об'єктами lxml
         catalog_node = root.find('.//Каталог')
         if catalog_node is None:
-            print("ПОМИЛКА: Не знайдено тег <Каталог>.")
             return "failure\nНе знайдено тег <Каталог>.", 400
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
@@ -694,9 +691,10 @@ def bas_import():
             product_id = product_node.findtext('Ид')
             if not product_id: continue
 
-            name = product_node.findtext('Наименование', 'Без назви').strip()
-            description = product_node.findtext('Описание', '').strip()
-            group_id = product_node.find('.//Группы/Ид').text if product_node.find('.//Группы/Ид') is not None else None
+            name = (product_node.findtext('Наименование') or 'Без назви').strip()
+            description = (product_node.findtext('Описание') or '').strip()
+            group_id_node = product_node.find('.//Группы/Ид')
+            group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
 
             image_node = product_node.find('Картинка')
@@ -704,8 +702,8 @@ def bas_import():
 
             price = 0.0
             offer_node = catalog_node.find(f".//Предложение[Ид='{product_id}']")
-            if offer_node:
-                price_text = offer_node.findtext('.//ЦенаЗаЕдиницу', '0').replace(',', '.')
+            if offer_node is not None:
+                price_text = (offer_node.findtext('.//ЦенаЗаЕдиницу') or '0').replace(',', '.')
                 try:
                     price = float(re.match(r"[\d.]+", price_text).group(0))
                 except (ValueError, AttributeError):
@@ -720,12 +718,10 @@ def bas_import():
             if product:
                 product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image, in_stock
                 updated_count += 1
-                print(f"Оновлено товар: {name}")
             else:
                 db.session.add(Product(name=name, price=price, description=description, category=category, image=image,
                                        in_stock=in_stock, brand="Не вказано"))
                 added_count += 1
-                print(f"Додано новий товар: {name}")
 
         db.session.commit()
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
