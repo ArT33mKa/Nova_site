@@ -660,7 +660,6 @@ def handle_bas_handshake():
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    # Перевіряємо, чи надіслано файл у полі 'file'
     if 'file' not in request.files:
         print("ПОМИЛКА: Запит не містить файлу в полі 'file'.")
         return "failure\nFile part is missing in the request.", 400
@@ -672,15 +671,14 @@ def bas_import():
     print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку...")
 
     try:
-        # Обробка кодування
         raw_data = cml_file.read()
         try:
             xml_data = raw_data.decode('utf-8')
         except UnicodeDecodeError:
             print("Попередження: Не вдалося декодувати як UTF-8. Спроба декодування як windows-1251.")
+            # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Додаємо errors='replace' для ігнорування помилок кодування
             xml_data = raw_data.decode('windows-1251', errors='replace')
 
-        # Видалення неймспейсів
         xml_data = re.sub(r' xmlns="[^"]+"', '', xml_data, count=1)
         root = ET.fromstring(xml_data)
 
@@ -701,12 +699,8 @@ def bas_import():
             group_id = product_node.find('.//Группы/Ид').text if product_node.find('.//Группы/Ид') is not None else None
             category = groups.get(group_id, "Загальна")
 
-            # [НОВЕ] Обробка зображення з умовою за замовчуванням
             image_node = product_node.find('Картинка')
-            if image_node is not None and image_node.text:
-                image = image_node.text.strip()
-            else:
-                image = 'default_tovar.jpg'  # Ваше фото за замовчуванням
+            image = image_node.text.strip() if image_node is not None and image_node.text else 'default_tovar.png'
 
             price = 0.0
             offer_node = catalog_node.find(f".//Предложение[Ид='{product_id}']")
