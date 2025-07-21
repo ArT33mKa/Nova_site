@@ -14,6 +14,8 @@ from collections import Counter
 import locale  # [НОВЕ] Імпорт для локалізації дати
 import re
 from flask import request, jsonify
+import xml.etree.ElementTree as ET
+from werkzeug.exceptions import Unauthorized
 
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
@@ -620,27 +622,33 @@ def send_message():
 def favorites_page(): return render_template("favorites.html")
 
 
-import xml.etree.ElementTree as ET
-from werkzeug.exceptions import Unauthorized
-
-
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         api_key = os.getenv('BAS_API_KEY')
-        # Ключ може передаватися або в заголовку, або як параметр запиту
-        provided_key = request.headers.get('X-API-KEY') or request.args.get('api_key')
+        # [ВИПРАВЛЕНО] Тепер приймає ключ з параметра 'key'
+        provided_key = request.headers.get('X-API-KEY') or request.args.get('key')
 
         if not api_key or provided_key != api_key:
             print(f"ПОМИЛКА: Неправильний або відсутній ключ API. Отримано: {provided_key}")
-            # Використовуємо стандартний виняток для помилки авторизації
             raise Unauthorized("Невірний або відсутній ключ API.")
         return f(*args, **kwargs)
 
     return decorated_function
 
 
-@app.route('/api/bas_import', methods=['POST'])
+# [НОВЕ] Маршрут-заглушка для перевірки зв'язку від BAS
+@app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
+def handle_bas_handshake():
+    """
+    Обробляє запит 'перевірки зв'язку' від BAS.
+    Відповідає 'success', щоб BAS знав, що сайт готовий приймати дані.
+    """
+    return "success"
+
+
+# [ОНОВЛЕНО] Додано strict_slashes=False, щоб маршрут працював і з / в кінці
+@app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
     """
@@ -653,13 +661,11 @@ def bas_import():
         xml_data = request.data.decode('utf-8')
         root = ET.fromstring(xml_data)
 
-        # CommerceML часто використовує неймспейси, що ускладнює пошук.
-        # Ця функція допоможе нам ігнорувати їх для спрощення.
+        # Функція для ігнорування неймспейсів у тегах
         def get_tag_name(element):
             return element.tag.split('}')[-1]
 
-        # Крок 1: Збираємо всі товари та їх дані (назва, опис) в словник.
-        # Ключем буде унікальний ID товару.
+        # Крок 1: Збираємо дані про товари з <Каталог>
         products_catalog = {}
         catalog_node = root.find('.//Каталог')
         if catalog_node is not None:
@@ -668,13 +674,19 @@ def bas_import():
                 if not product_id:
                     continue
 
+                # Знаходимо бренд (може бути в різних місцях)
+                brand_name = "Без бренду"
+                manufacturer_node = product_node.find('Изготовитель')
+                if manufacturer_node is not None:
+                    brand_name = manufacturer_node.findtext('Наименование', 'Без бренду').strip()
+
                 products_catalog[product_id] = {
                     'name': product_node.findtext('Наименование', 'Без назви').strip(),
                     'description': product_node.findtext('Описание', '').strip(),
-                    'brand': product_node.findtext('Изготовитель/Бренд', 'Без бренду').strip()  # Назва може бути іншою
+                    'brand': brand_name
                 }
 
-        # Крок 2: Проходимо по пропозиціях (ціни та залишки).
+        # Крок 2: Збираємо ціни та залишки з <ПакетПредложений>
         offers_package = root.find('.//ПакетПредложений')
         if offers_package is None:
             return jsonify({"status": "error", "message": "Не знайдено блок <ПакетПредложений> у файлі."}), 400
@@ -685,9 +697,8 @@ def bas_import():
         for offer_node in offers_package.findall('.//Предложение'):
             offer_id = offer_node.findtext('Ид')
             if not offer_id or offer_id not in products_catalog:
-                continue  # Пропускаємо пропозицію, якщо для неї немає товару в каталозі
+                continue
 
-            # Отримуємо ціну
             price_node = offer_node.find('.//Цена')
             price = 0.0
             if price_node is not None:
@@ -697,29 +708,24 @@ def bas_import():
                 except (ValueError, AttributeError):
                     price = 0.0
 
-            # Отримуємо залишок
             stock_text = offer_node.findtext('Количество', '0')
             try:
                 in_stock = int(stock_text) > 0
             except ValueError:
                 in_stock = False
 
-            # Отримуємо дані про товар зі словника, який ми створили на кроці 1
             product_data = products_catalog[offer_id]
             product_name = product_data['name']
 
-            # Перевіряємо, чи існує вже такий товар
             product = Product.query.filter_by(name=product_name).first()
 
             if product:
-                # Оновлюємо існуючий
                 product.price = price
                 product.description = product_data['description']
                 product.brand = product_data['brand']
                 product.in_stock = in_stock
                 updated_count += 1
             else:
-                # Створюємо новий
                 product = Product(
                     name=product_name,
                     price=price,
