@@ -693,25 +693,6 @@ def handle_bas_handshake():
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
 
-def require_api_key(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        api_key = os.getenv('BAS_API_KEY')
-        provided_key = request.headers.get('X-API-KEY') or request.args.get('key')
-        if not api_key or provided_key != api_key:
-            return "failure\nInvalid API key.", 401
-        return f(*args, **kwargs)
-
-    return decorated_function
-
-
-# Цей маршрут потрібен для початкового "рукостискання" з BAS. Залиште його як є.
-@app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
-def handle_bas_handshake():
-    print("BAS: пройдено етап handshake.")
-    return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
-
-
 # [ВАЖЛИВО] Старий маршрут /upload_image більше не потрібен, оскільки uploader.py
 # тепер завантажує фото напряму в Cloudinary. Його можна повністю видалити.
 
