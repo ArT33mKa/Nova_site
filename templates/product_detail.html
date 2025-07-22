@@ -19,7 +19,7 @@
 
         <!-- Ліва колонка з зображенням товару -->
         <div class="product-image-main">
-            <img src="{{ url_for('static', filename='img/products/' + product.image) }}" alt="{{ product.name }}">
+            <img src="{{ product.image }}" alt="{{ product.name }}">
         </div>
 
         <!-- Права колонка з інформацією про товар -->

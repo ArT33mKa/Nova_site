@@ -140,7 +140,7 @@ function updateCartView() {
                     const stockText = item.in_stock ? '✔ В наявності' : '✖ Немає в наявності';
                     const itemHtml = `
                     <div class="cart-item" data-id="${item.id}">
-                        <a href="${item.url}" class="cart-item-link"><img src="/static/img/products/${item.image}" alt="${item.name}" class="cart-item-img"></a>
+                        <a href="${item.url}" class="cart-item-link"><img src="${item.image}" alt="${item.name}" class="cart-item-img"></a>
                         <div class="cart-item-info">
                             <a href="${item.url}" class="cart-item-link"><h4>${item.name}</h4></a>
                             <p class="cart-item-price">${item.price.toFixed(2)} ₴</p>
@@ -279,7 +279,7 @@ function renderFavoritesModal() {
             const cardHtml = `
             <div class="product-card" data-id="${p.id}">
                 <div class="product-image">
-                    <a href="${p.url}"><img src="/static/img/products/${p.image}" alt="${p.name}"></a>
+                    <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
                     ${stockStatus}
                     <button class="favorite-btn active" title="Видалити з обраного"><i class="fas fa-star"></i></button>
                     ${adminActionsHtml} <!-- Вставляємо адмін-кнопки сюди -->

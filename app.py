@@ -1,23 +1,23 @@
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
-from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-from sqlalchemy import func, and_
-from collections import Counter
-import requests
-import locale  # [НОВЕ] Імпорт для локалізації дати
 import re
-
-from flask_dance.contrib.google import make_google_blueprint, google
+import locale
+import smtplib
+import cloudinary.utils
+from functools import wraps
+from datetime import datetime
+from dotenv import load_dotenv
+from collections import Counter
+from sqlalchemy import func, and_
+from email.mime.text import MIMEText
+from lxml import etree as lxml_etree
+from flask_sqlalchemy import SQLAlchemy
+from email.mime.multipart import MIMEMultipart
 from flask_dance.consumer import oauth_authorized
 from flask_dance.consumer.storage.sqla import SQLAlchemyStorage
+from flask_dance.contrib.google import make_google_blueprint, google
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 
 # [ОНОВЛЕНО] Встановлюємо українську локаль для дат.
 # Якщо на вашому сервері (включаючи Render, Heroku і т.д.) не встановлена ця локаль,
@@ -672,9 +672,7 @@ def admin_unfinished():
 
 # ────────────────────────────────
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
-# ────────────────────────────────
-from lxml import etree as lxml_etree  # Імпортуємо нову бібліотеку
-import os
+# ───────────────────────────────
 
 
 def require_api_key(f):
@@ -695,48 +693,32 @@ def handle_bas_handshake():
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
 
-@app.route('/upload_image', methods=['POST'])
-def upload_image_debug():
-    filename = request.args.get('filename')
-    if not filename:
-        print("HTTP UPLOAD: Запит прийшов, але без імені файлу.")
-        return "failure: filename parameter is missing", 400
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = os.getenv('BAS_API_KEY')
+        provided_key = request.headers.get('X-API-KEY') or request.args.get('key')
+        if not api_key or provided_key != api_key:
+            return "failure\nInvalid API key.", 401
+        return f(*args, **kwargs)
 
-    print(f"HTTP UPLOAD: Отримано запит на завантаження файлу '{filename}'!")
+    return decorated_function
 
-    try:
-        upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, filename)
 
-        with open(file_path, 'wb') as f:
-            f.write(request.data)
+# Цей маршрут потрібен для початкового "рукостискання" з BAS. Залиште його як є.
+@app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
+def handle_bas_handshake():
+    print("BAS: пройдено етап handshake.")
+    return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
-        print(f"HTTP UPLOAD: Файл '{filename}' успішно збережено!")
-        return "success"
 
-    except Exception as e:
-        print(f"HTTP UPLOAD: Критична помилка при збереженні файлу: {e}")
-        return f"failure: {e}", 500
-
+# [ВАЖЛИВО] Старий маршрут /upload_image більше не потрібен, оскільки uploader.py
+# тепер завантажує фото напряму в Cloudinary. Його можна повністю видалити.
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    filename = request.args.get('filename')
-
-    # --- Прийом та збереження файлу зображення ---
-    if filename and any(filename.lower().endswith(ext) for ext in ['.jpeg', '.jpg', '.png', '.gif']):
-        upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, filename)
-
-        with open(file_path, 'wb') as f:
-            f.write(request.data)
-
-        print(f"BAS Image Upload: Успішно збережено '{filename}'.")
-        return "success"
-
+    # --- Крок 1: Отримуємо та перевіряємо файл ---
     if 'file' not in request.files:
         return "failure\nFile part is missing in the request.", 400
 
@@ -749,46 +731,58 @@ def bas_import():
     try:
         raw_data = cml_file.read()
 
-        # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Використовуємо lxml, який може відновлюватися після помилок
+        # --- Крок 2: Надійний парсинг XML ---
         # Створюємо парсер, який буде намагатися виправити помилки в XML
-        parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
         try:
             # Спробуємо спочатку UTF-8
-            root = lxml_etree.fromstring(raw_data, parser=lxml_etree.XMLParser(recover=True, encoding='utf-8'))
+            parser_utf8 = lxml_etree.XMLParser(recover=True, encoding='utf-8')
+            root = lxml_etree.fromstring(raw_data, parser=parser_utf8)
             print("Info: Файл успішно розібрано з кодуванням UTF-8.")
         except Exception:
             # Якщо не вийшло, використовуємо windows-1251
-            root = lxml_etree.fromstring(raw_data, parser=parser)
+            parser_win1251 = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
+            root = lxml_etree.fromstring(raw_data, parser=parser_win1251)
             print("Info: Файл успішно розібрано з кодуванням windows-1251.")
 
-        # Видаляємо неймспейси, використовуючи можливості lxml
+        # Видаляємо неймспейси, щоб спростити пошук тегів
         for elem in root.getiterator():
             if '}' in elem.tag:
                 elem.tag = elem.tag.split('}', 1)[1]
 
-        # Подальша логіка залишається такою ж, але працює з об'єктами lxml
         catalog_node = root.find('.//Каталог')
         if catalog_node is None:
             return "failure\nНе знайдено тег <Каталог>.", 400
 
+        # --- Крок 3: Підготовка даних для обробки товарів ---
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
-
         updated_count, added_count = 0, 0
+
+        # --- Крок 4: Цикл обробки кожного товару ---
         for product_node in catalog_node.findall('.//Товар'):
-            product_id = product_node.findtext('Ид')
-            if not product_id: continue
+            product_id_from_xml = product_node.findtext('Ид')
+            if not product_id_from_xml: continue
 
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
+
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
 
-            image_node = product_node.find('Картинка')
-            image = image_node.text.strip() if image_node is not None and image_node.text else 'default_tovar.jpg'
+            # --- [ГОЛОВНА ЗМІНА] Формування URL зображення з Cloudinary ---
+            image_filename = (product_node.findtext('Картинка') or '').strip()
+            image_url = 'https://res.cloudinary.com/your_cloud_name/image/upload/v1/products/default_tovar.jpg'  # Повне посилання на ваше дефолтне фото
+
+            if image_filename:
+                # Створюємо public_id, який використовувався при завантаженні: `folder/filename_without_ext`
+                public_id = f"products/{os.path.splitext(image_filename)[0]}"
+                # Генеруємо безпечний https:// URL
+                # Ця функція автоматично візьме налаштування (cloud_name) з вашого середовища
+                image_url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
+            # -----------------------------------------------------------------
 
             price = 0.0
-            offer_node = catalog_node.find(f".//Предложение[Ид='{product_id}']")
+            offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
             if offer_node is not None:
                 price_text = (offer_node.findtext('.//ЦенаЗаЕдиницу') or '0').replace(',', '.')
                 try:
@@ -797,19 +791,43 @@ def bas_import():
                     pass
 
             in_stock = False
-            stock_prop = product_node.find(f".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
-            if stock_prop is not None and stock_prop.text:
-                in_stock = stock_prop.text.lower() == 'true'
+            # Пробуємо знайти наявність за новим реквізитом
+            stock_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
+            if stock_node is not None and stock_node.text is not None:
+                in_stock = stock_node.text.strip().lower() in ['true', 'да', 'є']
+            else:  # Якщо не знайшли, шукаємо кількість у пропозиції як запасний варіант
+                offer_stock_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']/Количество")
+                if offer_stock_node is not None and offer_stock_node.text is not None:
+                    try:
+                        stock_quantity = int(float(offer_stock_node.text.strip()))
+                        in_stock = stock_quantity > 0
+                    except (ValueError, TypeError):
+                        pass
 
+            # --- Крок 5: Оновлення або створення товару в базі даних ---
             product = Product.query.filter_by(name=name).first()
             if product:
-                product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image, in_stock
+                # Оновлюємо існуючий товар, ЗАПИСУЮЧИ URL ЗОБРАЖЕННЯ
+                product.price = price
+                product.description = description
+                product.category = category
+                product.image = image_url  # <-- Зберігаємо URL
+                product.in_stock = in_stock
                 updated_count += 1
             else:
-                db.session.add(Product(name=name, price=price, description=description, category=category, image=image,
-                                       in_stock=in_stock, ))
+                # Створюємо новий товар, ЗАПИСУЮЧИ URL ЗОБРАЖЕННЯ
+                new_product = Product(
+                    name=name,
+                    price=price,
+                    description=description,
+                    category=category,
+                    image=image_url,  # <-- Зберігаємо URL
+                    in_stock=in_stock
+                )
+                db.session.add(new_product)
                 added_count += 1
 
+        # --- Крок 6: Зберігаємо всі зміни в базі даних ---
         db.session.commit()
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)

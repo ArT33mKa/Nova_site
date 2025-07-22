@@ -5,7 +5,7 @@
     <div class="product-image">
         <!-- Посилання, що огортає зображення -->
         <a href="{{ url_for('product_detail', product_id=product.id) }}" class="product-image-link">
-            <img src="{{ url_for('static', filename='img/products/' + product.image) }}" alt="{{ product.name }}">
+            <img src="{{ product.image }}" alt="{{ product.name }}">
         </a>
 
         <!-- Статус наявності (зверху зліва) -->

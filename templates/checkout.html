@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 data.items.forEach(item => {
                     const itemHtml = `
                         <div class="summary-item">
-                            <img src="/static/img/products/${item.image}" alt="${item.name}">
+                            <img src="${item.image}" alt="${item.name}">
                             <div class="summary-item-details">
                                 <div class="name">${item.name}</div>
                                 <div class="price">${item.quantity} x ${item.price.toFixed(2)} ₴</div>
