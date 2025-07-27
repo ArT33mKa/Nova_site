@@ -1,3 +1,4 @@
+<!-- templates/checkout.html (НОВА, ПОКРАЩЕНА ВЕРСІЯ) -->
 {% extends "base.html" %}
 {% block title %}Оформлення замовлення{% endblock %}
 
@@ -104,11 +105,8 @@ document.addEventListener('DOMContentLoaded', function() {
         group.addEventListener('click', e => {
             const label = e.target.closest('.radio-option');
             if (!label) return;
-            // Знімаємо клас active з усіх опцій в групі
             group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
-            // Додаємо клас active до обраної
             label.classList.add('active');
-            // Переконуємось, що радіокнопка всередині обрана
             label.querySelector('input').checked = true;
         });
     });
