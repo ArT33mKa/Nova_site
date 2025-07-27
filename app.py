@@ -70,21 +70,35 @@ def send_email(to_address, subject, html_body):
 
 def send_telegram_notification(order, items):
     """Відправляє дані про нове замовлення на вебхук SendPulse."""
-    webhook_url, event_name, admin_id = (os.getenv("SENDPULSE_WEBHOOK_URL"), os.getenv("SENDPULSE_EVENT_NAME"),
-                                         os.getenv("ADMIN_TELEGRAM_ID"))
-    if not all([webhook_url, event_name, admin_id]):
-        print(">>> ПОМИЛКА SendPulse: URL, назва події або ID адміна не вказані в .env")
+
+    webhook_url = os.getenv("SENDPULSE_WEBHOOK_URL")  # Новий URL для нової події
+    event_name = os.getenv("SENDPULSE_EVENT_NAME")  # Назва нової події, напр. 'nova_podia_2025_07_27'
+    admin_email = os.getenv("ADMIN_EMAIL_FOR_SP")  # Твій email, як в аудиторії SendPulse
+
+    if not all([webhook_url, event_name, admin_email]):
+        print(">>> ПОМИЛКА SendPulse: URL, назва події або email адміна не вказані в .env")
         return
 
     first_item = items[0]['product'] if items else None
     product_names = ", ".join([item['product'].name for item in items])
     photo_url = first_item.image if first_item else ''
 
-    payload = {"telegram_id": admin_id, "eventName": event_name,
-               "variables": {"order_id": str(order.id), "order_status": "Нове", "product_name": product_names,
-                             "customer_name": order.customer_name, "customer_phone": order.customer_phone,
-                             "delivery_method": order.delivery_method, "payment_method": order.payment_method,
-                             "photo_url": photo_url}}
+    # [ВАЖЛИВО] Створюємо payload, який точно працює.
+    # Головний ідентифікатор - email.
+    payload = {
+        "email": admin_email,
+        "eventName": event_name,
+        "variables": {
+            "order_id": str(order.id),
+            "order_status": "Нове",
+            "product_name": product_names,
+            "customer_name": order.customer_name,
+            "customer_phone": order.customer_phone,
+            "delivery_method": order.delivery_method,
+            "payment_method": order.payment_method,
+            "photo_url": photo_url
+        }
+    }
 
     try:
         print(">>> SendPulse: Намагаюся відправити сповіщення...")
