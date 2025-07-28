@@ -78,21 +78,22 @@ def send_telegram_notification(order, items):
 
     product_names = ", ".join([item['product'].name for item in items])
 
-    # Готуємо дані (payload) для відправки
     payload = {
         "order_id": order.id,
-        "order_status": order.status,
+        "order_status": "Нове",  # Видаляємо .status, бо ми його ще не додали
         "customer_name": order.customer_name,
         "customer_phone": order.customer_phone,
         "product_name": product_names,
+        "delivery_method": order.delivery_method,  # Додаємо відсутні поля
+        "payment_method": order.payment_method,  # Додаємо відсутні поля
         "total_cost": f"{order.total_cost:.2f} ₴"
     }
 
     try:
         print(">>> Make.com: Намагаюся відправити сповіщення на вебхук...")
         response = requests.post(webhook_url, json=payload, timeout=10)
-        # Make повертає текст "Accepted" і статус 200, якщо все добре
-        if response.status_code == 200 and response.text == "Accepted":
+
+        if response.status_code == 200 and "Accepted" in response.text:
             print(f">>> Make.com: Дані про замовлення #{order.id} успішно надіслано!")
         else:
             print(f">>> Make.com: Помилка відповіді від сервера - {response.status_code} {response.text}")
