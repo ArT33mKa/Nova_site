@@ -702,58 +702,6 @@ def admin_unfinished():
 
     return render_template('admin_unfinished.html', products=products, counts=counts)
 
-
-# ────────────────────────────────
-#  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
-# ───────────────────────────────
-
-def send_telegram_notification(order, items):
-    """
-    [ОНОВЛЕНО] Відправляє дані про нове замовлення на вебхук SendPulse
-    для створення інтерактивного повідомлення з кнопками.
-    """
-    webhook_url = os.getenv("SENDPULSE_WEBHOOK_URL")
-    admin_email = os.getenv("ADMIN_EMAIL_FOR_SP") # Ваш email, як в аудиторії SendPulse
-
-    if not webhook_url or not admin_email:
-        print(">>> ПОМИЛКА SendPulse: URL вебхука або email адміна не вказані в .env")
-        return
-
-    # Збираємо назви всіх товарів через кому
-    product_names = ", ".join([item['product'].name for item in items])
-    # Беремо фото першого товару для прев'ю
-    photo_url = items[0]['product'].image if items else ''
-
-    # [ВАЖЛИВО] Формуємо дані (payload), які SendPulse очікує отримати.
-    # Назви змінних мають співпадати з тими, що ви використовуєте в SendPulse.
-    payload = {
-        "email": admin_email, # Обов'язкове поле для ідентифікації контакту в SendPulse
-        "variables": {
-            "order_id": str(order.id),
-            "order_status": "Нове", # Початковий статус
-            "product_name": product_names,
-            "customer_name": order.customer_name,
-            "customer_phone": order.customer_phone,
-            "delivery_method": order.delivery_method,
-            "payment_method": order.payment_method,
-            "photo_url": photo_url # Можна використати для картинки в повідомленні
-        }
-    }
-
-    try:
-        print(">>> SendPulse: Намагаюся відправити сповіщення на вебхук...")
-        # Ми не вказуємо назву події, бо вебхук спрацьовує сам по собі
-        response = requests.post(webhook_url, json=payload, timeout=10)
-        response.raise_for_status() # Перевіряємо на помилки (4xx, 5xx)
-
-        # SendPulse зазвичай повертає {"result": true} при успіху
-        if response.json().get('result'):
-            print(f">>> SendPulse: Дані про замовлення #{order.id} успішно надіслано!")
-        else:
-            print(f">>> SendPulse: Помилка відповіді від сервера - {response.text}")
-
-    except requests.exceptions.RequestException as e:
-        print(f">>> SendPulse: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
