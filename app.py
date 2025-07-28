@@ -69,49 +69,35 @@ def send_email(to_address, subject, html_body):
 
 # [ПОЧАТОК ЗМІН] --- Повністю замінена функція для відправки в Telegram
 def send_telegram_notification(order, items):
-    """
-    [ОНОВЛЕНО 2.0] Відправляє дані на вебхук SendPulse,
-    використовуючи chat_id для прямої ідентифікації отримувача.
-    """
-    webhook_url = os.getenv("SENDPULSE_WEBHOOK_URL")
-    # [НОВЕ] Замість email, ми беремо chat_id з налаштувань
-    admin_chat_id = os.getenv("ADMIN_TELEGRAM_CHAT_ID")
+    """[ОНОВЛЕНО 4.0] Відправляє дані про замовлення на вебхук Make.com."""
+    webhook_url = os.getenv("MAKE_WEBHOOK_URL")
 
-    if not webhook_url or not admin_chat_id:
-        print(">>> ПОМИЛКА SendPulse: URL вебхука або ID чату адміна не вказані в .env")
+    if not webhook_url:
+        print(">>> ПОМИЛКА Make.com: URL вебхука не вказано в .env")
         return
 
     product_names = ", ".join([item['product'].name for item in items])
-    photo_url = items[0]['product'].image if items else ''
 
-    # [ВАЖЛИВО] Формуємо новий payload.
-    # Тепер головний ідентифікатор - це chat_id.
+    # Готуємо дані (payload) для відправки
     payload = {
-        "chat_id": admin_chat_id,  # Надсилаємо ID чату напряму
-        "variables": {
-            "order_id": str(order.id),
-            "order_status": "Нове",
-            "product_name": product_names,
-            "customer_name": order.customer_name,
-            "customer_phone": order.customer_phone,
-            "delivery_method": order.delivery_method,
-            "payment_method": order.payment_method,
-            "photo_url": photo_url
-        }
+        "order_id": order.id,
+        "order_status": order.status,
+        "customer_name": order.customer_name,
+        "customer_phone": order.customer_phone,
+        "product_name": product_names,
+        "total_cost": f"{order.total_cost:.2f} ₴"
     }
 
     try:
-        print(">>> SendPulse: Намагаюся відправити сповіщення на вебхук...")
+        print(">>> Make.com: Намагаюся відправити сповіщення на вебхук...")
         response = requests.post(webhook_url, json=payload, timeout=10)
-        response.raise_for_status()
-
-        if response.json().get('result'):
-            print(f">>> SendPulse: Дані про замовлення #{order.id} успішно надіслано!")
+        # Make повертає текст "Accepted" і статус 200, якщо все добре
+        if response.status_code == 200 and response.text == "Accepted":
+            print(f">>> Make.com: Дані про замовлення #{order.id} успішно надіслано!")
         else:
-            print(f">>> SendPulse: Помилка відповіді від сервера - {response.text}")
-
+            print(f">>> Make.com: Помилка відповіді від сервера - {response.status_code} {response.text}")
     except requests.exceptions.RequestException as e:
-        print(f">>> SendPulse: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
+        print(f">>> Make.com: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
 
 
 # ────────────────────────────────
