@@ -70,44 +70,41 @@ def send_email(to_address, subject, html_body):
 # [ПОЧАТОК ЗМІН] --- Повністю замінена функція для відправки в Telegram
 def send_telegram_notification(order, items):
     """
-    [ОНОВЛЕНО] Відправляє дані про нове замовлення на вебхук SendPulse
-    для створення інтерактивного повідомлення з кнопками.
+    [ОНОВЛЕНО 2.0] Відправляє дані на вебхук SendPulse,
+    використовуючи chat_id для прямої ідентифікації отримувача.
     """
     webhook_url = os.getenv("SENDPULSE_WEBHOOK_URL")
-    admin_email = os.getenv("ADMIN_EMAIL_FOR_SP") # Ваш email, як в аудиторії SendPulse
+    # [НОВЕ] Замість email, ми беремо chat_id з налаштувань
+    admin_chat_id = os.getenv("ADMIN_TELEGRAM_CHAT_ID")
 
-    if not webhook_url or not admin_email:
-        print(">>> ПОМИЛКА SendPulse: URL вебхука або email адміна не вказані в .env")
+    if not webhook_url or not admin_chat_id:
+        print(">>> ПОМИЛКА SendPulse: URL вебхука або ID чату адміна не вказані в .env")
         return
 
-    # Збираємо назви всіх товарів через кому
     product_names = ", ".join([item['product'].name for item in items])
-    # Беремо фото першого товару для прев'ю
     photo_url = items[0]['product'].image if items else ''
 
-    # [ВАЖЛИВО] Формуємо дані (payload), які SendPulse очікує отримати.
-    # Назви змінних мають співпадати з тими, що ви використовуєте в SendPulse.
+    # [ВАЖЛИВО] Формуємо новий payload.
+    # Тепер головний ідентифікатор - це chat_id.
     payload = {
-        "email": admin_email, # Обов'язкове поле для ідентифікації контакту в SendPulse
+        "chat_id": admin_chat_id,  # Надсилаємо ID чату напряму
         "variables": {
             "order_id": str(order.id),
-            "order_status": "Нове", # Початковий статус
+            "order_status": "Нове",
             "product_name": product_names,
             "customer_name": order.customer_name,
             "customer_phone": order.customer_phone,
             "delivery_method": order.delivery_method,
             "payment_method": order.payment_method,
-            "photo_url": photo_url # Можна використати для картинки в повідомленні
+            "photo_url": photo_url
         }
     }
 
     try:
         print(">>> SendPulse: Намагаюся відправити сповіщення на вебхук...")
-        # Ми не вказуємо назву події, бо вебхук спрацьовує сам по собі
         response = requests.post(webhook_url, json=payload, timeout=10)
-        response.raise_for_status() # Перевіряємо на помилки (4xx, 5xx)
+        response.raise_for_status()
 
-        # SendPulse зазвичай повертає {"result": true} при успіху
         if response.json().get('result'):
             print(f">>> SendPulse: Дані про замовлення #{order.id} успішно надіслано!")
         else:
