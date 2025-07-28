@@ -67,49 +67,54 @@ def send_email(to_address, subject, html_body):
         print(f"Помилка при відправці email: {e}")
         return False
 
-
+# [ПОЧАТОК ЗМІН] --- Повністю замінена функція для відправки в Telegram
 def send_telegram_notification(order, items):
-    """Відправляє дані про нове замовлення на вебхук SendPulse."""
+    """Відправляє дані про нове замовлення напряму в Telegram-бот."""
 
-    webhook_url = os.getenv("SENDPULSE_WEBHOOK_URL")  # Новий URL для нової події
-    event_name = os.getenv("SENDPULSE_EVENT_NAME")  # Назва нової події, напр. 'nova_podia_2025_07_27'
-    admin_email = os.getenv("ADMIN_EMAIL_FOR_SP")  # Твій email, як в аудиторії SendPulse
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
-    if not all([webhook_url, event_name, admin_email]):
-        print(">>> ПОМИЛКА SendPulse: URL, назва події або email адміна не вказані в .env")
+    if not bot_token or not chat_id:
+        print(">>> ПОМИЛКА Telegram: Токен або ID чату не вказані в .env")
         return
 
-    first_item = items[0]['product'] if items else None
-    product_names = ", ".join([item['product'].name for item in items])
-    photo_url = first_item.image if first_item else ''
+    # Формуємо текст повідомлення з HTML-тегами для краси
+    items_text = ""
+    for item in items:
+        product = item['product']
+        items_text += f"   - {product.name} (x{item['quantity']})\n"
 
-    # [ВАЖЛИВО] Створюємо payload, який точно працює.
-    # Головний ідентифікатор - email.
+    message_text = (
+        f"🔔 <b>Нове замовлення #{order.id}</b>\n\n"
+        f"<b>Ім'я клієнта:</b> {order.customer_name}\n"
+        f"<b>Телефон:</b> {order.customer_phone}\n\n"
+        f"<b>Товари:</b>\n"
+        f"{items_text}\n"
+        f"<b>Доставка:</b> {order.delivery_method}\n"
+        f"<b>Оплата:</b> {order.payment_method}\n\n"
+        f"💰 <b>Загальна сума: {order.total_cost:.2f} ₴</b>"
+    )
+
+    # Готуємо запит до Telegram API
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
-        "email": admin_email,
-        "eventName": event_name,
-        "variables": {
-            "order_id": str(order.id),
-            "order_status": "Нове",
-            "product_name": product_names,
-            "customer_name": order.customer_name,
-            "customer_phone": order.customer_phone,
-            "delivery_method": order.delivery_method,
-            "payment_method": order.payment_method,
-            "photo_url": photo_url
-        }
+        'chat_id': chat_id,
+        'text': message_text,
+        'parse_mode': 'HTML'  # Дозволяє використовувати <b>, <i> і т.д.
     }
 
     try:
-        print(">>> SendPulse: Намагаюся відправити сповіщення...")
-        response = requests.post(webhook_url, json=payload, timeout=10)
-        response.raise_for_status()
-        if response.json().get('result'):
-            print(f">>> SendPulse: Сповіщення про замовлення #{order.id} успішно надіслано!")
+        print(f">>> Telegram: Намагаюся відправити сповіщення про замовлення #{order.id}...")
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status() # Перевіряє на помилки (4xx, 5xx)
+        if response.json().get('ok'):
+            print(f">>> Telegram: Сповіщення успішно надіслано!")
         else:
-            print(f">>> SendPulse: Помилка відповіді - {response.text}")
+            print(f">>> Telegram: Помилка відповіді - {response.text}")
     except requests.exceptions.RequestException as e:
-        print(f">>> SendPulse: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
+        print(f">>> Telegram: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
+
+# [КІНЕЦЬ ЗМІН] -----------------------------------------------------------------
 
 
 # ────────────────────────────────
@@ -545,7 +550,6 @@ def checkout():
             user_id=current_user.id if current_user.is_authenticated else None
         )
         db.session.add(order)
-        # flush() потрібен, щоб отримати order.id ДО того, як ми збережемо все в базу
         db.session.flush()
 
         order_items_for_email_and_tg = []
@@ -553,13 +557,12 @@ def checkout():
             if p := product_map.get(pid):
                 order_item = OrderItem(order_id=order.id, product_id=p.id, quantity=qty, price=p.price)
                 db.session.add(order_item)
-                # Використовуємо один і той же список для email та telegram
                 order_items_for_email_and_tg.append({'product': p, 'quantity': qty, 'price': p.price})
 
         db.session.commit()
 
         # --- Відправка сповіщень ---
-        # 1. Відправляємо на email (як було)
+        # 1. Відправляємо на email адміну
         try:
             admin_email = os.getenv("SMTP_USER")
             if admin_email:
@@ -572,7 +575,7 @@ def checkout():
         except Exception as e:
             print(f">>> КРИТИЧНА ПОМИЛКА при відправці листа про замовлення: {e}")
 
-        # [НОВЕ ДЛЯ SENDPULSE] 2. Відправляємо в Telegram
+        # [ЗМІНЕНО] 2. Відправляємо в Telegram напряму
         # Робимо це в try-except, щоб помилка в сповіщенні не зламала замовлення
         try:
             send_telegram_notification(order, order_items_for_email_and_tg)
@@ -739,9 +742,6 @@ def handle_bas_handshake():
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
 
-# [ВАЖЛИВО] Старий маршрут /upload_image більше не потрібен, оскільки uploader.py
-# тепер завантажує фото напряму в Cloudinary. Його можна повністю видалити.
-
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
@@ -774,13 +774,9 @@ def bas_import():
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
-        # --- [ГОЛОВНА ОПТИМІЗАЦІЯ] ---
-        # 1. Завантажуємо всі існуючі товари ОДНИМ запитом.
-        #    Створюємо словник: { 'Назва товару': об'єкт_Product }
         print("Оптимізація: завантаження існуючих товарів в пам'ять...")
         existing_products = {p.name: p for p in Product.query.all()}
         print(f"Завантажено {len(existing_products)} товарів для порівняння.")
-        # --------------------------------
 
         updated_count, added_count = 0, 0
         products_from_xml = catalog_node.findall('.//Товар')
@@ -798,62 +794,45 @@ def bas_import():
             category = groups.get(group_id, "Загальна")
 
             image_filename = (product_node.findtext('Картинка') or '').strip()
-            # [ВАЖЛИВО] Замініть 'your_cloud_name' на вашу реальну назву хмари
             image_url = 'https://res.cloudinary.com/your_cloud_name/image/upload/v1/products/default_tovar.jpg'
             if image_filename:
                 public_id = f"products/{os.path.splitext(image_filename)[0]}"
                 image_url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
 
             price = 0.0
-            in_stock = False  # За замовчуванням товару немає в наявності
+            in_stock = False
 
-            # Шукаємо відповідний вузол <Предложение> для поточного товару
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
 
             if offer_node is not None:
-                # 1. Визначаємо ціну з пропозиції
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
                     price_text = price_node.text.replace(',', '.')
                     try:
                         price = float(re.match(r"[\d.]+", price_text).group(0))
                     except (ValueError, AttributeError):
-                        price = 0.0  # Якщо не вдалося розпарсити, ціна буде 0
-
-                # 2. Визначаємо наявність з пропозиції (найбільш поширений варіант)
+                        price = 0.0
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
-                        # Перетворюємо кількість на число і перевіряємо, чи вона більша за нуль
                         stock_quantity = int(float(quantity_node.text.strip()))
                         if stock_quantity > 0:
                             in_stock = True
                     except (ValueError, TypeError):
-                        # Якщо в тезі не число, ігноруємо його
                         pass
 
-            # 3. Як ЗАПАСНИЙ варіант, шукаємо спеціальний реквізит "Наличие"
-            #    Це спрацює, якщо логіка вище не знайшла тег <Количество>
             if not in_stock:
-                # Шукаємо реквізит у вузлі самого товару
                 stock_prop_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
                 if stock_prop_node is not None and stock_prop_node.text is not None:
-                    # Перевіряємо, чи значення реквізиту є "true", "да", або "є"
                     if stock_prop_node.text.strip().lower() in ['true', 'да', 'є', 'yes']:
                         in_stock = True
                 else:
-                    # Якщо і там не знайшли, спробуємо знайти властивість "Наличие"
-                    # Цей пошук менш точний, але може допомогти
                     stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
                     if stock_prop_node_alt is not None and stock_prop_node_alt.text:
                         if stock_prop_node_alt.text.lower() == 'true':
                             in_stock = True
 
-            # --- [ГОЛОВНА ОПТИМІЗАЦІЯ] ---
-            # 2. Перевіряємо існування товару в нашому словнику (це миттєво),
-            #    а не робимо запит до БД.
             product = existing_products.get(name)
-            # --------------------------------
 
             if product:
                 product.price = price
@@ -870,7 +849,6 @@ def bas_import():
                 db.session.add(new_product)
                 added_count += 1
 
-        # Зберігаємо всі зміни в БД одним великим коммітом
         print("Завершення циклу. Зберігаю зміни в базі даних...")
         db.session.commit()
         print("Зміни успішно збережено.")
@@ -885,7 +863,6 @@ def bas_import():
         error_details = traceback.format_exc()
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
-
 
 
 # ────────────────────────────────
