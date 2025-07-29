@@ -1,0 +1,43 @@
+<!-- templates/404.html (НОВИЙ ФАЙЛ) -->
+{% extends "base.html" %}
+{% block title %}Сторінку не знайдено{% endblock %}
+
+{% block content %}
+<style>
+    .error-page-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 80px 20px;
+        min-height: 50vh;
+    }
+    .error-page-container .error-code {
+        font-size: 10rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        line-height: 1;
+        margin-bottom: 20px;
+    }
+    .error-page-container h1 {
+        font-size: 2.5rem;
+        margin-bottom: 15px;
+    }
+    .error-page-container p {
+        font-size: 1.2rem;
+        color: var(--gray-color);
+        margin-bottom: 30px;
+        max-width: 500px;
+    }
+</style>
+
+<div class="container">
+    <div class="error-page-container">
+        <div class="error-code">404</div>
+        <h1>Сторінку не знайдено</h1>
+        <p>На жаль, сторінка, яку ви шукали, не існує. Можливо, її було переміщено або видалено.</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">Повернутися на головну</a>
+    </div>
+</div>
+{% endblock %}

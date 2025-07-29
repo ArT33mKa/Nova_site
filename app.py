@@ -937,6 +937,13 @@ def api_get_orders():
     ]
     return jsonify({"status": "success", "orders": orders_data})
 
+# ДОДАТИ ЦЕЙ КОД В app.py В КІНЦІ СЕКЦІЇ "ІНШІ МАРШРУТИ"
+
+@app.errorhandler(404)
+def page_not_found(e):
+    # Зауважте, що ми явно передаємо код відповіді 404
+    return render_template('404.html', shop=shop_info), 404
+
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
 # ────────────────────────────────
