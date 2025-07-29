@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Керування замовленнями{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div class="container">
+        <h1 class="page-title">Керування замовленнями</h1>
+    </div>
+</header>
+<div class="container" style="padding-top: 40px; padding-bottom: 60px;">
+    {% include '_review_flash_messages.html' %}
+
+    <!-- Фільтри статусів -->
+    <div class="tabs" style="margin-bottom: 30px;">
+        <a href="{{ url_for('admin_orders', status='all') }}" class="tab-link {% if current_status == 'all' %}active{% endif %}">Всі</a>
+        {% for status in all_statuses %}
+        <a href="{{ url_for('admin_orders', status=status) }}" class="tab-link {% if current_status == status %}active{% endif %}">{{ status }}</a>
+        {% endfor %}
+    </div>
+
+    {% if orders.items %}
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>№ Замовлення</th>
+                <th>Дата</th>
+                <th>Клієнт / Телефон</th>
+                <th>Доставка</th>
+                <th>Сума</th>
+                <th>Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders.items %}
+            <tr>
+                <td><strong>#{{ order.id }}</strong></td>
+                <td>{{ order.timestamp.strftime('%d %b %Y, %H:%M') }}</td>
+                <td>
+                    {{ order.customer_name }}<br>
+                    <small>{{ order.customer_phone }}</small>
+                </td>
+                <td>
+                    {{ order.delivery_method }}
+                    {% if order.delivery_city %}
+                    <br><small>{{ order.delivery_city }}, {{ order.delivery_warehouse }}</small>
+                    {% endif %}
+                </td>
+                <td><strong>{{ "%.2f"|format(order.total_cost) }} ₴</strong></td>
+                <td>
+                    <form action="{{ url_for('admin_orders', status=current_status) }}" method="POST" style="display: flex; gap: 5px;">
+                        <input type="hidden" name="order_id" value="{{ order.id }}">
+                        <select name="status" class="form-control" style="padding: 5px;">
+                            {% for status in all_statuses %}
+                            <option value="{{ status }}" {% if order.status == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-primary">Зберегти</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+     <!-- Пагінація -->
+    <div class="pagination">
+        <div class="pagination-controls">
+            {% set query_params = request.args.to_dict() %}{% do query_params.pop('page', None) %}
+            {% if orders.has_prev %}<a href="{{ url_for('admin_orders', page=orders.prev_num, **query_params) }}" class="page-link">«</a>{% endif %}
+            {% for page_num in orders.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}<a href="{{ url_for('admin_orders', page=page_num, **query_params) }}" class="page-link {{ 'active' if orders.page == page_num else '' }}">{{ page_num }}</a>{% else %}<span class="page-dots">...</span>{% endif %}
+            {% endfor %}
+            {% if orders.has_next %}<a href="{{ url_for('admin_orders', page=orders.next_num, **query_params) }}" class="page-link">»</a>{% endif %}
+        </div>
+    </div>
+    {% else %}
+    <p>Замовлень з таким статусом не знайдено.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -69,23 +69,27 @@ def send_email(to_address, subject, html_body):
 
 # [ПОЧАТОК ЗМІН] --- Повністю замінена функція для відправки в Telegram
 def send_telegram_notification(order, items):
-    """[ОНОВЛЕНО 4.0] Відправляє дані про замовлення на вебхук Make.com."""
+    """[ОНОВЛЕНО 5.0] Відправляє дані про замовлення на вебхук Make.com."""
     webhook_url = os.getenv("MAKE_WEBHOOK_URL")
 
     if not webhook_url:
         print(">>> ПОМИЛКА Make.com: URL вебхука не вказано в .env")
         return
 
-    product_names = ", ".join([item['product'].name for item in items])
+    product_names = ", ".join([f"{item['product'].name} ({item['quantity']} шт)" for item in items])
+
+    delivery_details = order.delivery_method
+    if order.delivery_method == 'Нова Пошта':
+        delivery_details += f" ({order.delivery_city}, {order.delivery_warehouse})"
 
     payload = {
         "order_id": order.id,
-        "order_status": "Нове",  # Видаляємо .status, бо ми його ще не додали
+        "order_status": order.status,
         "customer_name": order.customer_name,
         "customer_phone": order.customer_phone,
         "product_name": product_names,
-        "delivery_method": order.delivery_method,  # Додаємо відсутні поля
-        "payment_method": order.payment_method,  # Додаємо відсутні поля
+        "delivery_method": delivery_details,  # Оновлене поле
+        "payment_method": order.payment_method,
         "total_cost": f"{order.total_cost:.2f} ₴"
     }
 
@@ -99,7 +103,6 @@ def send_telegram_notification(order, items):
             print(f">>> Make.com: Помилка відповіді від сервера - {response.status_code} {response.text}")
     except requests.exceptions.RequestException as e:
         print(f">>> Make.com: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
-
 
 # ────────────────────────────────
 #  МОДЕЛІ БАЗИ ДАНИХ (ОЧИЩЕНО ВІД ДУБЛІКАТІВ)
@@ -148,10 +151,15 @@ class Review(db.Model):
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    status = db.Column(db.String(50), nullable=False, default='Нове')
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     customer_name = db.Column(db.String(100), nullable=False)
     customer_phone = db.Column(db.String(20), nullable=False)
     delivery_method = db.Column(db.String(50))
+    # --- НОВІ ПОЛЯ ---
+    delivery_city = db.Column(db.String(100), nullable=True)
+    delivery_warehouse = db.Column(db.String(255), nullable=True)
+    # ------------------
     payment_method = db.Column(db.String(50))
     total_cost = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
@@ -529,6 +537,12 @@ def checkout():
             customer_name=request.form.get('customer_name'),
             customer_phone=request.form.get('customer_phone'),
             delivery_method=request.form.get('delivery_method'),
+
+            # --- ОСЬ ЦІ ДВА РЯДКИ ПОТРІБНО ДОДАТИ ---
+            delivery_city=request.form.get('delivery_city'),
+            delivery_warehouse=request.form.get('delivery_warehouse'),
+            # ----------------------------------------
+
             payment_method=request.form.get('payment_method'),
             total_cost=total_cost,
             user_id=current_user.id if current_user.is_authenticated else None
@@ -576,6 +590,38 @@ def checkout():
 # ────────────────────────────────
 #  АДМІН-ПАНЕЛЬ
 # ────────────────────────────────
+
+@app.route('/admin/orders', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_orders():
+    # Обробка запиту на оновлення статусу
+    if request.method == 'POST':
+        order_id = request.form.get('order_id')
+        new_status = request.form.get('status')
+        order = Order.query.get(order_id)
+        if order and new_status:
+            order.status = new_status
+            db.session.commit()
+            flash(f"Статус замовлення #{order.id} оновлено на '{new_status}'.", "success")
+        return redirect(url_for('admin_orders', status=request.args.get('status', 'Нове')))
+
+    # Відображення списку замовлень
+    page = request.args.get('page', 1, type=int)
+    # Фільтруємо за статусом, за замовчуванням показуємо 'Нові'
+    status_filter = request.args.get('status', 'Нове')
+
+    query = Order.query
+    if status_filter != 'all':
+        query = query.filter_by(status=status_filter)
+
+    orders = query.order_by(Order.timestamp.desc()).paginate(page=page, per_page=15, error_out=False)
+
+    # Статуси для кнопок фільтрації
+    all_statuses = ['Нове', 'Відправлено', 'Виконано', 'Скасовано']
+
+    return render_template('admin_orders.html', orders=orders, all_statuses=all_statuses, current_status=status_filter)
+
 @app.route('/admin/reviews')
 @login_required
 @admin_required
@@ -842,6 +888,54 @@ def bas_import():
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
 
+
+def require_bot_api_key(f):
+    """Декоратор для захисту наших API-маршрутів."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = os.getenv('BOT_API_KEY')
+        provided_key = request.headers.get('X-Bot-API-Key')
+        if not api_key or provided_key != api_key:
+            return jsonify({"status": "error", "message": "Invalid API key"}), 401
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+@app.route('/api/order/<int:order_id>/update_status', methods=['POST'])
+@require_bot_api_key
+def api_update_order_status(order_id):
+    """Оновлює статус замовлення."""
+    order = Order.query.get_or_404(order_id)
+    new_status = request.json.get('status')
+    if new_status in ['Виконано', 'Скасовано', 'Нове', 'Відправлено']:
+        order.status = new_status
+        db.session.commit()
+        return jsonify({"status": "success", "message": f"Order #{order.id} status updated to {new_status}"})
+    return jsonify({"status": "error", "message": "Invalid status"}), 400
+
+
+@app.route('/api/orders')
+@require_bot_api_key
+def api_get_orders():
+    """Повертає список замовлень за статусом."""
+    status = request.args.get('status')
+    if not status:
+        return jsonify({"status": "error", "message": "Status parameter is required"}), 400
+
+    orders = Order.query.filter_by(status=status).order_by(Order.timestamp.desc()).limit(10).all()
+
+    orders_data = [
+        {
+            "id": o.id,
+            "date": o.timestamp.strftime('%Y-%m-%d'),
+            "name": o.customer_name,
+            "total": o.total_cost
+        }
+        for o in orders
+    ]
+    return jsonify({"status": "success", "orders": orders_data})
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ

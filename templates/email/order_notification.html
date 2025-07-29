@@ -1,61 +1,170 @@
 <!DOCTYPE html>
-<html>
+<html lang="uk">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Нове замовлення на сайті {{ shop.name }}</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }
-        .header { background-color: #0066cc; color: white; padding: 15px; text-align: center; border-radius: 8px 8px 0 0; }
-        .content { padding: 25px; background-color: white; border-radius: 0 0 8px 8px; }
-        h2 { color: #0066cc; }
-        .order-details, .customer-details { margin-bottom: 25px; }
-        .order-details th, .order-details td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; }
-        .order-details th { background-color: #f2f2f2; }
-        .total-row td { font-weight: bold; font-size: 1.1em; border-top: 2px solid #333; }
-        .footer { margin-top: 20px; font-size: 0.8em; text-align: center; color: #888; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+            margin: 0;
+            padding: 0;
+            width: 100% !important;
+            background-color: #f4f4f7;
+            color: #333333;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .header {
+            background-color: #0066cc;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .content h2 {
+            font-size: 20px;
+            color: #0066cc;
+            margin-top: 0;
+        }
+        .info-block {
+            margin-bottom: 20px;
+        }
+        .info-block p {
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .items-table th, .items-table td {
+            border-bottom: 1px solid #e9ecef;
+            padding: 10px 5px;
+            text-align: left;
+        }
+        .items-table th {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        .total-row {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: right;
+            margin-top: 20px;
+        }
+        .button-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #0066cc;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #e9ecef;
+            margin: 25px 0;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header"><h1>Нове замовлення #{{ order.id }}</h1></div>
-        <div class="content">
-            <h2>Деталі замовлення</h2>
-
-            <div class="customer-details">
-                <p><strong>Ім'я клієнта:</strong> {{ order.customer_name }}</p>
-                <p><strong>Телефон:</strong> {{ order.customer_phone }}</p>
-                <p><strong>Спосіб доставки:</strong> {{ order.delivery_method }}</p>
-                <p><strong>Спосіб оплати:</strong> {{ order.payment_method }}</p>
-            </div>
-
-            <h2>Товари в замовленні</h2>
-            <table class="order-details" width="100%" cellspacing="0">
-                <thead>
+    <table width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#f4f4f7">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table class="container" border="0" cellpadding="0" cellspacing="0">
+                    <!-- Заголовок листа -->
                     <tr>
-                        <th>Товар</th>
-                        <th>К-сть</th>
-                        <th>Ціна</th>
-                        <th>Сума</th>
+                        <td class="header">
+                            <h1>Нове замовлення #{{ order.id }}</h1>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for item in items %}
+                    <!-- Основний контент -->
                     <tr>
-                        <td>{{ item.product.name }}</td>
-                        <td>{{ item.quantity }}</td>
-                        <td>{{ "%.2f"|format(item.price) }} ₴</td>
-                        <td>{{ "%.2f"|format(item.price * item.quantity) }} ₴</td>
+                        <td class="content">
+                            <h2>Інформація про клієнта</h2>
+                            <div class="info-block">
+                                <p><strong>Ім'я:</strong> {{ order.customer_name }}</p>
+                                <p><strong>Телефон:</strong> {{ order.customer_phone }}</p>
+                            </div>
+
+                            <hr>
+
+                            <h2>Інформація про доставку</h2>
+                            <div class="info-block">
+                                <p><strong>Спосіб доставки:</strong> {{ order.delivery_method }}</p>
+                                {% if order.delivery_method == 'Нова Пошта' %}
+                                    <p><strong>Місто:</strong> {{ order.delivery_city or 'Не вказано' }}</p>
+                                    <p><strong>Відділення / Поштомат:</strong> {{ order.delivery_warehouse or 'Не вказано' }}</p>
+                                {% endif %}
+                                <p><strong>Спосіб оплати:</strong> {{ order.payment_method }}</p>
+                            </div>
+
+                            <hr>
+
+                            <h2>Замовлені товари</h2>
+                            <table class="items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Товар</th>
+                                        <th style="text-align: center;">К-сть</th>
+                                        <th style="text-align: right;">Сума</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in items %}
+                                    <tr>
+                                        <td>{{ item.product.name }}</td>
+                                        <td style="text-align: center;">{{ item.quantity }}</td>
+                                        <td style="text-align: right;">{{ "%.2f"|format(item.price * item.quantity) }} ₴</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+
+                            <p class="total-row">
+                                Загальна сума: {{ "%.2f"|format(order.total_cost) }} ₴
+                            </p>
+
+                            <div class="button-container">
+                                <!-- Важливо: _external=True генерує повне посилання, що необхідно для email -->
+                                <a href="{{ url_for('admin_orders', _external=True) }}" class="btn">Керувати замовленнями</a>
+                            </div>
+                        </td>
                     </tr>
-                    {% endfor %}
-                    <tr class="total-row">
-                        <td colspan="3">Всього до сплати:</td>
-                        <td>{{ "%.2f"|format(order.total_cost) }} ₴</td>
+                    <!-- Футер -->
+                    <tr>
+                        <td class="footer">
+                            <p>Це автоматичне сповіщення з сайту {{ shop.name }}</p>
+                        </td>
                     </tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="footer">
-            <p>Це автоматичне повідомлення з сайту {{ shop.name }}.</p>
-        </div>
-    </div>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
