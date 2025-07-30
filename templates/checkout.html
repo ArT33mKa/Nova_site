@@ -15,10 +15,14 @@
                     </div>
                     <div class="form-group">
                         <label for="customer_name">Прізвище та ім'я</label>
-                        <input type="text" name="customer_name" id="customer_name" required value="{{ current_user.username if current_user.is_authenticated else '' }}" placeholder="Іванов Іван">
+                        {# [ЗАВДАННЯ 1] Автоматично підставляємо ім'я, якщо користувач увійшов #}
+                        <input type="text" name="customer_name" id="customer_name" required
+                               value="{% if current_user.is_authenticated %}{{ current_user.first_name }} {{ current_user.last_name or '' }}{% endif %}"
+                               placeholder="Іванов Іван">
                     </div>
                     <div class="form-group">
                         <label for="customer_phone">Номер телефону</label>
+                        {# [ЗАВДАННЯ 2] Інпут для телефону з плейсхолдером #}
                         <input type="tel" name="customer_phone" id="customer_phone" required placeholder="+380 (__) ___-__-__">
                     </div>
                 </section>
@@ -43,16 +47,16 @@
                             </div>
                         </label>
                     </div>
-                    <!-- Блок для Нової Пошти, спочатку прихований -->
+                    <!-- [ЗАВДАННЯ 3] Блок для Нової Пошти, спочатку прихований -->
                     <div id="nova-poshta-details" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
                         <div class="form-group">
                             <label for="delivery_city">Населений пункт</label>
-                            <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста">
+                            <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста чи села">
                         </div>
                         <div class="form-group">
                             <label for="delivery_warehouse">Відділення або поштомат</label>
                             <select name="delivery_warehouse" id="delivery_warehouse" disabled>
-                                <option value="">Спочатку виберіть місто</option>
+                                <option value="">Спочатку виберіть населений пункт</option>
                             </select>
                         </div>
                     </div>
@@ -182,28 +186,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        cityInput.addEventListener('change', function() {
+        cityInput.addEventListener('input', function() {
             const cityName = this.value.trim();
-            if (cityName) {
+            if (cityName.length > 2) { // Починаємо пошук після введення 3-х символів
                 fetchWarehouses(cityName);
             } else {
-                warehouseSelect.innerHTML = '<option value="">Спочатку виберіть місто</option>';
+                warehouseSelect.innerHTML = '<option value="">Введіть назву населеного пункту</option>';
                 warehouseSelect.disabled = true;
             }
         });
 
-        // Імітація API "Нової Пошти". У реальному проєкті тут буде AJAX-запит.
+        // ІМІТАЦІЯ API "Нової Пошти"
         function fetchWarehouses(city) {
             warehouseSelect.disabled = true;
             warehouseSelect.innerHTML = '<option value="">Завантаження...</option>';
 
-            // ПРИКЛАД: у вас має бути реальний запит до API
-            console.log(`Імітація запиту відділень для міста: ${city}`);
+            // ВАЖЛИВО: У реальному проєкті тут має бути AJAX-запит до API Нової Пошти.
+            // Оскільки це неможливо зробити без API ключа, я імітую цей процес
+            // з невеликим набором даних, щоб показати, як це працює.
+            console.log(`Імітація запиту відділень для: ${city}`);
 
             // Імітуємо затримку мережі
             setTimeout(() => {
-                // Це тестові дані. Їх потрібно отримувати з API Нової Пошти.
-                const warehouses = {
+                const warehousesByCity = {
                     "Київ": ["Відділення №1: вул. Пирогівський шлях, 135", "Відділення №10: вул. Велика Васильківська, 22", "Поштомат №5050: вул. Хрещатик, 1"],
                     "Харків": ["Відділення №5: просп. Гагаріна, 41/2", "Відділення №12: вул. Пушкінська, 50/52"],
                     "Львів": ["Відділення №3: вул. Городоцька, 179", "Поштомат №7123: пл. Ринок, 1"],
@@ -212,7 +217,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     "Миргород": ["Відділення №1: вул. Гоголя, 100", "Відділення №2: вул. Сорочинська, 20"]
                 };
 
-                const cityWarehouses = warehouses[city] || [];
+                // Простий пошук за ключем для демонстрації
+                let cityWarehouses = [];
+                for (const key in warehousesByCity) {
+                    if (key.toLowerCase().startsWith(city.toLowerCase())) {
+                        cityWarehouses = warehousesByCity[key];
+                        break;
+                    }
+                }
 
                 if (cityWarehouses.length > 0) {
                     warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення --</option>';
@@ -228,45 +240,70 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // [ЗАВДАННЯ 2] Повністю нова, виправлена логіка маски телефону
     function setupPhoneMask() {
         const phoneInput = document.getElementById('customer_phone');
 
-        const MASK_OPTIONS = {
-            mask: '+{380} (00) 000-00-00',
-            lazy: false,
-        };
+        const onPhoneInput = (e) => {
+            const input = e.target;
+            let value = input.value.replace(/\D/g, ''); // Видаляємо все, крім цифр
+            let formattedValue = "";
 
-        // Для цієї маски потрібна бібліотека, наприклад, IMask.js.
-        // Оскільки ми не можемо її підключити, зробимо просту ванільну реалізацію.
-        phoneInput.addEventListener('input', (e) => {
-            let input = e.target;
-            let value = input.value.replace(/\D/g, '');
+            // Завжди починаємо з +380
             if (value.startsWith('380')) {
                 value = value.substring(3);
             }
 
-            let formattedValue = "+380";
-            if (value.length > 0) {
-                formattedValue += " (" + value.substring(0, 2);
-            }
-            if (value.length >= 3) {
-                formattedValue += ") " + value.substring(2, 5);
-            }
-            if (value.length >= 6) {
-                formattedValue += "-" + value.substring(5, 7);
-            }
-            if (value.length >= 8) {
-                formattedValue += "-" + value.substring(7, 9);
+            const matrix = "+380 (__) ___-__-__";
+            let i = 0;
+
+            formattedValue = matrix.replace(/_/g, (char) => {
+                if (value[i]) {
+                    return value[i++];
+                }
+                return char;
+            });
+
+            // Видаляємо зайві символи в кінці, якщо номер неповний
+            const lastDigitIndex = formattedValue.lastIndexOf(value[value.length - 1]);
+            if(lastDigitIndex !== -1) {
+               formattedValue = formattedValue.substring(0, lastDigitIndex + 1);
             }
 
-            input.value = formattedValue.substring(0, 19);
-        });
+            input.value = formattedValue;
 
-        phoneInput.addEventListener('focus', e => {
+            // Змінюємо колір тексту
+            if (input.value.length > 5) { // 5 символів це "+380 ("
+                input.style.color = 'var(--dark-color)';
+            } else {
+                input.style.color = 'var(--gray-color)';
+            }
+        };
+
+        const onPhoneFocus = (e) => {
             if (e.target.value === '') {
-                e.target.value = '+380 ';
+                e.target.value = '+380 (';
+                e.target.style.color = 'var(--gray-color)';
             }
-        });
+        };
+
+        const onPhoneBlur = (e) => {
+             if (e.target.value === '+380 (') {
+                e.target.value = '';
+                e.target.style.color = 'var(--dark-color)'; // Повертаємо стандартний колір
+            }
+        };
+
+        phoneInput.addEventListener('input', onPhoneInput);
+        phoneInput.addEventListener('focus', onPhoneFocus);
+        phoneInput.addEventListener('blur', onPhoneBlur);
+
+        // Додаємо CSS для плейсхолдера
+        const style = document.createElement('style');
+        style.innerHTML = `
+            #customer_phone::placeholder { color: var(--gray-color); }
+        `;
+        document.head.appendChild(style);
     }
 });
 </script>

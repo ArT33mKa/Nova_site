@@ -155,6 +155,7 @@ class Review(db.Model):
                               cascade="all, delete-orphan", order_by='Review.timestamp.asc()')
 
 
+
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     status = db.Column(db.String(50), nullable=False, default='Нове')
