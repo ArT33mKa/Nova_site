@@ -21,7 +21,8 @@ def initialize_database():
             print(">>> 2. Створення адміністратора...")
             admin = User(
                 username='admin',
-                email='artemcool200911@gmail.com',  # Можете змінити email, якщо потрібно
+                first_name='Admin',  # <-- ДОДАЙТЕ ЦЕЙ РЯДОК
+                email='artemcool200911@gmail.com',
                 is_admin=True
             )
             admin.set_password('admin123')
