@@ -110,10 +110,11 @@ def send_telegram_notification(order, items):
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
-    # [ЗМІНЕНО] Додаємо нові поля
     first_name = db.Column(db.String(80), nullable=False)
-    last_name = db.Column(db.String(80), nullable=False) # Прізвище робимо необов'язковим
-    phone = db.Column(db.String(20), nullable=False)    # Телефон теж
+    # ПЕРЕВІРТЕ, ЩО nullable=True ПРИСУТНІЙ ТУТ
+    last_name = db.Column(db.String(80), nullable=True)
+    phone = db.Column(db.String(20), nullable=True)
+    #----------------------------------------------------
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))

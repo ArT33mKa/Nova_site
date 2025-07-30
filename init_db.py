@@ -16,7 +16,8 @@ def initialize_database():
             print(">>> 2. Створення адміністратора...")
             admin = User(
                 username='admin',
-                first_name='Admin',  # Додано обов'язкове поле
+                first_name='Admin',
+                last_name='User',  # <-- ДОДАЙТЕ ЦЕЙ РЯДОК
                 email='artemcool200911@gmail.com',
                 is_admin=True
             )
