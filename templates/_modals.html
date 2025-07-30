@@ -18,13 +18,36 @@
             <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block"><img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"> Увійти через Google</a>
         </div>
 
+        <!-- templates/_modals.html -> Замініть старий блок реєстрації на цей -->
+
         <div id="register" class="tab-content">
             <form id="registerForm" class="auth-form">
-                <div class="form-group"><input type="email" name="email" placeholder="Email" required></div>
-                <div class="form-group"><input type="password" name="password" placeholder="Пароль" required></div>
+                <!-- [НОВЕ] Поля для імені та прізвища в один рядок -->
+                <div class="form-group-inline" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <input type="text" name="first_name" placeholder="Ім'я" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" name="last_name" placeholder="Прізвище">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <input type="tel" name="phone" placeholder="Номер телефону">
+                </div>
+                <div class="form-group">
+                    <input type="email" name="email" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" name="password" placeholder="Пароль" required>
+                </div>
                 <div id="registerError" class="error-message" style="display: none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">Зареєструватися</button>
             </form>
+            <!-- [НОВЕ] Додаємо розділювач та кнопку Google -->
+            <div class="auth-divider"><span>або</span></div>
+            <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block">
+                <img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"> Зареєструватися через Google
+            </a>
         </div>
     </div>
 </div>

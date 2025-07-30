@@ -107,8 +107,13 @@ def send_telegram_notification(order, items):
 # ────────────────────────────────
 #  МОДЕЛІ БАЗИ ДАНИХ (ОЧИЩЕНО ВІД ДУБЛІКАТІВ)
 # ────────────────────────────────
+
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
+    # [ЗМІНЕНО] Додаємо нові поля
+    first_name = db.Column(db.String(80), nullable=False)
+    last_name = db.Column(db.String(80), nullable=False) # Прізвище робимо необов'язковим
+    phone = db.Column(db.String(20), nullable=False)    # Телефон теж
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
@@ -382,20 +387,37 @@ def login():
     return jsonify({"status": "error", "message": "Невірний email або пароль"}), 401
 
 
+# app.py -> АВТЕНТИФІКАЦІЯ
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
     email = data.get('email')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    phone = data.get('phone')
+
+    # Перевірка на обов'язкові поля
+    if not email or not first_name or not data.get('password'):
+        return jsonify({"status": "error", "message": "Ім'я, Email та Пароль є обов'язковими"}), 400
+
     if User.query.filter_by(email=email).first():
         return jsonify({"status": "error", "message": "Цей email вже зареєстровано"}), 400
 
-    username_base = email.split('@')[0]
+    # Створюємо унікальний username з імені та, якщо потрібно, цифр
+    username_base = first_name.strip()
     username, counter = username_base, 1
     while User.query.filter_by(username=username).first():
         username = f"{username_base}_{counter}"
         counter += 1
 
-    new_user = User(username=username, email=email)
+    new_user = User(
+        first_name=first_name,
+        last_name=last_name,
+        phone=phone,
+        email=email,
+        username=username
+    )
     new_user.set_password(data.get('password'))
     db.session.add(new_user)
     db.session.commit()
