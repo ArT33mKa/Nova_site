@@ -3030,25 +3030,37 @@ main {
 }
 
 /* ==============================================
-  ВИПРАВЛЕННЯ ІНТЕРФЕЙСУ (КУРСОР ТА ФОКУС)
+   ГЛОБАЛЬНЕ ВИПРАВЛЕННЯ ІНТЕРФЕЙСУ
 ============================================== */
 
-/* 1. Забороняємо виділення тексту на кнопках та посиланнях */
-a, button, .btn {
-  user-select: none; /* Стандартний синтаксис */
-  -webkit-user-select: none; /* Для старих версій Chrome/Safari */
-  -moz-user-select: none; /* Для Firefox */
-  -ms-user-select: none; /* Для Internet Explorer */
+/* 1. Повністю прибираємо стандартну синю/чорну обводку для ВСІХ елементів */
+*:focus {
+  outline: none;
 }
 
-/* 2. Замінюємо стандартну чорну обводку на кастомну тінь при фокусі */
-/* Це застосується до всіх інтерактивних елементів */
-a:focus,
-button:focus,
-input:focus,
-textarea:focus,
-select:focus,
-.auth-tab:focus {
-  outline: none; /* Прибираємо стандартну обводку */
-  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.4); /* Додаємо красиву тінь вашого основного кольору */
+/* 2. Натомість додаємо кастомну тінь ТІЛЬКИ при навігації з клавіатури */
+/* Це найсучасніший та правильний спосіб для доступності */
+*:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.4);
+}
+
+/* 3. Забороняємо виділення тексту для всього сайту */
+body {
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* IE */
+  user-select: none;
+}
+
+/* 4. ...АЛЕ ДОЗВОЛЯЄМО виділення там, де це потрібно (поля вводу, текст) */
+input, textarea, p, h1, h2, h3, h4, h5, h6, li, span, dt, dd, strong, b, i, em {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* 5. Прибираємо сірий фон при натисканні на посилання на мобільних */
+a, button {
+    -webkit-tap-highlight-color: transparent;
 }
