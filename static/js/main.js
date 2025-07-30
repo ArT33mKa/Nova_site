@@ -14,7 +14,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initCartLogic();
     initFavoritesLogic();
 
-    // Початкове оновлення UI при завантаженні сторінки
+        // [НОВЕ] Ініціалізуємо маски для телефону на всіх сторінках, де вони можуть бути
+    setupPhoneMaskAdvanced('#customer_phone'); // Для сторінки checkout
+    setupPhoneMaskAdvanced('#register_phone'); // Для модального вікна реєстрації
+
     updateCartView();
     updateAllProductButtonStates();
     updateFavoritesUI();
@@ -163,6 +166,79 @@ function updateCartView() {
             }
             totalEl.textContent = `${data.total.toFixed(2)} ₴`;
         });
+}
+
+function setupPhoneMaskAdvanced(selector) {
+    const input = document.querySelector(selector);
+    if (!input) return; // Виходимо, якщо елемента немає на сторінці
+
+    const matrix = "+380 (__) ___-__-__";
+
+    const setCursorPosition = (pos, elem) => {
+        // requestAnimationFrame потрібен, щоб зміна позиції курсора
+        // відбулась ПІСЛЯ того, як браузер оновить значення в полі вводу.
+        requestAnimationFrame(() => {
+            elem.focus();
+            elem.setSelectionRange(pos, pos);
+        });
+    };
+
+    const mask = (event) => {
+        const input = event.target;
+        let i = 0;
+        // Отримуємо тільки цифри з того, що є в полі
+        const def = matrix.replace(/\D/g, ""); // "380"
+        let val = input.value.replace(/\D/g, ""); // Введені користувачем цифри
+
+        // Якщо користувач намагається стерти "+380", повертаємо їх назад
+        if (val.length < def.length) {
+            val = def;
+        }
+
+        // Створюємо нове значення, замінюючи "_" на цифри з val
+        let newValue = matrix.replace(/[_\d]/g, (a) => {
+            return i < val.length ? val.charAt(i++) : a;
+        });
+
+        // Знаходимо першу позицію для введення наступної цифри
+        i = newValue.indexOf("_");
+
+        // Якщо номер повністю введено, курсор стає в кінець
+        if (i === -1) {
+            i = newValue.length;
+        }
+
+        // Встановлюємо нове, відформатоване значення в поле
+        input.value = newValue;
+
+        // Встановлюємо правильний колір тексту
+        // Якщо довжина цифр більша за "380", значить користувач щось ввів
+        input.style.color = (val.length > def.length) ? 'var(--dark-color)' : 'var(--gray-color)';
+
+        // Якщо подія - не 'blur', встановлюємо курсор
+        if (event.type !== "blur") {
+             setCursorPosition(i, input);
+        }
+    };
+
+    input.addEventListener("input", mask, false);
+    input.addEventListener("focus", mask, false);
+    input.addEventListener("blur", (e) => {
+        // Якщо при втраті фокусу нічого не введено, повертаємо сірий колір
+        if (e.target.value === matrix) {
+            e.target.style.color = 'var(--gray-color)';
+        }
+    }, false);
+    input.addEventListener("keydown", (e) => {
+        // Забороняємо backspace, якщо курсор на початку статичної частини
+        if (e.key === 'Backspace' && e.target.value.replace(/\D/g, "").length <= 3) {
+            e.preventDefault();
+        }
+    });
+
+    // Початковий стан
+    input.value = matrix;
+    input.style.color = 'var(--gray-color)';
 }
 
 function updateAllProductButtonStates() {
