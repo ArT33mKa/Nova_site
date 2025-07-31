@@ -1,4 +1,4 @@
-// static/js/main.js (ФІНАЛЬНА ВЕРСІЯ 7.0 З ПОВНІСТЮ ПЕРЕПИСАНОЮ МАСКОЮ)
+// static/js/main.js (ФІНАЛЬНА ВЕРСІЯ З ОПТИМІСТИЧНИМ ОНОВЛЕННЯМ)
 
 document.addEventListener('DOMContentLoaded', function() {
     // Ініціалізація всіх основних модулів
@@ -10,73 +10,177 @@ document.addEventListener('DOMContentLoaded', function() {
     initHeroSlider();
     initSimilarProductsCarousel();
     initProductDescriptionToggle();
-    initCartLogic();
+
+    // [ОПТИМІЗАЦІЯ] Запускаємо нову, оптимізовану логіку кошика
+    initOptimizedCartLogic();
+
     initFavoritesLogic();
 
-    // Ініціалізуємо єдину правильну маску для обох полів вводу телефону
+    // Ініціалізуємо маску для полів вводу телефону
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
 
+    // Первинне завантаження стану кошика та кнопок при завантаженні сторінки
     updateCartView();
-    updateAllProductButtonStates();
     updateFavoritesUI();
 });
 
 // ===================================================================
-//  [ПОВНІСТЮ ПЕРЕПИСАНА І ВИПРАВЛЕНА ФУНКЦІЯ МАСКИ ТЕЛЕФОНУ]
+//  НОВА ОПТИМІЗОВАНА ЛОГІКА КОШИКА
 // ===================================================================
+
+function initOptimizedCartLogic() {
+    document.body.addEventListener('click', e => {
+        const button = e.target.closest('button');
+        if (!button) return;
+
+        const productId = button.dataset.id || button.closest('[data-id]')?.dataset.id;
+        if (!productId) return;
+
+        // --- ДІЯ 1: ДОДАТИ В КОШИК ---
+        if (button.matches('.add-to-cart-btn') && !button.classList.contains('in-cart')) {
+            // 1. Оптимістично оновлюємо UI
+            setButtonAsInCart(button, true);
+            updateCartCounter(1);
+            showToast('Товар додано до кошика', 'success', `<a href="/checkout" class="btn btn-sm btn-primary">Оформити</a>`);
+
+            // 2. Відправляємо запит на сервер у фоні
+            fetch('/add_to_cart', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: productId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    // 3. У разі невдачі - відкочуємо зміни
+                    setButtonAsInCart(button, false);
+                    updateCartCounter(-1);
+                    showToast(data.message || 'Помилка додавання товару', 'error');
+                } else {
+                    // 4. Оновлюємо повний вигляд кошика для синхронізації
+                    updateCartView();
+                }
+            }).catch(() => {
+                // 3. У разі мережевої помилки - теж відкочуємо
+                setButtonAsInCart(button, false);
+                updateCartCounter(-1);
+                showToast('Мережева помилка', 'error');
+            });
+        }
+
+        // --- ДІЯ 2: КУПИТИ ЗАРАЗ ---
+        if (button.matches('.buy-now-btn')) {
+             fetch('/buy_now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: productId })})
+             .then(res => res.json()).then(data => { if(data.status === 'success') window.location.href = '/checkout'; });
+        }
+
+        // --- ДІЯ 3: КНОПКИ +/- У БІЧНОМУ КОШИКУ ---
+        if (button.matches('.qty-btn')) {
+             const cartItemRow = button.closest('.cart-item');
+             const quantityDisplay = cartItemRow.querySelector('.quantity-display');
+             const currentQuantity = parseInt(quantityDisplay.textContent);
+             const newQuantity = button.classList.contains('plus') ? currentQuantity + 1 : currentQuantity - 1;
+
+             if (newQuantity >= 1) {
+                // Оптимістично оновлюємо кількість і відправляємо запит
+                updateCartView(); // Найпростіший спосіб перерахувати все
+                fetch(`/update_cart_quantity/${productId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({quantity: newQuantity})
+                });
+             }
+        }
+
+        // --- ДІЯ 4: ВИДАЛИТИ З БІЧНОГО КОШИКА ---
+        if (button.matches('.remove-item')) {
+            const cartItemRow = button.closest('.cart-item');
+            if (cartItemRow) {
+                // Оптимістично видаляємо елемент з UI
+                cartItemRow.style.transition = 'opacity 0.3s, transform 0.3s';
+                cartItemRow.style.opacity = '0';
+                cartItemRow.style.transform = 'translateX(50px)';
+                setTimeout(() => {
+                     updateCartView(); // Перемальовуємо кошик після анімації
+                }, 300);
+
+                // Відправляємо запит на видалення у фоні
+                fetch(`/remove_from_cart/${productId}`, { method: 'POST' });
+            }
+        }
+    });
+}
+
+/**
+ * [НОВИЙ ХЕЛПЕР] Оновлює лічильник кошика на задане значення.
+ * @param {number} change - Значення, на яке змінити лічильник (напр. 1 або -1).
+ */
+function updateCartCounter(change) {
+    const counter = document.getElementById('cart-count');
+    if (counter) {
+        const currentValue = parseInt(counter.textContent, 10) || 0;
+        counter.textContent = Math.max(0, currentValue + change);
+    }
+}
+
+/**
+ * [НОВИЙ ХЕЛПЕР] Встановлює або знімає стан "в кошику" для кнопки.
+ * @param {HTMLElement} button - Елемент кнопки.
+ * @param {boolean} isInCart - True, якщо товар в кошику, false - якщо ні.
+ */
+function setButtonAsInCart(button, isInCart) {
+    if (isInCart) {
+        button.classList.add('in-cart');
+        button.innerHTML = '<i class="fas fa-check"></i> В кошику';
+    } else {
+        button.classList.remove('in-cart');
+        button.innerHTML = 'Додати в кошик'; // Проста версія для відкочування
+    }
+}
+
+// ===================================================================
+//  ФУНКЦІЇ, ЩО ЗАЛИШИЛИСЬ БЕЗ ЗМІН
+//  (або з мінімальними адаптаціями)
+// ===================================================================
+
 function setupPhoneMaskAdvanced(selector) {
     const phoneInput = document.querySelector(selector);
     if (!phoneInput) return;
-
     const matrix = "+380 (__) ___-__-__";
     const prefixNumber = "380";
-
     const setCursorPosition = (pos, elem) => {
         requestAnimationFrame(() => {
             elem.focus();
             elem.setSelectionRange(pos, pos);
         });
     };
-
     const applyMask = (value) => {
-        // 1. Беремо тільки цифри з введеного значення
         let digits = value.replace(/\D/g, "");
-
-        // 2. Якщо цифр менше, ніж у префіксі, примусово встановлюємо префікс
         if (digits.length < prefixNumber.length) {
             digits = prefixNumber;
         } else {
-            // Інакше - гарантуємо, що початок рядка відповідає префіксу
             digits = prefixNumber + digits.substring(prefixNumber.length);
         }
-
-        // 3. Заповнюємо матрицю наявними цифрами
         let i = 0;
         let formattedValue = matrix.replace(/[_\d]/g, (char) => {
             return i < digits.length ? digits.charAt(i++) : char;
         });
-
-        // 4. Визначаємо позицію для курсора (перший символ '_')
         let cursorPos = formattedValue.indexOf('_');
         if (cursorPos === -1) {
-            cursorPos = formattedValue.length; // Якщо все заповнено, курсор в кінці
+            cursorPos = formattedValue.length;
         }
-
         return { formattedValue, cursorPos };
     };
-
     phoneInput.addEventListener('input', (e) => {
         const { formattedValue, cursorPos } = applyMask(e.target.value);
         e.target.value = formattedValue;
         setCursorPosition(cursorPos, e.target);
     });
-
     phoneInput.addEventListener('keydown', (e) => {
         if (e.key === 'Backspace') {
             e.preventDefault();
             let digits = e.target.value.replace(/\D/g, "");
-            // Дозволяємо видалення тільки якщо цифр більше, ніж у префіксі
             if (digits.length > prefixNumber.length) {
                 const newDigits = digits.slice(0, -1);
                 const { formattedValue, cursorPos } = applyMask(newDigits);
@@ -85,35 +189,26 @@ function setupPhoneMaskAdvanced(selector) {
             }
         }
     });
-
     phoneInput.addEventListener('focus', (e) => {
         const { formattedValue, cursorPos } = applyMask(e.target.value);
         e.target.value = formattedValue;
         setCursorPosition(cursorPos, e.target);
     });
-
     phoneInput.addEventListener('click', (e) => {
         const { cursorPos } = applyMask(e.target.value);
         setCursorPosition(cursorPos, e.target);
     });
-
     phoneInput.addEventListener('blur', (e) => {
         if (e.target.value.replace(/\D/g, "") === prefixNumber) {
-            e.target.value = ''; // Очищуємо поле, якщо користувач нічого не ввів
+            e.target.value = '';
         }
     });
 }
-
-
-// ===================================================================
-//  РЕШТА ФУНКЦІЙ (без змін)
-// ===================================================================
 
 function initProductDescriptionToggle() {
     const wrapper = document.getElementById('description-wrapper');
     const btn = document.getElementById('toggle-description-btn');
     if (!wrapper || !btn) return;
-
     if (wrapper.scrollHeight > 125) {
         btn.style.display = 'inline-block';
     } else {
@@ -124,46 +219,6 @@ function initProductDescriptionToggle() {
     btn.addEventListener('click', function() {
         const isExpanded = wrapper.classList.toggle('expanded');
         btn.textContent = isExpanded ? 'Приховати' : 'Читати далі';
-    });
-}
-
-function initCartLogic() {
-    document.body.addEventListener('click', e => {
-        const button = e.target.closest('button');
-        if (!button) return;
-        const productId = button.dataset.id || button.closest('[data-id]')?.dataset.id;
-        const actions = {
-            '.add-to-cart-btn': () => {
-                if (!button.classList.contains('in-cart') && productId) {
-                    const checkoutBtn = `<a href="/checkout" class="btn btn-sm btn-primary">Оформити</a>`;
-                    fetchApi('/add_to_cart', { product_id: productId })
-                        .then(() => showToast('Товар додано до кошика', 'success', checkoutBtn));
-                }
-            },
-            '.buy-now-btn': () => {
-                 if (!productId) return;
-                 fetch('/buy_now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: productId })})
-                 .then(res => res.json()).then(data => { if(data.status === 'success') window.location.href = '/checkout'; });
-            },
-            '.qty-btn.plus': () => {
-                if (!productId) return;
-                const newQuantity = parseInt(button.previousElementSibling.textContent) + 1;
-                fetchApi(`/update_cart_quantity/${productId}`, { quantity: newQuantity });
-            },
-            '.qty-btn.minus': () => {
-                if (!productId) return;
-                const currentQuantity = parseInt(button.nextElementSibling.textContent);
-                if (currentQuantity <= 1) return;
-                const newQuantity = currentQuantity - 1;
-                fetchApi(`/update_cart_quantity/${productId}`, { quantity: newQuantity });
-            },
-            '.remove-item': () => {
-                if (productId) fetchApi(`/remove_from_cart/${productId}`, null, 'POST');
-            }
-        };
-        for (const selector in actions) {
-            if (button.matches(selector)) { actions[selector](); break; }
-        }
     });
 }
 
@@ -203,24 +258,27 @@ function updateCartView() {
             itemsContainer.innerHTML = '<div class="empty-cart-message"><i class="fas fa-shopping-cart"></i><p>Ваш кошик порожній</p></div>';
         }
         totalEl.textContent = `${data.total.toFixed(2)} ₴`;
+
+        // Синхронізуємо кнопки на всій сторінці
+        updateAllProductButtonStates(data.items);
     });
 }
 
-function updateAllProductButtonStates() {
-    fetch('/get_cart').then(res => res.json()).then(data => {
-        const cartProductIds = new Set(data.items.map(item => String(item.id)));
-        document.querySelectorAll('.add-to-cart-btn').forEach(button => {
-            const productId = button.closest('[data-id]')?.dataset.id;
-            if (productId) {
-                if (cartProductIds.has(productId)) {
-                    button.classList.add('in-cart');
-                    button.innerHTML = '<i class="fas fa-check"></i> В кошику';
-                } else {
-                    button.classList.remove('in-cart');
-                    button.innerHTML = button.innerHTML.includes('fa-shopping-cart') ? '<i class="fas fa-shopping-cart"></i> В кошик' : 'Додати в кошик';
-                }
+function updateAllProductButtonStates(cartItems) {
+    const cartProductIds = new Set(cartItems.map(item => String(item.id)));
+    document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+        const productId = button.closest('[data-id]')?.dataset.id;
+        if (productId) {
+            const isInCart = cartProductIds.has(productId);
+            button.classList.toggle('in-cart', isInCart);
+            // Використовуємо .btn-lg як маркер для кнопок, що вимагають іншого тексту/іконок
+            const isLargeButton = button.classList.contains('btn-lg');
+            if (isInCart) {
+                button.innerHTML = isLargeButton ? '<i class="fas fa-check"></i> Вже в кошику' : '<i class="fas fa-check"></i> В кошику';
+            } else {
+                button.innerHTML = isLargeButton ? '<i class="fas fa-shopping-cart"></i> В кошик' : 'Додати в кошик';
             }
-        });
+        }
     });
 }
 
@@ -277,42 +335,34 @@ function renderFavoritesModal() {
     }
     fetch('/get_products_by_ids', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: favoriteIds })})
     .then(res => res.json()).then(products => {
-        products.forEach(p => {
-            const stockStatus = p.in_stock ? `<div class="stock-status in-stock">Є в наявності</div>` : `<div class="stock-status out-of-stock">Немає в наявності</div>`;
-            let adminActionsHtml = window.isAdmin ? `
-            <div class="admin-product-actions">
-                <a href="/admin/edit_product/${p.id}" class="admin-action-btn edit-btn" title="Редагувати"><i class="fas fa-pencil-alt"></i></a>
-                <form action="/admin/delete_product/${p.id}" method="POST" onsubmit="return confirm('Ви впевнені?');"><button type="submit" class="admin-action-btn delete-btn" title="Видалити"><i class="fas fa-trash-alt"></i></button></form>
-            </div>` : '';
-            container.insertAdjacentHTML('beforeend', `
-            <div class="product-card" data-id="${p.id}">
-                <div class="product-image">
-                    <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
-                    ${stockStatus}
-                    <button class="favorite-btn active" title="Видалити з обраного"><i class="fas fa-star"></i></button>
-                    ${adminActionsHtml}
-                </div>
-                <div class="product-info">
-                    <h3><a href="${p.url}">${p.name}</a></h3>
-                    <div class="product-footer">
-                        <span class="price">${p.price.toFixed(2)} ₴</span>
-                        <button class="btn btn-sm add-to-cart-btn" data-id="${p.id}" ${p.in_stock ? '' : 'disabled'}>Додати в кошик</button>
+        fetch('/get_cart').then(r => r.json()).then(cartData => {
+            products.forEach(p => {
+                const stockStatus = p.in_stock ? `<div class="stock-status in-stock">Є в наявності</div>` : `<div class="stock-status out-of-stock">Немає в наявності</div>`;
+                let adminActionsHtml = window.isAdmin ? `
+                <div class="admin-product-actions">
+                    <a href="/admin/edit_product/${p.id}" class="admin-action-btn edit-btn" title="Редагувати"><i class="fas fa-pencil-alt"></i></a>
+                    <form action="/admin/delete_product/${p.id}" method="POST" onsubmit="return confirm('Ви впевнені?');"><button type="submit" class="admin-action-btn delete-btn" title="Видалити"><i class="fas fa-trash-alt"></i></button></form>
+                </div>` : '';
+                container.insertAdjacentHTML('beforeend', `
+                <div class="product-card" data-id="${p.id}">
+                    <div class="product-image">
+                        <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
+                        ${stockStatus}
+                        <button class="favorite-btn active" title="Видалити з обраного"><i class="fas fa-star"></i></button>
+                        ${adminActionsHtml}
                     </div>
-                </div>
-            </div>`);
+                    <div class="product-info">
+                        <h3><a href="${p.url}">${p.name}</a></h3>
+                        <div class="product-footer">
+                            <span class="price">${p.price.toFixed(2)} ₴</span>
+                            <button class="btn btn-sm add-to-cart-btn" data-id="${p.id}" ${p.in_stock ? '' : 'disabled'}>Додати в кошик</button>
+                        </div>
+                    </div>
+                </div>`);
+            });
+            updateAllProductButtonStates(cartData.items);
         });
-        updateAllProductButtonStates();
     });
-}
-
-function fetchApi(url, body, method = 'POST') {
-    const options = { method, headers: { 'Content-Type': 'application/json' } };
-    if (body) options.body = JSON.stringify(body);
-    return fetch(url, options).then(res => res.json()).then(data => {
-        if (data.status !== 'success') showToast(data.message || 'Сталася помилка', 'error');
-        updateCartView();
-        updateAllProductButtonStates();
-    }).catch(err => { console.error('API Error:', err); showToast('Мережева помилка', 'error'); });
 }
 
 function showToast(message, type = 'success', actions = '') {
