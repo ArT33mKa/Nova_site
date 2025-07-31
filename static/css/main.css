@@ -1326,7 +1326,11 @@ img {
 .review-item .rating { color: #ffc107; }
 .review-item .review-date { color: #999; font-size: 0.8em; }
 
-.products-grid { grid-template-columns: repeat(3, 1fr); }
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
 @media (max-width: 992px) { .products-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 576px) { .products-grid { grid-template-columns: 1fr; } }
 
@@ -3085,4 +3089,116 @@ input, textarea, p, h1, h2, h3, h4, h5, h6, li, span, dt, dd, strong, b, i, em {
 /* 5. Прибираємо сірий фон при натисканні на посилання на мобільних */
 a, button {
     -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 992px) {
+    html {
+        scroll-padding-top: 100px; /* Коригуємо відступ для меншого хедера */
+    }
+
+    /* Складні сітки перетворюємо в одну колонку */
+    .about-content,
+    .contacts-grid,
+    .product-detail-grid,
+    .checkout-grid-v2,
+    .reviews-page-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .catalog-content {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .filters-sidebar {
+        width: 100%;
+        margin-bottom: 30px;
+    }
+
+    /* Вимикаємо "прилипання" елементів */
+    .product-image-main,
+    .order-summary-v2,
+    .reviews-summary .summary-box {
+        position: static;
+        max-height: none;
+        margin-top: 30px;
+    }
+
+    .about-image {
+        order: -1; /* На планшеті картинка буде зверху */
+        margin-bottom: 30px;
+    }
+
+    .main-nav {
+        flex-direction: column;
+        gap: 20px;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+
+/* --- ДЛЯ МОБІЛЬНИХ ТЕЛЕФОНІВ (ширина екрану до 768px) --- */
+@media (max-width: 768px) {
+    .header-top,
+    .header-actions {
+        flex-direction: column; /* Елементи хедера стають в стовпчик */
+        align-items: center;
+        gap: 20px;
+    }
+    .header-actions {
+      width: 100%;
+    }
+
+    .main-nav ul {
+        gap: 15px 20px; /* Менші відступи між пунктами меню */
+        justify-content: center; /* Центруємо їх */
+        flex-wrap: wrap; /* Дозволяємо перенос */
+    }
+
+    .section-title { font-size: 1.8rem; }
+
+    .hero-slide h2 { font-size: 2rem; }
+    .hero-slide p { font-size: 1.1rem; }
+    .slider-nav button { width: 40px; height: 40px; }
+
+    /* Ховаємо стрілки каруселі "Схожі товари", бо пальцем скролити зручніше */
+    .similar-products-section .carousel-btn {
+        display: none;
+    }
+    .similar-products-section .products-carousel {
+        overflow-x: auto; /* Додаємо горизонтальний скрол */
+    }
+    .similar-products-section .product-card {
+        flex: 0 0 60%; /* Показуємо приблизно по 1.5 товару на екрані */
+        min-width: 0;
+    }
+}
+
+
+/* --- ДЛЯ ДУЖЕ МАЛЕНЬКИХ ЕКРАНІВ (ширина до 576px) --- */
+@media (max-width: 576px) {
+    /* Робимо сітку товарів по два в ряд */
+    .products-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    /* Коригуємо картку товару для маленьких екранів */
+    .product-card .product-image { height: 160px; }
+    .product-card .product-info h3 { font-size: 0.9rem; line-height: 1.3; }
+    .product-card .price { font-size: 1rem; }
+    .product-card .product-footer .btn-sm {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+
+    /* Категорії також по 2 в ряд */
+    .categories-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    .modal-content { width: 95%; }
+    .cart-sidebar { max-width: 90%; }
 }
