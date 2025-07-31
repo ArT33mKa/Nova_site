@@ -1,4 +1,4 @@
-// static/js/main.js (ФІНАЛЬНА ВЕРСІЯ 6.0 З ВИПРАВЛЕНОЮ МАСКОЮ)
+// static/js/main.js (ФІНАЛЬНА ВЕРСІЯ 7.0 З ПОВНІСТЮ ПЕРЕПИСАНОЮ МАСКОЮ)
 
 document.addEventListener('DOMContentLoaded', function() {
     // Ініціалізація всіх основних модулів
@@ -33,63 +33,77 @@ function setupPhoneMaskAdvanced(selector) {
     const prefixNumber = "380";
 
     const setCursorPosition = (pos, elem) => {
-        // requestAnimationFrame допомагає уникнути "гонки" подій і стабілізує позиціонування
         requestAnimationFrame(() => {
             elem.focus();
             elem.setSelectionRange(pos, pos);
         });
     };
 
-    const mask = (event) => {
-        const { target, type } = event;
-        let value = target.value.replace(/\D/g, ""); // Отримуємо тільки цифри
-        let i = 0;
+    const applyMask = (value) => {
+        // 1. Беремо тільки цифри з введеного значення
+        let digits = value.replace(/\D/g, "");
 
-        // Гарантуємо, що префікс завжди на місці і не може бути видалений
-        if (value.length < prefixNumber.length) {
-            value = prefixNumber;
+        // 2. Якщо цифр менше, ніж у префіксі, примусово встановлюємо префікс
+        if (digits.length < prefixNumber.length) {
+            digits = prefixNumber;
+        } else {
+            // Інакше - гарантуємо, що початок рядка відповідає префіксу
+            digits = prefixNumber + digits.substring(prefixNumber.length);
         }
 
-        // Заново форматуємо рядок за матрицею
-        let newValue = matrix.replace(/[_\d]/g, (a) => {
-            if (i < value.length) {
-                return value.charAt(i++);
-            }
-            return a; // Якщо цифри закінчилися, повертаємо символ матриці ('_' або цифру)
+        // 3. Заповнюємо матрицю наявними цифрами
+        let i = 0;
+        let formattedValue = matrix.replace(/[_\d]/g, (char) => {
+            return i < digits.length ? digits.charAt(i++) : char;
         });
 
-        // Знаходимо наступну позицію для курсора
-        i = newValue.indexOf("_");
-        if (i === -1) { // якщо символів '_' не залишилось, курсор ставимо в кінець
-            i = newValue.length;
+        // 4. Визначаємо позицію для курсора (перший символ '_')
+        let cursorPos = formattedValue.indexOf('_');
+        if (cursorPos === -1) {
+            cursorPos = formattedValue.length; // Якщо все заповнено, курсор в кінці
         }
 
-        target.value = newValue;
-
-        // При будь-якій взаємодії (введення, клік, фокус) ставимо курсор на правильне місце
-        if (type !== 'blur') {
-            setCursorPosition(i, target);
-        }
+        return { formattedValue, cursorPos };
     };
 
-    phoneInput.addEventListener("input", mask);
-    phoneInput.addEventListener("focus", mask);
-    phoneInput.addEventListener("click", mask);
+    phoneInput.addEventListener('input', (e) => {
+        const { formattedValue, cursorPos } = applyMask(e.target.value);
+        e.target.value = formattedValue;
+        setCursorPosition(cursorPos, e.target);
+    });
 
-    // Очищуємо поле, якщо користувач пішов з нього, так і не ввівши номер
-    phoneInput.addEventListener("blur", (e) => {
-        if (e.target.value.replace(/\D/g, "") === prefixNumber) {
-            e.target.value = "";
+    phoneInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace') {
+            e.preventDefault();
+            let digits = e.target.value.replace(/\D/g, "");
+            // Дозволяємо видалення тільки якщо цифр більше, ніж у префіксі
+            if (digits.length > prefixNumber.length) {
+                const newDigits = digits.slice(0, -1);
+                const { formattedValue, cursorPos } = applyMask(newDigits);
+                e.target.value = formattedValue;
+                setCursorPosition(cursorPos, e.target);
+            }
         }
     });
 
-    // Додаткова обробка Backspace для запобігання видалення префіксу
-    phoneInput.addEventListener("keydown", (e) => {
-        if (e.key === 'Backspace' && e.target.value.replace(/\D/g, "").length <= prefixNumber.length) {
-            e.preventDefault();
+    phoneInput.addEventListener('focus', (e) => {
+        const { formattedValue, cursorPos } = applyMask(e.target.value);
+        e.target.value = formattedValue;
+        setCursorPosition(cursorPos, e.target);
+    });
+
+    phoneInput.addEventListener('click', (e) => {
+        const { cursorPos } = applyMask(e.target.value);
+        setCursorPosition(cursorPos, e.target);
+    });
+
+    phoneInput.addEventListener('blur', (e) => {
+        if (e.target.value.replace(/\D/g, "") === prefixNumber) {
+            e.target.value = ''; // Очищуємо поле, якщо користувач нічого не ввів
         }
     });
 }
+
 
 // ===================================================================
 //  РЕШТА ФУНКЦІЙ (без змін)
