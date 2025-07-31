@@ -208,18 +208,16 @@ google_blueprint = make_google_blueprint(
 )
 app.register_blueprint(google_blueprint, url_prefix="/login")
 
-# [ВИПРАВЛЕНО] Змінено назви категорій, щоб вони відповідали назвам у базі даних
-# та видалено категорію "СУШКА ДЛЯ РУШНИКІВ"
 shop_info = {"name": "НОВА ХВИЛЯ",
-             "categories": [{'name': 'Поливочна система', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
-                            {'name': 'Насоси', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
-                            {'name': 'Бойлери', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
-                            {'name': 'Змішувачі', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
-                            {'name': 'Витяжки', 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
-                            {'name': 'Колонки газові', 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
-                            {'name': 'Запчастини до газового обладнання', 'image': 'gas_parts.jpg',
-                             'icon': 'gas_parts.jpg'}],
-             "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
+             "categories": [{'name': 'ПОЛИВОЧНА СИСТЕМА', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
+                            {'name': 'НАСОСИ', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
+                            {'name': 'БОЙЛЕРА', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
+                            {'name': 'ЗМІШУВАЧІ', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
+                            {'name': "ВИТЯЖКИ", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
+                            {'name': "КОЛОНКИ", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
+                            {'name': "СУШКА ДЛЯ РУШНИКІВ", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
+                            {'name': "ЗАПЧАСТИНИ ДО ГАЗ ОБЛАДНАННЯ", 'image': 'gas_parts.jpg',
+                             'icon': 'gas_parts.jpg'}], "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
              "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
              "hours": {"Пн - Пт:": "8:00 - 17:00", "Субота:": "8:00 - 15:00", "Неділя:": "8:00 - 15:00"}}
 
@@ -924,7 +922,7 @@ if __name__ == "__main__":
         db.create_all()
         if not User.query.filter_by(is_admin=True).first():
             print(">>> Створення адміністратора...")
-            admin = User(username='admin', first_name='Admin', last_name='User', email='artemcool200911@gmail.com', is_admin=True)
+            admin = User(username='admin', email='artemcool200911@gmail.com', is_admin=True)
             admin.set_password('admin123')
             db.session.add(admin);
             db.session.commit()
