@@ -14,6 +14,7 @@ from lxml import etree as lxml_etree
 from flask_sqlalchemy import SQLAlchemy
 from email.mime.multipart import MIMEMultipart
 from flask_dance.consumer import oauth_authorized
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_dance.consumer.storage.sqla import SQLAlchemyStorage
 from flask_dance.contrib.google import make_google_blueprint, google
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -27,6 +28,8 @@ except locale.Error:
 
 load_dotenv()
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 app.jinja_env.add_extension('jinja2.ext.do')
 app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")
 
