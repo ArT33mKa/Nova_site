@@ -13,13 +13,19 @@
                     <div class="checkout-section-header">
                         <span class="icon">1</span><h4>Контактні дані</h4>
                     </div>
-                    <div class="form-group">
-                        <label for="customer_name">Прізвище та ім'я</label>
-                        <input type="text" name="customer_name" id="customer_name" required value="{% if current_user.is_authenticated %}{{ current_user.first_name }} {{ current_user.last_name or '' }}{% endif %}" placeholder="Іванов Іван">
+                    <!-- [ЗМІНЕНО] Поля для імені та прізвища в один рядок -->
+                    <div class="form-group-inline" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label for="customer_first_name">Ім'я</label>
+                            <input type="text" name="customer_first_name" id="customer_first_name" required value="{% if current_user.is_authenticated %}{{ current_user.first_name }}{% endif %}" placeholder="Іван">
+                        </div>
+                        <div class="form-group">
+                            <label for="customer_last_name">Прізвище</label>
+                            <input type="text" name="customer_last_name" id="customer_last_name" required value="{% if current_user.is_authenticated %}{{ current_user.last_name or '' }}{% endif %}" placeholder="Іванов">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="customer_phone">Номер телефону</label>
-                        <!-- НОВИЙ ІНПУТ ДЛЯ ТЕЛЕФОНУ -->
                         <input type="tel" name="customer_phone" id="customer_phone" required>
                     </div>
                 </section>
@@ -119,6 +125,21 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPhoneMaskAdvanced();
 
     // --- ФУНКЦІЇ ---
+
+    const form = document.querySelector('.checkout-grid-v2');
+    form.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+            e.preventDefault();
+            const inputs = Array.from(form.querySelectorAll('input, select'));
+            const currentIndex = inputs.indexOf(e.target);
+            const nextInput = inputs[currentIndex + 1];
+            if (nextInput) {
+                nextInput.focus();
+            } else {
+                form.querySelector('button[type="submit"]').focus();
+            }
+        }
+    });
 
     function setupRadioGroups() {
         // ... (код без змін)

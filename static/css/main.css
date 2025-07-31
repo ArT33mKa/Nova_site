@@ -1067,6 +1067,10 @@ img {
 
 /* Toast Notifications */
 .toast-notification {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
     position: fixed;
     bottom: 20px;
     left: 50%;
@@ -1079,6 +1083,11 @@ img {
     z-index: 3000;
     opacity: 0;
     transition: transform 0.4s ease, opacity 0.4s ease;
+}
+
+.toast-actions a {
+    color: white;
+    text-decoration: underline;
 }
 
 .toast-notification.show {
@@ -1737,9 +1746,22 @@ img { max-width: 100%; height: auto; display: block; }
 /* 4. Бічний кошик (Cart Sidebar) */
 .cart-item-link { text-decoration: none; color: inherit; }
 .cart-item-sidebar-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-.cart-item-quantity-controls { display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; }
-.cart-item-quantity-controls .qty-btn { background: none; border: none; cursor: pointer; padding: 6px 10px; }
-.cart-item-quantity-controls .qty-display { padding: 0 5px; }
+.cart-item-quantity-controls {
+    display: flex;
+    align-items: center;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+.cart-item-quantity-controls .qty-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 10px;
+}
+.cart-item-quantity-controls .qty-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
 .cart-item-stock { font-size: 0.8rem; margin-top: 5px; }
 .cart-item-stock.in-stock { color: var(--success-color); }
 .cart-item-stock.out-of-stock { color: var(--danger-color); }
@@ -2466,7 +2488,7 @@ main {
     background-color: rgba(0, 102, 204, 0.1);
     color: var(--primary-color);
     width: 28px;
-    height: 28px;
+     height: 28px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;

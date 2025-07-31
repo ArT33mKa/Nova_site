@@ -254,7 +254,7 @@ def catalog():
     query = Product.query.filter(
         Product.in_stock == True,
         and_(Product.description != None, Product.description != ''),
-        Product.image != 'default_tovar.jpg'
+        Product.image.notlike('%default_tovar.jpg%')
     )
 
     # Далі застосовуємо фільтри, які вибрав користувач
@@ -557,8 +557,13 @@ def checkout():
         product_map = {str(p.id): p for p in products}
         total_cost = sum(product_map[pid].price * qty for pid, qty in cart.items())
 
+        # [ОНОВЛЕНО] Об'єднуємо ім'я та прізвище
+        first_name = request.form.get('customer_first_name', '').strip()
+        last_name = request.form.get('customer_last_name', '').strip()
+        customer_full_name = f"{first_name} {last_name}".strip()
+
         order = Order(
-            customer_name=request.form.get('customer_name'),
+            customer_name=customer_full_name, # Використовуємо об'єднане ім'я
             customer_phone=request.form.get('customer_phone'),
             delivery_method=request.form.get('delivery_method'),
 

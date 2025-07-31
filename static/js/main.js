@@ -52,7 +52,9 @@ function initCartLogic() {
         const actions = {
             '.add-to-cart-btn': () => {
                 if (!button.classList.contains('in-cart') && productId) {
-                    fetchApi('/add_to_cart', { product_id: productId }).then(() => showToast('Товар додано до кошика'));
+                    const checkoutBtn = `<a href="/checkout" class="btn btn-sm btn-primary">Оформити</a>`;
+                    fetchApi('/add_to_cart', { product_id: productId })
+                        .then(() => showToast('Товар додано до кошика', 'success', checkoutBtn));
                 }
             },
             '.buy-now-btn': () => {
@@ -67,7 +69,10 @@ function initCartLogic() {
             },
             '.qty-btn.minus': () => {
                 if (!productId) return;
-                const newQuantity = parseInt(button.nextElementSibling.textContent) - 1;
+                const currentQuantity = parseInt(button.nextElementSibling.textContent);
+                // [НОВЕ] Блокуємо зменшення, якщо кількість 1
+                if (currentQuantity <= 1) return;
+                const newQuantity = currentQuantity - 1;
                 fetchApi(`/update_cart_quantity/${productId}`, { quantity: newQuantity });
             },
             '.remove-item': () => {
@@ -103,11 +108,11 @@ function updateCartView() {
                     </div>
                     <div class="cart-item-sidebar-controls">
                         <div class="cart-item-quantity-controls">
-                            <button class="qty-btn minus" data-id="${item.id}">-</button>
+                            <button class="qty-btn minus" data-id="${item.id}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
                             <span class="quantity-display">${item.quantity}</span>
                             <button class="qty-btn plus" data-id="${item.id}">+</button>
                         </div>
-                        <button class="remove-item" data-id="${item.id}" title="Видалити">×</button>
+                        <button class="remove-item" data-id="${item.id}" title="Видалити"><i class="fas fa-trash-alt"></i></button>
                     </div>
                 </div>`);
             });
@@ -130,17 +135,19 @@ function setupPhoneMaskAdvanced(selector) {
     const setCursorPosition = (pos, elem) => {
         requestAnimationFrame(() => {
             elem.focus();
-            elem.setSelectionRange(pos, pos);
+            if (elem.setSelectionRange) {
+                elem.setSelectionRange(pos, pos);
+            }
         });
     };
 
-    const applyMask = (target) => {
-        let value = target.value.replace(/\D/g, '');
+    const applyMask = (event) => {
+        const target = event.target;
+        let value = target.value.replace(/\D/g, "");
         let i = 0;
 
-        // Переконуємось, що префікс завжди є
         if (!value.startsWith(prefixNumber)) {
-            value = prefixNumber;
+            value = prefixNumber + value.substring(prefixNumber.length);
         }
 
         let formattedValue = matrix.replace(/[_\d]/g, (a) => {
@@ -149,45 +156,21 @@ function setupPhoneMaskAdvanced(selector) {
 
         // Знаходимо першу позицію для введення
         const firstUnderscore = formattedValue.indexOf('_');
-        const cursorPosition = (firstUnderscore !== -1) ? firstUnderscore : formattedValue.length;
+        if (event.type !== 'blur' || value.length > prefixNumber.length) {
+            target.value = formattedValue;
+        } else if (value.length <= prefixNumber.length) {
+            target.value = ''; // Очищуємо, якщо нічого крім префіксу не введено
+        }
 
-        target.value = formattedValue;
-        target.style.color = (value.length > prefixNumber.length) ? 'var(--dark-color)' : 'var(--gray-color)';
-
-        return cursorPosition;
+        if (event.type === 'click' || event.type === 'focus') {
+             setCursorPosition(firstUnderscore !== -1 ? firstUnderscore : formattedValue.length, target);
+        }
     };
 
-    input.addEventListener('input', (e) => {
-        // Обробляємо лише введення, а не видалення
-        if (e.inputType && e.inputType.includes('delete')) return;
-        const cursorPosition = applyMask(e.target);
-        setCursorPosition(cursorPosition, e.target);
-    });
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace') {
-            e.preventDefault();
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length > prefixNumber.length) {
-                e.target.value = value.slice(0, -1);
-                const cursorPosition = applyMask(e.target);
-                setCursorPosition(cursorPosition, e.target);
-            }
-        }
-    });
-
-    input.addEventListener('focus', (e) => {
-        if (!e.target.value) {
-           const cursorPosition = applyMask(e.target);
-           setCursorPosition(cursorPosition, e.target);
-        }
-    });
-
-    input.addEventListener('blur', (e) => {
-        if (e.target.value.replace(/\D/g, '') === prefixNumber) {
-            e.target.value = '';
-        }
-    });
+    input.addEventListener("input", applyMask);
+    input.addEventListener("focus", applyMask);
+    input.addEventListener("click", applyMask);
+    input.addEventListener("blur", applyMask);
 }
 
 
@@ -308,10 +291,22 @@ function fetchApi(url, body, method = 'POST') {
     }).catch(err => { console.error('API Error:', err); showToast('Мережева помилка', 'error'); });
 }
 
-function showToast(message, type = 'success') {
+function showToast(message, type = 'success', actions = '') {
     const toast = document.createElement('div');
     toast.className = `toast-notification ${type}`;
-    toast.textContent = message;
+
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = message;
+
+    toast.appendChild(messageSpan);
+
+    if (actions) {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'toast-actions';
+        actionsDiv.innerHTML = actions;
+        toast.appendChild(actionsDiv);
+    }
+
     document.body.appendChild(toast);
     setTimeout(() => {
         toast.classList.add('show');
