@@ -121,9 +121,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupRadioGroups();
     loadCartSummary();
     setupDeliveryLogic();
-    // [ЗМІНЕНО] Викликаємо нову функцію для маски
-    setupPhoneMaskAdvanced();
-
     // --- ФУНКЦІЇ ---
 
     const form = document.querySelector('.checkout-grid-v2');
@@ -233,24 +230,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // [НОВА ФУНКЦІЯ] Повністю переписана логіка для маски телефону
-    function setupPhoneMaskAdvanced() {
-        const phoneInput = document.getElementById('customer_phone');
-        const matrix = "+380 (__) ___-__-__";
-
-        // Функція для встановлення позиції курсора
-        const setCursorPosition = (pos, elem) => {
-            elem.focus();
-            if (elem.setSelectionRange) {
-                elem.setSelectionRange(pos, pos);
-            } else if (elem.createTextRange) {
-                const range = elem.createTextRange();
-                range.collapse(true);
-                range.moveEnd("character", pos);
-                range.moveStart("character", pos);
-                range.select();
-            }
-        };
 
         const mask = (event) => {
             let i = 0;

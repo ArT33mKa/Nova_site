@@ -751,6 +751,8 @@ def send_message():
 def favorites_page(): return render_template("favorites.html")
 
 
+# app.py -> у функції admin_unfinished()
+
 @app.route('/admin/unfinished')
 @login_required
 @admin_required
@@ -758,19 +760,34 @@ def admin_unfinished():
     page = request.args.get('page', 1, type=int)
     query = Product.query
 
-    # Застосовуємо фільтри
-    if request.args.get('no_stock'):
-        query = query.filter(Product.in_stock == False)
-    if request.args.get('no_description'):
-        query = query.filter((Product.description == None) | (Product.description == ''))
-    if request.args.get('no_image'):
-        query = query.filter(Product.image == 'default_tovar.jpg')
+    # [ОНОВЛЕНА ЛОГІКА]
+    # Перевіряємо, чи застосував користувач хоча б один фільтр
+    active_filters = [k for k in request.args if k in ['no_stock', 'no_description', 'no_image']]
 
-    # Рахуємо статистику до пагінації
+    if not active_filters:
+        # Якщо фільтрів немає, показуємо всі товари, що є незавершеними ХОЧА Б ПО ОДНОМУ КРИТЕРІЮ
+        query = query.filter(
+            db.or_(
+                Product.in_stock == False,
+                (Product.description == None) | (Product.description == ''),
+                Product.image.like('%default_tovar.jpg%')
+            )
+        )
+    else:
+        # Якщо користувач вибрав фільтри, застосовуємо їх
+        if 'no_stock' in active_filters:
+            query = query.filter(Product.in_stock == False)
+        if 'no_description' in active_filters:
+            query = query.filter((Product.description == None) | (Product.description == ''))
+        if 'no_image' in active_filters:
+            # Використовуємо .like() для надійності
+            query = query.filter(Product.image.like('%default_tovar.jpg%'))
+
+    # Рахуємо статистику до пагінації (ця логіка залишається правильною)
     counts = {
         'no_stock': Product.query.filter(Product.in_stock == False).count(),
         'no_description': Product.query.filter((Product.description == None) | (Product.description == '')).count(),
-        'no_image': Product.query.filter(Product.image == 'default_tovar.jpg').count()
+        'no_image': Product.query.filter(Product.image.like('%default_tovar.jpg%')).count()
     }
 
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
