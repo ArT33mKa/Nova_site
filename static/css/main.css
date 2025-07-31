@@ -3140,6 +3140,11 @@ a, button {
 
 /* --- ДЛЯ МОБІЛЬНИХ ТЕЛЕФОНІВ (ширина екрану до 768px) --- */
 @media (max-width: 768px) {
+
+    .header-contacts {
+        display: none;
+    }
+
     .header-top,
     .header-actions {
         flex-direction: column; /* Елементи хедера стають в стовпчик */
