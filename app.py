@@ -36,6 +36,11 @@ if database_url and database_url.startswith("postgres://"):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# [НОВЕ] Завантажуємо ключі Google в конфігурацію Flask
+app.config["GOOGLE_OAUTH_CLIENT_ID"] = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+
 db = SQLAlchemy(app)
 
 login_manager = LoginManager(app)
@@ -67,9 +72,9 @@ def send_email(to_address, subject, html_body):
         print(f"Помилка при відправці email: {e}")
         return False
 
-# [ПОЧАТОК ЗМІН] --- Повністю замінена функція для відправки в Telegram
+
 def send_telegram_notification(order, items):
-    """[ОНОВЛЕНО 5.0] Відправляє дані про замовлення на вебхук Make.com."""
+    """Відправляє дані про замовлення на вебхук Make.com."""
     webhook_url = os.getenv("MAKE_WEBHOOK_URL")
 
     if not webhook_url:
@@ -88,15 +93,13 @@ def send_telegram_notification(order, items):
         "customer_name": order.customer_name,
         "customer_phone": order.customer_phone,
         "product_name": product_names,
-        "delivery_method": delivery_details,  # Оновлене поле
+        "delivery_method": delivery_details,
         "payment_method": order.payment_method,
         "total_cost": f"{order.total_cost:.2f} ₴"
     }
 
     try:
-        print(">>> Make.com: Намагаюся відправити сповіщення на вебхук...")
         response = requests.post(webhook_url, json=payload, timeout=10)
-
         if response.status_code == 200 and "Accepted" in response.text:
             print(f">>> Make.com: Дані про замовлення #{order.id} успішно надіслано!")
         else:
@@ -104,20 +107,20 @@ def send_telegram_notification(order, items):
     except requests.exceptions.RequestException as e:
         print(f">>> Make.com: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
 
+
 # ────────────────────────────────
-#  МОДЕЛІ БАЗИ ДАНИХ (ОЧИЩЕНО ВІД ДУБЛІКАТІВ)
+#  МОДЕЛІ БАЗИ ДАНИХ
 # ────────────────────────────────
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(80), nullable=False)
-    # ПЕРЕВІРТЕ, ЩО nullable=True ПРИСУТНІЙ ТУТ
+    # [ЗМІНЕНО] nullable=True, бо Google не завжди віддає прізвище
     last_name = db.Column(db.String(80), nullable=True)
-    phone = db.Column(db.String(20), nullable=True)
-    #----------------------------------------------------
+    phone = db.Column(db.String(20), nullable=True)  # теж робимо необов'язковим
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256))
+    password_hash = db.Column(db.String(256), nullable=True)  # Пароль може бути відсутнім для Google-юзерів
     is_admin = db.Column(db.Boolean, default=False)
     avatar_url = db.Column(db.String(255), nullable=True)
     reviews = db.relationship('Review', backref='author', lazy='dynamic')
@@ -127,6 +130,7 @@ class User(db.Model, UserMixin):
     def check_password(self, password): return check_password_hash(self.password_hash, password)
 
 
+# ... (решта ваших моделей Product, Review, Order, etc. залишаються без змін) ...
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -155,7 +159,6 @@ class Review(db.Model):
                               cascade="all, delete-orphan", order_by='Review.timestamp.asc()')
 
 
-
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     status = db.Column(db.String(50), nullable=False, default='Нове')
@@ -163,10 +166,8 @@ class Order(db.Model):
     customer_name = db.Column(db.String(100), nullable=False)
     customer_phone = db.Column(db.String(20), nullable=False)
     delivery_method = db.Column(db.String(50))
-    # --- НОВІ ПОЛЯ ---
     delivery_city = db.Column(db.String(100), nullable=True)
     delivery_warehouse = db.Column(db.String(255), nullable=True)
-    # ------------------
     payment_method = db.Column(db.String(50))
     total_cost = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
@@ -194,9 +195,14 @@ class OAuth(db.Model):
 #  GOOGLE AUTH ТА НАЛАШТУВАННЯ МАГАЗИНУ
 # ────────────────────────────────
 
-google_blueprint = make_google_blueprint(scope=["openid", "https://www.googleapis.com/auth/userinfo.email",
-                                                "https://www.googleapis.com/auth/userinfo.profile"],
-                                         storage=SQLAlchemyStorage(OAuth, db.session, user=current_user))
+google_blueprint = make_google_blueprint(
+    scope=[
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile"
+    ],
+    storage=SQLAlchemyStorage(OAuth, db.session, user=current_user)
+)
 app.register_blueprint(google_blueprint, url_prefix="/login")
 
 shop_info = {"name": "НОВА ХВИЛЯ",
@@ -220,8 +226,9 @@ def load_user(user_id): return User.query.get(int(user_id))
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin: flash(
-            'Доступ до цієї сторінки мають тільки адміністратори.', 'danger'); return redirect(url_for('index'))
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash('Доступ до цієї сторінки мають тільки адміністратори.', 'danger')
+            return redirect(url_for('index'))
         return f(*args, **kwargs)
 
     return decorated_function
@@ -230,6 +237,8 @@ def admin_required(f):
 @app.context_processor
 def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
 
+
+# ... (решта ваших маршрутів @app.route('/...'), крім блоку аутентифікації) ...
 
 @app.route("/")
 def index():
@@ -240,7 +249,6 @@ def index():
          'subtitle': 'Від найкращих виробників'},
         {'image': 'kotly.jpg', 'title': 'Все для систем опалення', 'subtitle': 'Котли, бойлери та комплектуючі'}
     ]
-    # [ЗМІНЕНО] Вибираємо 5 товарів для головної, щоб заповнити ряд
     products = Product.query.order_by(Product.id.desc()).limit(5).all()
     return render_template("index.html", products=products, hero_slides=hero_slides)
 
@@ -248,23 +256,16 @@ def index():
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
-
-    # [НОВЕ] Фільтруємо "готові" товари для публічного каталогу.
-    # Показуємо тільки ті, що є в наявності, мають опис та фото.
     query = Product.query.filter(
         Product.in_stock == True,
         and_(Product.description != None, Product.description != ''),
         Product.image.notlike('%default_tovar.jpg%')
     )
 
-    # Далі застосовуємо фільтри, які вибрав користувач
     if search_query := request.args.get('search', ''):
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
     if category_arg := request.args.get('category'):
         query = query.filter(Product.category == category_arg.strip())
-    # Фільтр по 'in_stock' вже не потрібен, бо ми його застосували вище для всіх
-    # if request.args.get('in_stock'):
-    #     query = query.filter(Product.in_stock == True)
     if min_price := request.args.get('min_price', type=float):
         query = query.filter(Product.price >= min_price)
     if max_price := request.args.get('max_price', type=float):
@@ -272,22 +273,17 @@ def catalog():
     if request.args.get('min_rating'):
         query = query.filter(Product.rating >= 4.0)
 
-    # [ЗМІНЕНО] Встановлюємо 25 товарів на сторінку (5 рядків по 5 товарів)
     products = query.paginate(page=page, per_page=25, error_out=False)
-
     categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0]]
-
     return render_template('catalog.html', products=products, categories=categories)
 
 
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
-    # [ЗМІНЕНО] Завантажуємо 5 схожих товарів замість 4
     similar_products = Product.query.filter(
         Product.category == product.category,
         Product.id != product.id,
-        # [ДОДАНО] Схожі товари також мають бути "готовими"
         Product.in_stock == True,
         and_(Product.description != None, Product.description != ''),
         Product.image != 'default_tovar.jpg'
@@ -306,34 +302,23 @@ def get_products_by_ids():
         return jsonify({'error': 'Invalid IDs provided'}), 400
 
     products = Product.query.filter(Product.id.in_(safe_product_ids)).all()
-
-    products_data = [
-        {
-            'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image,
-            'in_stock': p.in_stock, 'url': url_for('product_detail', product_id=p.id)
-        } for p in products
-    ]
+    products_data = [{'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'in_stock': p.in_stock,
+                      'url': url_for('product_detail', product_id=p.id)} for p in products]
     return jsonify(products_data)
 
 
 def get_reviews_data(product_id):
     product = Product.query.get_or_404(product_id)
     all_reviews_and_questions = product.reviews.order_by(Review.timestamp.desc())
-
     reviews_only = [r for r in all_reviews_and_questions if r.review_type == 'review' and r.parent_id is None]
     questions_only = [q for q in all_reviews_and_questions if q.review_type == 'question' and q.parent_id is None]
-
     reviews_with_rating = [r for r in reviews_only if r.rating > 0]
     total_with_rating_count = len(reviews_with_rating)
-    ratings_list = [r.rating for r in reviews_with_rating]
-    rating_counts = Counter(ratings_list)
+    rating_counts = Counter([r.rating for r in reviews_with_rating])
     rating_breakdown = {star: rating_counts.get(star, 0) for star in range(5, 0, -1)}
-
-    return {
-        'product': product, 'reviews': reviews_only, 'questions': questions_only,
-        'review_only_count': len(reviews_only), 'rating_breakdown': rating_breakdown,
-        'total_reviews_with_rating': total_with_rating_count
-    }
+    return {'product': product, 'reviews': reviews_only, 'questions': questions_only,
+            'review_only_count': len(reviews_only), 'rating_breakdown': rating_breakdown,
+            'total_reviews_with_rating': total_with_rating_count}
 
 
 @app.route("/product/<int:product_id>/reviews")
@@ -352,12 +337,10 @@ def product_questions(product_id):
 def add_review(product_id):
     product = Product.query.get_or_404(product_id)
     form = request.form
-    new_review_data = {
-        'product_id': product_id, 'text': form.get('text'),
-        'author_name': form.get('author_name', 'Анонім'), 'author_email': form.get('author_email'),
-        'review_type': form.get('review_type', 'review'),
-        'parent_id': form.get('parent_id') if form.get('parent_id') else None
-    }
+    new_review_data = {'product_id': product_id, 'text': form.get('text'),
+                       'author_name': form.get('author_name', 'Анонім'), 'author_email': form.get('author_email'),
+                       'review_type': form.get('review_type', 'review'),
+                       'parent_id': form.get('parent_id') if form.get('parent_id') else None}
     if new_review_data['review_type'] == 'review': new_review_data['rating'] = int(form.get('rating', 0))
     if current_user.is_authenticated:
         new_review_data['user_id'] = current_user.id
@@ -370,10 +353,8 @@ def add_review(product_id):
         product.reviews_count = int(result[1] or 0)
     db.session.commit()
     flash('Дякуємо! Ваш запис було успішно додано.', 'success')
-    review_type = request.form.get('review_type', 'review')
-    if review_type == 'question':
-        return redirect(url_for('product_questions', product_id=product_id))
-    return redirect(url_for('product_reviews', product_id=product_id))
+    return redirect(url_for('product_questions' if request.form.get('review_type') == 'question' else 'product_reviews',
+                            product_id=product_id))
 
 
 # ────────────────────────────────
@@ -383,52 +364,35 @@ def add_review(product_id):
 def login():
     data = request.get_json()
     user = User.query.filter_by(email=data.get('email')).first()
-    if user and user.check_password(data.get('password')):
+    if user and user.password_hash and user.check_password(data.get('password')):
         login_user(user, remember=True)
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Невірний email або пароль"}), 401
 
 
-# app.py -> АВТЕНТИФІКАЦІЯ
-
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
-    email = data.get('email')
-    first_name = data.get('first_name')
-    last_name = data.get('last_name')
-    phone = data.get('phone')
-
-    # Перевірка на обов'язкові поля
+    email, first_name, last_name, phone = data.get('email'), data.get('first_name'), data.get('last_name'), data.get(
+        'phone')
     if not email or not first_name or not data.get('password'):
         return jsonify({"status": "error", "message": "Ім'я, Email та Пароль є обов'язковими"}), 400
-
     if User.query.filter_by(email=email).first():
         return jsonify({"status": "error", "message": "Цей email вже зареєстровано"}), 400
 
-    # Створюємо унікальний username з імені та, якщо потрібно, цифр
     username_base = first_name.strip()
     username, counter = username_base, 1
     while User.query.filter_by(username=username).first():
         username = f"{username_base}_{counter}"
         counter += 1
 
-    new_user = User(
-        first_name=first_name,
-        last_name=last_name,
-        phone=phone,
-        email=email,
-        username=username
-    )
+    new_user = User(first_name=first_name, last_name=last_name, phone=phone, email=email, username=username)
     new_user.set_password(data.get('password'))
     db.session.add(new_user)
     db.session.commit()
     login_user(new_user, remember=True)
-
-    subject = f"Вітаємо у {shop_info['name']}!"
-    html_body = render_template("email/welcome.html", user=new_user, shop=shop_info)
-    send_email(new_user.email, subject, html_body)
-
+    send_email(new_user.email, f"Вітаємо у {shop_info['name']}!",
+               render_template("email/welcome.html", user=new_user, shop=shop_info))
     return jsonify({"status": "success"})
 
 
@@ -436,47 +400,78 @@ def register():
 @login_required
 def logout():
     logout_user()
+    flash("Ви успішно вийшли з акаунту.", "success")
     return redirect(url_for('index'))
 
 
+# [ЗМІНЕНО] Повністю переписана і доповнена логіка для Google
 @oauth_authorized.connect_via(google_blueprint)
 def google_logged_in(blueprint, token):
     if not token:
         flash("Не вдалося увійти через Google.", category="error")
         return redirect(url_for("index"))
+
+    # Запит до Google API для отримання інформації про користувача
     resp = blueprint.session.get("/oauth2/v2/userinfo")
     if not resp.ok:
-        flash("Не вдалося отримати інформацію про користувача.", category="error")
+        msg = resp.json().get("error", {}).get("message", "Невідома помилка.")
+        flash(f"Не вдалося отримати інформацію про користувача з Google: {msg}", category="error")
         return redirect(url_for("index"))
 
     google_info = resp.json()
     email = google_info["email"]
+
+    # Шукаємо користувача в нашій базі за email
     user = User.query.filter_by(email=email).first()
+
     if not user:
-        username_base = google_info.get("name", email.split('@')[0])
+        # Сценарій 1: Реєстрація нового користувача
+        first_name = google_info.get("given_name", "User")
+        last_name = google_info.get("family_name")  # Може бути відсутнім
+
+        # Створюємо унікальний username
+        username_base = first_name.lower().strip()
         username, counter = username_base, 1
         while User.query.filter_by(username=username).first():
-            username = f"{username_base}_{counter}"
+            username = f"{username_base}{counter}"
             counter += 1
-        user = User(email=email, username=username, avatar_url=google_info.get('picture'))
-        user.set_password(os.urandom(16).hex())
+
+        user = User(
+            email=email,
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            avatar_url=google_info.get('picture')
+        )
+        # Пароль не встановлюємо, вхід буде тільки через Google
         db.session.add(user)
+        db.session.commit()
+
+        # Надсилаємо вітальний лист
         subject = f"Вітаємо у {shop_info['name']}!"
         html_body = render_template("email/welcome.html", user=user, shop=shop_info)
         send_email(user.email, subject, html_body)
+
+        flash("Ви успішно зареєструвалися та увійшли через Google!", category="success")
+
     else:
+        # Сценарій 2: Існуючий користувач входить через Google
+        # Оновимо аватар, якщо його не було
         if not user.avatar_url and google_info.get('picture'):
             user.avatar_url = google_info.get('picture')
-    db.session.commit()
+            db.session.commit()
+        flash("Ви успішно увійшли через Google!", category="success")
 
-    login_user(user)
-    flash("Ви успішно увійшли через Google!", category="success")
+    # Входимо користувача в систему
+    login_user(user, remember=True)
     return redirect(url_for("index"))
 
 
 # ────────────────────────────────
 #  КОШИК ТА ОФОРМЛЕННЯ ЗАМОВЛЕННЯ
 # ────────────────────────────────
+# ... (цей блок залишається без змін, він у вас працює коректно) ...
+
 @app.route('/add_to_cart', methods=['POST'])
 def add_to_cart():
     data = request.get_json()
@@ -492,37 +487,30 @@ def update_cart_quantity(product_id):
     cart = session.get("cart", {})
     product_id_str = str(product_id)
     new_quantity = request.json.get('quantity')
-
     if product_id_str in cart:
         if new_quantity and new_quantity > 0:
             cart[product_id_str] = new_quantity
-            session["cart"] = cart
-            return jsonify(status="success", message="Кількість оновлено")
         else:
             del cart[product_id_str]
-            session["cart"] = cart
-            return jsonify(status="success", message="Товар видалено з кошика")
-
-    return jsonify(status="error", message="Товар не знайдено в кошику"), 404
+        session["cart"] = cart
+        return jsonify(status="success")
+    return jsonify(status="error", message="Товар не знайдено"), 404
 
 
 @app.route('/get_cart')
 def get_cart():
     cart = session.get("cart", {})
-    cart_items = []
-    total = 0
+    cart_items, total = [], 0
     if cart:
         product_ids = [int(pid) for pid in cart.keys() if pid.isdigit()]
         products = Product.query.filter(Product.id.in_(product_ids)).all()
         product_map = {str(p.id): p for p in products}
-
         for product_id, quantity in cart.items():
             if product := product_map.get(product_id):
-                cart_items.append({
-                    "id": product.id, "name": product.name, "price": product.price, "image": product.image,
-                    "quantity": quantity, "in_stock": product.in_stock,
-                    "url": url_for('product_detail', product_id=product.id)
-                })
+                cart_items.append(
+                    {"id": product.id, "name": product.name, "price": product.price, "image": product.image,
+                     "quantity": quantity, "in_stock": product.in_stock,
+                     "url": url_for('product_detail', product_id=product.id)})
                 total += product.price * quantity
     return jsonify({"items": cart_items, "total": total})
 
@@ -530,17 +518,14 @@ def get_cart():
 @app.route("/remove_from_cart/<int:product_id>", methods=["POST"])
 def remove_from_cart(product_id):
     cart = session.get("cart", {})
-    product_id_str = str(product_id)
-    if product_id_str in cart:
-        del cart[product_id_str]
-        session["cart"] = cart
-    return jsonify(status="success", message="Товар видалено з кошика", cart_count=sum(cart.values()))
+    if str(product_id) in cart: del cart[str(product_id)]
+    session["cart"] = cart
+    return jsonify(status="success")
 
 
 @app.route('/buy_now', methods=['POST'])
 def buy_now():
-    product_id = str(request.get_json().get("product_id"))
-    session["cart"] = {product_id: 1}
+    session["cart"] = {str(request.get_json().get("product_id")): 1}
     return jsonify(status="success")
 
 
@@ -556,22 +541,15 @@ def checkout():
         products = Product.query.filter(Product.id.in_(product_ids)).all()
         product_map = {str(p.id): p for p in products}
         total_cost = sum(product_map[pid].price * qty for pid, qty in cart.items())
-
-        # [ОНОВЛЕНО] Об'єднуємо ім'я та прізвище
-        first_name = request.form.get('customer_first_name', '').strip()
-        last_name = request.form.get('customer_last_name', '').strip()
-        customer_full_name = f"{first_name} {last_name}".strip()
+        first_name, last_name = request.form.get('customer_first_name', '').strip(), request.form.get(
+            'customer_last_name', '').strip()
 
         order = Order(
-            customer_name=customer_full_name, # Використовуємо об'єднане ім'я
+            customer_name=f"{first_name} {last_name}".strip(),
             customer_phone=request.form.get('customer_phone'),
             delivery_method=request.form.get('delivery_method'),
-
-            # --- ОСЬ ЦІ ДВА РЯДКИ ПОТРІБНО ДОДАТИ ---
             delivery_city=request.form.get('delivery_city'),
             delivery_warehouse=request.form.get('delivery_warehouse'),
-            # ----------------------------------------
-
             payment_method=request.form.get('payment_method'),
             total_cost=total_cost,
             user_id=current_user.id if current_user.is_authenticated else None
@@ -582,82 +560,56 @@ def checkout():
         order_items_for_email_and_tg = []
         for pid, qty in cart.items():
             if p := product_map.get(pid):
-                order_item = OrderItem(order_id=order.id, product_id=p.id, quantity=qty, price=p.price)
-                db.session.add(order_item)
+                db.session.add(OrderItem(order_id=order.id, product_id=p.id, quantity=qty, price=p.price))
                 order_items_for_email_and_tg.append({'product': p, 'quantity': qty, 'price': p.price})
-
         db.session.commit()
 
-        # --- Відправка сповіщень ---
-        # 1. Відправляємо на email адміну
         try:
-            admin_email = os.getenv("SMTP_USER")
-            if admin_email:
-                subject = f"Нове замовлення #{order.id} на сайті {shop_info['name']}"
-                html_body = render_template(
-                    "email/order_notification.html",
-                    order=order, items=order_items_for_email_and_tg, shop=shop_info
-                )
-                send_email(admin_email, subject, html_body)
-        except Exception as e:
-            print(f">>> КРИТИЧНА ПОМИЛКА при відправці листа про замовлення: {e}")
-
-        # [ЗМІНЕНО] 2. Відправляємо в Telegram напряму
-        # Робимо це в try-except, щоб помилка в сповіщенні не зламала замовлення
-        try:
+            if admin_email := os.getenv("SMTP_USER"):
+                send_email(admin_email, f"Нове замовлення #{order.id}",
+                           render_template("email/order_notification.html", order=order,
+                                           items=order_items_for_email_and_tg, shop=shop_info))
             send_telegram_notification(order, order_items_for_email_and_tg)
         except Exception as e:
-            print(f">>> КРИТИЧНА ПОМИЛКА при виклику send_telegram_notification: {e}")
+            print(f">>> ПОМИЛКА СПОВІЩЕННЯ: {e}")
 
         session.pop('cart', None)
         flash('Дякуємо! Ваше замовлення прийнято.', 'success')
         return redirect(url_for('index'))
-
     return render_template('checkout.html')
 
 
 # ────────────────────────────────
 #  АДМІН-ПАНЕЛЬ
 # ────────────────────────────────
+# ... (цей блок залишається без змін, він у вас працює коректно) ...
 
 @app.route('/admin/orders', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def admin_orders():
-    # Обробка запиту на оновлення статусу
     if request.method == 'POST':
-        order_id = request.form.get('order_id')
-        new_status = request.form.get('status')
-        order = Order.query.get(order_id)
-        if order and new_status:
+        order_id, new_status = request.form.get('order_id'), request.form.get('status')
+        if order := Order.query.get(order_id):
             order.status = new_status
             db.session.commit()
-            flash(f"Статус замовлення #{order.id} оновлено на '{new_status}'.", "success")
+            flash(f"Статус замовлення #{order.id} оновлено.", "success")
         return redirect(url_for('admin_orders', status=request.args.get('status', 'Нове')))
 
-    # Відображення списку замовлень
     page = request.args.get('page', 1, type=int)
-    # Фільтруємо за статусом, за замовчуванням показуємо 'Нові'
     status_filter = request.args.get('status', 'Нове')
-
-    query = Order.query
-    if status_filter != 'all':
-        query = query.filter_by(status=status_filter)
-
+    query = Order.query if status_filter == 'all' else Order.query.filter_by(status=status_filter)
     orders = query.order_by(Order.timestamp.desc()).paginate(page=page, per_page=15, error_out=False)
-
-    # Статуси для кнопок фільтрації
     all_statuses = ['Нове', 'Відправлено', 'Виконано', 'Скасовано']
-
     return render_template('admin_orders.html', orders=orders, all_statuses=all_statuses, current_status=status_filter)
+
 
 @app.route('/admin/reviews')
 @login_required
 @admin_required
 def admin_reviews():
     page = request.args.get('page', 1, type=int)
-    all_reviews = Review.query.order_by(Review.timestamp.desc())
-    reviews = all_reviews.paginate(page=page, per_page=15, error_out=False)
+    reviews = Review.query.order_by(Review.timestamp.desc()).paginate(page=page, per_page=15, error_out=False)
     return render_template('admin_reviews.html', reviews=reviews)
 
 
@@ -666,15 +618,12 @@ def admin_reviews():
 @admin_required
 def add_product():
     if request.method == 'POST':
-        new_product = Product(
-            name=request.form['name'], price=float(request.form['price']),
-            description=request.form['description'], image=request.form['image'],
-            category=request.form['category'],
-            in_stock='in_stock' in request.form
-        )
+        new_product = Product(name=request.form['name'], price=float(request.form['price']),
+                              description=request.form['description'], image=request.form['image'],
+                              category=request.form['category'], in_stock='in_stock' in request.form)
         db.session.add(new_product);
         db.session.commit()
-        flash(f"Товар '{new_product.name}' успішно додано!", "success")
+        flash(f"Товар '{new_product.name}' додано!", "success")
         return redirect(url_for('catalog'))
     return render_template("add_product.html")
 
@@ -685,16 +634,12 @@ def add_product():
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == 'POST':
-        product.name = request.form['name']
-        product.price = float(request.form['price'])
-        product.description = request.form['description']
-        product.image = request.form['image']
-        product.category = request.form['category']
-        product.in_stock = 'in_stock' in request.form
+        product.name, product.price, product.description, product.image, product.category, product.in_stock = \
+        request.form['name'], float(request.form['price']), request.form['description'], request.form['image'], \
+        request.form['category'], 'in_stock' in request.form
         db.session.commit()
-        flash(f"Товар '{product.name}' успішно оновлено!", "success")
+        flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
-
     return render_template("edit_product.html", product=product)
 
 
@@ -702,15 +647,11 @@ def edit_product(product_id):
 @login_required
 @admin_required
 def delete_review(review_id):
-    review_to_delete = Review.query.get_or_404(review_id)
-    product_id = review_to_delete.product_id
-    is_admin_page = 'admin' in request.referrer
-    db.session.delete(review_to_delete)
+    review = Review.query.get_or_404(review_id)
+    db.session.delete(review);
     db.session.commit()
-    flash("Запис було успішно видалено.", "success")
-    if is_admin_page:
-        return redirect(url_for('admin_reviews'))
-    return redirect(request.referrer or url_for('product_reviews', product_id=product_id))
+    flash("Запис видалено.", "success")
+    return redirect(request.referrer or url_for('admin_reviews'))
 
 
 @app.route("/admin/delete_product/<int:product_id>", methods=["POST"])
@@ -718,14 +659,38 @@ def delete_review(review_id):
 @admin_required
 def delete_product(product_id):
     product = Product.query.get_or_404(product_id)
-    flash(f"Товар '{product.name}' було видалено.", "success")
     db.session.delete(product);
     db.session.commit()
+    flash(f"Товар '{product.name}' видалено.", "success")
     return redirect(url_for('catalog'))
 
 
+@app.route('/admin/unfinished')
+@login_required
+@admin_required
+def admin_unfinished():
+    page = request.args.get('page', 1, type=int)
+    query = Product.query
+    active_filters = [k for k in request.args if k in ['no_stock', 'no_description', 'no_image']]
+    if not active_filters:
+        query = query.filter(
+            db.or_(Product.in_stock == False, (Product.description == None) | (Product.description == ''),
+                   Product.image.like('%default_tovar.jpg%')))
+    else:
+        if 'no_stock' in active_filters: query = query.filter(Product.in_stock == False)
+        if 'no_description' in active_filters: query = query.filter(
+            (Product.description == None) | (Product.description == ''))
+        if 'no_image' in active_filters: query = query.filter(Product.image.like('%default_tovar.jpg%'))
+    counts = {'no_stock': Product.query.filter(Product.in_stock == False).count(),
+              'no_description': Product.query.filter(
+                  (Product.description == None) | (Product.description == '')).count(),
+              'no_image': Product.query.filter(Product.image.like('%default_tovar.jpg%')).count()}
+    products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
+    return render_template('admin_unfinished.html', products=products, counts=counts)
+
+
 # ────────────────────────────────
-#  ІНШІ МАРШРУТИ
+#  ІНШІ МАРШРУТИ ТА ЗАПУСК
 # ────────────────────────────────
 @app.route("/send_message", methods=["POST"])
 def send_message():
