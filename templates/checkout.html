@@ -1,4 +1,4 @@
-<!-- templates/checkout.html (ПОВНІСТЮ ОНОВЛЕНА ВЕРСІЯ 2.0) -->
+<!-- templates/checkout.html -->
 {% extends "base.html" %}
 {% block title %}Оформлення замовлення{% endblock %}
 
@@ -13,7 +13,6 @@
                     <div class="checkout-section-header">
                         <span class="icon">1</span><h4>Контактні дані</h4>
                     </div>
-                    <!-- [ЗМІНЕНО] Поля для імені та прізвища в один рядок -->
                     <div class="form-group-inline" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div class="form-group">
                             <label for="customer_first_name">Ім'я</label>
@@ -116,47 +115,51 @@
 
 {% block extra_js %}
 <script>
+// Цей скрипт містить лише логіку, специфічну для сторінки checkout,
+// а маска телефону тепер працює з глобального файлу main.js
 document.addEventListener('DOMContentLoaded', function() {
-    // --- ОСНОВНА ЛОГІКА СТОРІНКИ ---
     setupRadioGroups();
     loadCartSummary();
     setupDeliveryLogic();
-    // --- ФУНКЦІЇ ---
+    setupEnterKeyNavigation();
 
-    const form = document.querySelector('.checkout-grid-v2');
-    form.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
-            e.preventDefault();
-            const inputs = Array.from(form.querySelectorAll('input, select'));
-            const currentIndex = inputs.indexOf(e.target);
-            const nextInput = inputs[currentIndex + 1];
-            if (nextInput) {
-                nextInput.focus();
-            } else {
-                form.querySelector('button[type="submit"]').focus();
+    function setupEnterKeyNavigation() {
+        const form = document.querySelector('.checkout-grid-v2');
+        if (!form) return;
+        form.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+                e.preventDefault();
+                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select'));
+                const currentIndex = inputs.indexOf(e.target);
+                const nextInput = inputs[currentIndex + 1];
+                if (nextInput) {
+                    nextInput.focus();
+                } else {
+                    form.querySelector('button[type="submit"]').focus();
+                }
             }
-        }
-    });
+        });
+    }
 
     function setupRadioGroups() {
-        // ... (код без змін)
         document.querySelectorAll('.radio-group').forEach(group => {
             group.addEventListener('click', e => {
                 const label = e.target.closest('.radio-option');
                 if (!label) return;
                 group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
                 label.classList.add('active');
-                label.querySelector('input').checked = true;
+                const radio = label.querySelector('input');
+                if(radio) radio.checked = true;
+
                 if (group.id === 'delivery-method-group') {
-                    const event = new Event('deliveryChange');
-                    group.dispatchEvent(event);
+                    const event = new Event('deliveryChange', { bubbles: true });
+                    radio.dispatchEvent(event);
                 }
             });
         });
     }
 
     function loadCartSummary() {
-        // ... (код без змін)
         fetch('/get_cart')
             .then(res => res.json())
             .then(data => {
@@ -167,15 +170,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 listContainer.innerHTML = '';
                 if (data.items.length > 0) {
                     data.items.forEach(item => {
-                        const itemHtml = `
+                        listContainer.insertAdjacentHTML('beforeend', `
                             <div class="summary-item">
                                 <img src="${item.image}" alt="${item.name}">
                                 <div class="summary-item-details">
                                     <div class="name">${item.name}</div>
                                     <div class="price">${item.quantity} x ${item.price.toFixed(2)} ₴</div>
                                 </div>
-                            </div>`;
-                        listContainer.insertAdjacentHTML('beforeend', itemHtml);
+                            </div>`);
                     });
                 }
                 subtotalEl.textContent = `${data.total.toFixed(2)} ₴`;
@@ -184,17 +186,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setupDeliveryLogic() {
-        // ... (код без змін)
         const deliveryGroup = document.getElementById('delivery-method-group');
         const novaPoshtaDetails = document.getElementById('nova-poshta-details');
         const cityInput = document.getElementById('delivery_city');
         const warehouseSelect = document.getElementById('delivery_warehouse');
 
-        deliveryGroup.addEventListener('deliveryChange', () => {
-            const selectedMethod = document.querySelector('input[name="delivery_method"]:checked').value;
-            novaPoshtaDetails.style.display = selectedMethod === 'Нова Пошта' ? 'block' : 'none';
-            cityInput.required = selectedMethod === 'Нова Пошта';
-            warehouseSelect.required = selectedMethod === 'Нова Пошта';
+        deliveryGroup.addEventListener('deliveryChange', (e) => {
+            const selectedMethod = e.target.value;
+            const isNovaPoshta = selectedMethod === 'Нова Пошта';
+            novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
+            cityInput.required = isNovaPoshta;
+            warehouseSelect.required = isNovaPoshta;
         });
 
         cityInput.addEventListener('input', function() {
@@ -208,8 +210,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         function fetchWarehouses(city) {
-             warehouseSelect.disabled = true;
+            warehouseSelect.disabled = true;
             warehouseSelect.innerHTML = '<option value="">Завантаження...</option>';
+            // Це імітація запиту. Для реальної інтеграції тут буде fetch до API Нової Пошти
             setTimeout(() => {
                 const warehousesByCity = { "Київ": ["Відділення №1", "Відділення №10"], "Миргород": ["Відділення №1", "Відділення №2"] };
                 let cityWarehouses = [];
@@ -228,59 +231,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, 500);
         }
-    }
-
-
-        const mask = (event) => {
-            let i = 0;
-            const def = matrix.replace(/\D/g, "");
-            let val = event.target.value.replace(/\D/g, "");
-
-            // Забороняємо стирати префікс +380
-            if (val.length < def.length) {
-                val = def;
-            }
-
-            let newValue = matrix.replace(/[_\d]/g, (a) => {
-                return i < val.length ? val.charAt(i++) : a;
-            });
-
-            // Знаходимо першу позицію для введення
-            i = newValue.indexOf("_");
-            if (i !== -1) {
-                // Видаляємо все після першого "_"
-                newValue = newValue.slice(0, i);
-            }
-
-            // Якщо користувач натиснув не цифру, і це не backspace/delete, ігноруємо
-            const reg = new RegExp("^" + matrix.replace(/_/g, "\\d").replace(/\(/g, "\\(").replace(/\)/g, "\\)").replace(/\+/g, "\\+") + "$");
-            if (!reg.test(event.target.value) || event.target.value.length < 5 || (event.keyCode > 47 && event.keyCode < 58) ) {
-                event.target.value = newValue;
-            }
-
-            // Встановлюємо правильний колір
-            if (event.target.value.length <= 5) {
-                event.target.style.color = 'var(--gray-color)';
-            } else {
-                event.target.style.color = 'var(--dark-color)';
-            }
-        };
-
-        phoneInput.addEventListener("input", mask, false);
-        phoneInput.addEventListener("focus", mask, false);
-        phoneInput.addEventListener("blur", mask, false);
-        phoneInput.addEventListener("keydown", mask, false);
-        phoneInput.addEventListener("click", (event) => {
-            // При кліку завжди ставимо курсор на перше вільне місце
-            let i = event.target.value.indexOf("_");
-            if(i != -1) {
-                setCursorPosition(i, event.target);
-            }
-        }, false);
-
-        // Початковий стан
-        phoneInput.value = matrix;
-        phoneInput.style.color = 'var(--gray-color)';
     }
 });
 </script>

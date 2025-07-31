@@ -1,4 +1,4 @@
-// static/js/main.js (ФІНАЛЬНА ВЕРСІЯ 5.0 З НАДІЙНИМ ВИДАЛЕННЯМ)
+// static/js/main.js (ФІНАЛЬНА ВЕРСІЯ 6.0 З ВИПРАВЛЕНОЮ МАСКОЮ)
 
 document.addEventListener('DOMContentLoaded', function() {
     // Ініціалізація всіх основних модулів
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initCartLogic();
     initFavoritesLogic();
 
-    // Ініціалізуємо маски для обох полів вводу телефону
+    // Ініціалізуємо єдину правильну маску для обох полів вводу телефону
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
 
@@ -21,6 +21,79 @@ document.addEventListener('DOMContentLoaded', function() {
     updateAllProductButtonStates();
     updateFavoritesUI();
 });
+
+// ===================================================================
+//  [ПОВНІСТЮ ПЕРЕПИСАНА І ВИПРАВЛЕНА ФУНКЦІЯ МАСКИ ТЕЛЕФОНУ]
+// ===================================================================
+function setupPhoneMaskAdvanced(selector) {
+    const phoneInput = document.querySelector(selector);
+    if (!phoneInput) return;
+
+    const matrix = "+380 (__) ___-__-__";
+    const prefixNumber = "380";
+
+    const setCursorPosition = (pos, elem) => {
+        // requestAnimationFrame допомагає уникнути "гонки" подій і стабілізує позиціонування
+        requestAnimationFrame(() => {
+            elem.focus();
+            elem.setSelectionRange(pos, pos);
+        });
+    };
+
+    const mask = (event) => {
+        const { target, type } = event;
+        let value = target.value.replace(/\D/g, ""); // Отримуємо тільки цифри
+        let i = 0;
+
+        // Гарантуємо, що префікс завжди на місці і не може бути видалений
+        if (value.length < prefixNumber.length) {
+            value = prefixNumber;
+        }
+
+        // Заново форматуємо рядок за матрицею
+        let newValue = matrix.replace(/[_\d]/g, (a) => {
+            if (i < value.length) {
+                return value.charAt(i++);
+            }
+            return a; // Якщо цифри закінчилися, повертаємо символ матриці ('_' або цифру)
+        });
+
+        // Знаходимо наступну позицію для курсора
+        i = newValue.indexOf("_");
+        if (i === -1) { // якщо символів '_' не залишилось, курсор ставимо в кінець
+            i = newValue.length;
+        }
+
+        target.value = newValue;
+
+        // При будь-якій взаємодії (введення, клік, фокус) ставимо курсор на правильне місце
+        if (type !== 'blur') {
+            setCursorPosition(i, target);
+        }
+    };
+
+    phoneInput.addEventListener("input", mask);
+    phoneInput.addEventListener("focus", mask);
+    phoneInput.addEventListener("click", mask);
+
+    // Очищуємо поле, якщо користувач пішов з нього, так і не ввівши номер
+    phoneInput.addEventListener("blur", (e) => {
+        if (e.target.value.replace(/\D/g, "") === prefixNumber) {
+            e.target.value = "";
+        }
+    });
+
+    // Додаткова обробка Backspace для запобігання видалення префіксу
+    phoneInput.addEventListener("keydown", (e) => {
+        if (e.key === 'Backspace' && e.target.value.replace(/\D/g, "").length <= prefixNumber.length) {
+            e.preventDefault();
+        }
+    });
+}
+
+// ===================================================================
+//  РЕШТА ФУНКЦІЙ (без змін)
+// ===================================================================
 
 function initProductDescriptionToggle() {
     const wrapper = document.getElementById('description-wrapper');
@@ -39,10 +112,6 @@ function initProductDescriptionToggle() {
         btn.textContent = isExpanded ? 'Приховати' : 'Читати далі';
     });
 }
-
-// ===================================================================
-//  ЛОГІКА КОШИКА
-// ===================================================================
 
 function initCartLogic() {
     document.body.addEventListener('click', e => {
@@ -70,7 +139,6 @@ function initCartLogic() {
             '.qty-btn.minus': () => {
                 if (!productId) return;
                 const currentQuantity = parseInt(button.nextElementSibling.textContent);
-                // [НОВЕ] Блокуємо зменшення, якщо кількість 1
                 if (currentQuantity <= 1) return;
                 const newQuantity = currentQuantity - 1;
                 fetchApi(`/update_cart_quantity/${productId}`, { quantity: newQuantity });
@@ -124,56 +192,6 @@ function updateCartView() {
     });
 }
 
-// [НОВА, ПОВНІСТЮ РОБОЧА ВЕРСІЯ]
-function setupPhoneMaskAdvanced(selector) {
-    const input = document.querySelector(selector);
-    if (!input) return;
-
-    const matrix = "+380 (__) ___-__-__";
-    const prefixNumber = "380";
-
-    const setCursorPosition = (pos, elem) => {
-        requestAnimationFrame(() => {
-            elem.focus();
-            if (elem.setSelectionRange) {
-                elem.setSelectionRange(pos, pos);
-            }
-        });
-    };
-
-    const applyMask = (event) => {
-        const target = event.target;
-        let value = target.value.replace(/\D/g, "");
-        let i = 0;
-
-        if (!value.startsWith(prefixNumber)) {
-            value = prefixNumber + value.substring(prefixNumber.length);
-        }
-
-        let formattedValue = matrix.replace(/[_\d]/g, (a) => {
-            return i < value.length ? value.charAt(i++) : a;
-        });
-
-        // Знаходимо першу позицію для введення
-        const firstUnderscore = formattedValue.indexOf('_');
-        if (event.type !== 'blur' || value.length > prefixNumber.length) {
-            target.value = formattedValue;
-        } else if (value.length <= prefixNumber.length) {
-            target.value = ''; // Очищуємо, якщо нічого крім префіксу не введено
-        }
-
-        if (event.type === 'click' || event.type === 'focus') {
-             setCursorPosition(firstUnderscore !== -1 ? firstUnderscore : formattedValue.length, target);
-        }
-    };
-
-    input.addEventListener("input", applyMask);
-    input.addEventListener("focus", applyMask);
-    input.addEventListener("click", applyMask);
-    input.addEventListener("blur", applyMask);
-}
-
-
 function updateAllProductButtonStates() {
     fetch('/get_cart').then(res => res.json()).then(data => {
         const cartProductIds = new Set(data.items.map(item => String(item.id)));
@@ -191,10 +209,6 @@ function updateAllProductButtonStates() {
         });
     });
 }
-
-// ===================================================================
-//  ЛОГІКА ОБРАНОГО
-// ===================================================================
 
 function initFavoritesLogic() {
     document.body.addEventListener('click', e => {
@@ -277,10 +291,6 @@ function renderFavoritesModal() {
     });
 }
 
-// ===================================================================
-//  ІНШІ ІНІЦІАЛІЗАТОРИ ТА ДОПОМІЖНІ ФУНКЦІЇ
-// ===================================================================
-
 function fetchApi(url, body, method = 'POST') {
     const options = { method, headers: { 'Content-Type': 'application/json' } };
     if (body) options.body = JSON.stringify(body);
@@ -294,19 +304,15 @@ function fetchApi(url, body, method = 'POST') {
 function showToast(message, type = 'success', actions = '') {
     const toast = document.createElement('div');
     toast.className = `toast-notification ${type}`;
-
     const messageSpan = document.createElement('span');
     messageSpan.textContent = message;
-
     toast.appendChild(messageSpan);
-
     if (actions) {
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'toast-actions';
         actionsDiv.innerHTML = actions;
         toast.appendChild(actionsDiv);
     }
-
     document.body.appendChild(toast);
     setTimeout(() => {
         toast.classList.add('show');
