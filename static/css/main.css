@@ -1771,127 +1771,6 @@ img { max-width: 100%; height: auto; display: block; }
 .cart-item-stock.out-of-stock { color: var(--danger-color); }
 .cart-item-price { font-weight: 500; }
 
-* Hero Slider на головній */
-
-main {
-    display: block; /* Гарантує, що тег <main> поводиться як блок */
-}
-
-/* Hero Slider на головній */
-.hero-slider {
-    position: relative; /* Обов'язково для позиціонування дочірніх елементів */
-    width: 100%;
-    height: 75vh; /* Висота слайдера - 75% від висоти вікна */
-    min-height: 500px; /* Мінімальна висота для маленьких екранів */
-    background-color: var(--dark-color); /* Колір фону на випадок, якщо картинка не завантажиться */
-    overflow: hidden; /* Ховаємо все, що виходить за межі */
-}
-
-.hero-slider .slides-container {
-    width: 100%;
-    height: 100%;
-    position: relative;
-}
-
-.hero-slide {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-size: cover;
-    background-position: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: white;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.8s ease;
-    z-index: 1;
-}
-
-.hero-slide::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.5); /* Затемнення для кращої читабельності тексту */
-}
-
-.hero-slide.active {
-    opacity: 1;
-    visibility: visible;
-    z-index: 2;
-}
-
-.hero-slide .hero-content {
-    position: relative;
-    z-index: 3;
-    max-width: 800px;
-    padding: 20px;
-}
-
-.hero-slide h2 {
-    font-size: 2.8rem;
-    margin-bottom: 1rem;
-}
-.hero-slide p {
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
-}
-
-.slider-nav {
-    position: absolute;
-    top: 50%;
-    width: 100%;
-    transform: translateY(-50%);
-    display: flex;
-    justify-content: space-between;
-    padding: 0 20px;
-    z-index: 5;
-}
-
-.slider-nav button {
-    background: rgba(0,0,0,0.4);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 45px;
-    height: 45px;
-    font-size: 2rem;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-.slider-nav button:hover {
-    background-color: rgba(0,0,0,0.7);
-}
-
-.slider-dots {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 10px;
-    z-index: 5;
-}
-
-.slider-dots .dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.5);
-    border: none;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.slider-dots .dot.active {
-    background: white;
-}
-
 .product-image-main {
     max-height: 550px; /* Можете підібрати інше значення, наприклад 500px або 600px */
     display: flex;
@@ -3206,4 +3085,169 @@ a, button {
 
     .modal-content { width: 95%; }
     .cart-sidebar { max-width: 90%; }
+}
+
+.hero-container {
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.card-slider-wrapper {
+    position: relative;
+}
+
+/* "Сцена", на якій знаходяться слайди. Perspective створює 3D-ефект */
+.card-slider {
+    position: relative;
+    width: 100%;
+    height: 60vh;
+    min-height: 450px;
+    perspective: 1200px;
+    transform-style: preserve-3d;
+}
+
+.hero-slide {
+    position: absolute;
+    top: 10%; /* Трохи опускаємо, щоб було місце для тіні */
+    left: 50%;
+    width: 60%; /* Ширина центрального слайда */
+    height: 80%; /* Висота */
+    border-radius: 16px;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+    color: white;
+    display: flex;
+    align-items: flex-end; /* Вирівнюємо контент по низу */
+    padding: 2rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    /* Головна анімація! */
+    transition: transform 0.6s ease-in-out, opacity 0.6s ease, z-index 0s 0.3s;
+}
+
+.hero-slide::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    /* Затемнення градієнтом, щоб текст знизу було краще видно */
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0) 50%);
+    z-index: 1;
+}
+
+.hero-slide .hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: left;
+    width: 100%;
+}
+.hero-slide .hero-content h2 {
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+}
+.hero-slide .hero-content p {
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Стани слайдів */
+.slide-center {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+    z-index: 10;
+}
+.slide-left {
+    transform: translateX(-115%) scale(0.75) rotateY(45deg);
+    opacity: 0.5;
+    z-index: 5;
+}
+.slide-right {
+    transform: translateX(15%) scale(0.75) rotateY(-45deg);
+    opacity: 0.5;
+    z-index: 5;
+}
+/* Стан для слайда, що "вилазить" */
+.slide-new {
+    transform: translateX(115%) scale(0.75) rotateY(-45deg);
+    opacity: 0;
+    z-index: 4;
+}
+/* Стан для слайда, що зникає */
+.slide-exit {
+    transform: translateX(-215%) scale(0.75) rotateY(45deg);
+    opacity: 0;
+    z-index: 4;
+}
+
+/* Навігація */
+.slider-nav {
+    position: absolute;
+    top: 50%;
+    width: 100%;
+    transform: translateY(-50%);
+    display: flex;
+    justify-content: space-between;
+    padding: 0;
+    z-index: 20;
+}
+.slider-nav button {
+    background: rgba(255,255,255,0.9);
+    color: var(--dark-color);
+    border: none;
+    border-radius: 50%;
+    width: 45px; height: 45px;
+    font-size: 1.8rem;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: background-color 0.3s;
+}
+.slider-nav button:hover {
+    background-color: white;
+}
+.slider-nav .prev-btn {
+    transform: translateX(-20px);
+}
+.slider-nav .next-btn {
+    transform: translateX(20px);
+}
+
+/* Точки */
+.slider-dots {
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 20;
+}
+.slider-dots .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.2);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.slider-dots .dot.active {
+    background: var(--dark-color);
+    transform: scale(1.3);
+}
+
+@media (max-width: 768px) {
+    .card-slider {
+        height: 50vh;
+        min-height: 400px;
+    }
+    .hero-slide {
+        width: 80%;
+    }
+    .hero-slide .hero-content h2 {
+        font-size: 1.5rem;
+    }
+    .hero-slide .hero-content p {
+        font-size: 0.9rem;
+    }
+    .slider-nav {
+        display: none;
+    }
 }

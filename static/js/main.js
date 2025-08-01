@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initContactForm();
     initCatalogFilters();
     initReviewsPage();
-    initHeroSlider();
+    initHeroSlider(); // <--- ОСЬ ТУТ БУДЕ НОВА ФУНКЦІЯ
     initSimilarProductsCarousel();
     initProductDescriptionToggle();
 
@@ -489,32 +489,136 @@ function initReviewsPage() {
     [reviewModal, questionModal, replyModal].forEach(closeModalOnClick);
 }
 
+// ===================================================================
+// [ПОВНІСТЮ НОВА ФУНКЦІЯ] ІНІЦІАЛІЗАЦІЯ СЛАЙДЕРА-КАРУСЕЛІ
+// ===================================================================
 function initHeroSlider() {
-    const slider = document.querySelector('.hero-slider');
+    const slider = document.querySelector('.card-slider');
     if (!slider) return;
-    const slides = slider.querySelectorAll('.hero-slide');
-    if (slides.length <= 1) return;
-    const dotsContainer = slider.querySelector('.slider-dots');
+
+    const slides = Array.from(slider.querySelectorAll('.hero-slide'));
+    const prevBtn = document.querySelector('.card-slider-wrapper .prev-btn');
+    const nextBtn = document.querySelector('.card-slider-wrapper .next-btn');
+    const dotsContainer = document.querySelector('.card-slider-wrapper .slider-dots');
+
+    const totalSlides = slides.length;
+    if (totalSlides <= 1) {
+        if(prevBtn) prevBtn.style.display = 'none';
+        if(nextBtn) nextBtn.style.display = 'none';
+        if(dotsContainer) dotsContainer.style.display = 'none';
+        return;
+    }
+
     let currentIndex = 0;
+    let autoPlayInterval;
+
+    // Створюємо точки
     dotsContainer.innerHTML = '';
     slides.forEach((_, i) => {
         const dot = document.createElement('button');
         dot.classList.add('dot');
-        dot.addEventListener('click', () => showSlide(i));
+        dot.addEventListener('click', () => {
+            // Перехід по кліку на точку поки не реалізовано, щоб не ускладнювати
+            // Але можна буде додати
+        });
         dotsContainer.appendChild(dot);
     });
     const dots = dotsContainer.querySelectorAll('.dot');
-    const showSlide = index => {
-        slides[currentIndex].classList.remove('active');
-        dots[currentIndex].classList.remove('active');
-        currentIndex = (index + slides.length) % slides.length;
-        slides[currentIndex].classList.add('active');
-        dots[currentIndex].classList.add('active');
-    };
-    slider.querySelector('.next-btn').addEventListener('click', () => showSlide(currentIndex + 1));
-    slider.querySelector('.prev-btn').addEventListener('click', () => showSlide(currentIndex - 1));
-    setInterval(() => showSlide(currentIndex + 1), 5000);
-    showSlide(0);
+
+    function updateSlider(direction = 'next', newIndex = -1) {
+        // Зупиняємо анімацію, щоб не було конфліктів
+        clearInterval(autoPlayInterval);
+
+        const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
+        const nextIndexFromCurrent = (currentIndex + 1) % totalSlides;
+
+        const currentCenterSlide = slides[currentIndex];
+        const currentLeftSlide = slides[prevIndex];
+        const currentRightSlide = slides[nextIndexFromCurrent];
+
+        // Знімаємо всі класи позицій
+        slides.forEach(s => s.className = 'hero-slide');
+
+        if (direction === 'next') {
+            currentIndex = (currentIndex + 1) % totalSlides;
+            const newRightIndex = (currentIndex + 1) % totalSlides;
+
+            currentLeftSlide.classList.add('slide-exit');
+            currentCenterSlide.classList.add('slide-left');
+            currentRightSlide.classList.add('slide-center');
+            if (totalSlides > 3) {
+                slides[newRightIndex].classList.add('slide-new');
+                // Через мить перетворюємо на slide-right для анімації "виповзання"
+                setTimeout(() => {
+                    slides[newRightIndex].classList.remove('slide-new');
+                    slides[newRightIndex].classList.add('slide-right');
+                }, 50);
+            } else {
+                 slides[newRightIndex].classList.add('slide-right');
+            }
+
+        } else { // direction === 'prev'
+            currentIndex = (currentIndex - 1 + totalSlides) % totalSlides;
+            const newLeftIndex = (currentIndex - 1 + totalSlides) % totalSlides;
+
+            currentRightSlide.classList.add('slide-exit'); // "exit" to the right
+            currentCenterSlide.classList.add('slide-right');
+            currentLeftSlide.classList.add('slide-center');
+
+            if (totalSlides > 3) {
+                 slides[newLeftIndex].classList.add('slide-new'); // "new" from the left
+                 setTimeout(() => {
+                    slides[newLeftIndex].classList.remove('slide-new');
+                    slides[newLeftIndex].classList.add('slide-left');
+                }, 50);
+            } else {
+                 slides[newLeftIndex].classList.add('slide-left');
+            }
+        }
+
+        // Оновлюємо стилі слайдів без анімації
+        updateInitialPositions();
+        updateDots();
+
+        // Перезапускаємо автопрокрутку
+        startAutoPlay();
+    }
+
+    function updateInitialPositions() {
+        slides.forEach(s => s.className = 'hero-slide'); // Очищення
+
+        const leftIndex = (currentIndex - 1 + totalSlides) % totalSlides;
+        const rightIndex = (currentIndex + 1) % totalSlides;
+
+        if (totalSlides === 2) {
+            slides[currentIndex].classList.add('slide-center');
+            slides[rightIndex].classList.add('slide-right');
+        } else if (totalSlides >= 3) {
+            slides[leftIndex].classList.add('slide-left');
+            slides[currentIndex].classList.add('slide-center');
+            slides[rightIndex].classList.add('slide-right');
+        } else {
+            slides[currentIndex].classList.add('slide-center');
+        }
+    }
+
+    function updateDots() {
+        dots.forEach((dot, i) => {
+            dot.classList.toggle('active', i === currentIndex);
+        });
+    }
+
+    function startAutoPlay() {
+        autoPlayInterval = setInterval(() => updateSlider('next'), 5000);
+    }
+
+    nextBtn.addEventListener('click', () => updateSlider('next'));
+    prevBtn.addEventListener('click', () => updateSlider('prev'));
+
+    // Ініціалізація
+    updateInitialPositions();
+    updateDots();
+    startAutoPlay();
 }
 
 function initSimilarProductsCarousel() {

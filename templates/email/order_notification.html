@@ -119,7 +119,7 @@
                                 <p><strong>Спосіб доставки:</strong> {{ order.delivery_method }}</p>
                                 {% if order.delivery_method == 'Нова Пошта' %}
                                     <p><strong>Місто:</strong> {{ order.delivery_city or 'Не вказано' }}</p>
-                                    <p><strong>Відділення / Поштомат:</strong> {{ order.delivery_warehouse or 'Не вказано' }}</p>
+                                    <p><strong>Відділення:</strong> {{ order.delivery_warehouse or 'Не вказано' }}</p>
                                 {% endif %}
                                 <p><strong>Спосіб оплати:</strong> {{ order.payment_method }}</p>
                             </div>

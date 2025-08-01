@@ -1,39 +1,37 @@
-
 <!-- templates/index.html -->
 {% extends "base.html" %}
 {% block title %}Інтернет магазин сантехніки{% endblock %}
 
 {% block content %}
-<section class="hero-slider">
-    <div class="slides-container">
-        {% for slide in hero_slides %}
-        <div class="hero-slide {{ 'active' if loop.first else '' }}" style="background-image: url('{{ url_for('static', filename='img/' + slide.image) }}');">
-            <div class="container">
+<!-- [НОВА ВЕРСІЯ] Секція зі слайдером-каруселлю -->
+<section class="container hero-container">
+    <div class="card-slider-wrapper">
+        <div class="card-slider">
+            {% for slide in hero_slides %}
+            <div class="hero-slide" style="background-image: url('{{ url_for('static', filename='img/' + slide.image) }}');" data-index="{{ loop.index0 }}">
                 <div class="hero-content">
                     <h2>{{ slide.title }}</h2>
                     <p>{{ slide.subtitle }}</p>
                     <a href="{{ url_for('catalog') }}" class="btn btn-primary btn-lg">Перейти до каталогу</a>
                 </div>
             </div>
+            {% endfor %}
         </div>
-        {% endfor %}
+        <div class="slider-nav">
+            <button class="prev-btn">‹</button>
+            <button class="next-btn">›</button>
+        </div>
+        <div class="slider-dots"></div>
     </div>
-    <div class="slider-nav">
-        <button class="prev-btn">‹</button>
-        <button class="next-btn">›</button>
-    </div>
-    <div class="slider-dots"></div>
 </section>
 
 <!-- Categories Section -->
 <section class="categories-section" style="padding: 80px 0;">
     <div class="container">
         <h2 class="section-title">Категорії товарів</h2>
-        <!-- [ВИПРАВЛЕНО] Повертаємось до простого вигляду карток -->
         <div class="products-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
             {% for category in shop.categories %}
             <a href="{{ url_for('catalog', category=category.name) }}" class="category-card">
-                <!-- Тепер тут зображення замість іконки-шрифта -->
                 <div class="category-icon-wrapper">
                     <img src="{{ url_for('static', filename='img/' + category.icon) }}" alt="{{ category.name }}">
                 </div>
@@ -48,7 +46,6 @@
 <section class="featured-products container" style="padding-bottom: 80px;">
     <h2 class="section-title">Популярні товари</h2>
     <div class="products-grid">
-        {# [ЗМІНЕНО] Тепер виводимо 5 товарів, щоб заповнити рядок #}
         {% for product in products[:5] %}
             {% include '_product_card.html' %}
         {% endfor %}
@@ -83,21 +80,17 @@
     <div class="contacts-grid">
         <div class="contact-info">
             <h3><i class="fas fa-map-marker-alt"></i> Наша адреса</h3>
-            <!-- [ОНОВЛЕНО] Додано посилання на Google Maps -->
             <a href="https://maps.app.goo.gl/CKHaxyU7WfwkrA6C8" target="_blank" rel="noopener noreferrer">
                 <p>{{ shop.city }}, {{ shop.address }}</p>
             </a>
-
             <h3 style="margin-top: 20px;"><i class="fas fa-phone"></i> Телефони</h3>
             <ul class="phones-list" style="list-style: none; padding-left: 0;">
                 {% for phone in shop.phone %}
                     <li><a href="tel:{{ phone }}">{{ phone }}</a></li>
                 {% endfor %}
             </ul>
-
             <h3 style="margin-top: 20px;"><i class="fas fa-envelope"></i> Email</h3>
             <p><a href="mailto:{{ shop.email }}">{{ shop.email }}</a></p>
-
             <h3 style="margin-top: 20px;"><i class="fas fa-clock"></i> Графік роботи</h3>
             <ul class="work-hours" style="list-style: none; padding-left: 0;">
                 {% for day, hours in shop.hours.items() %}
