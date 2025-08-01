@@ -34,7 +34,7 @@
             {% for order in orders.items %}
             <tr>
                 <td><strong>#{{ order.id }}</strong></td>
-                <td>{{ order.timestamp.strftime('%d %b %Y, %H:%M') }}</td>
+                <td>{{ order.timestamp.strftime('%d.%m.%Y, %H:%M') }}</td>
                 <td>
                     {{ order.customer_name }}<br>
                     <small>{{ order.customer_phone }}</small>

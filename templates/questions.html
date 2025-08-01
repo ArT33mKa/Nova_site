@@ -35,7 +35,7 @@
                         <div class="review-header">
                             <strong class="review-author">{{ question.author_name or (question.author and question.author.username) }}</strong>
                             <span class="review-type-badge">Питання</span>
-                            <small class="review-date">{{ question.timestamp.strftime('%d %B %Y') }}</small>
+                            <small class="review-date">{{ question.timestamp.strftime('%d.%m.%Y') }}</small>
                             <!-- [НОВЕ] Кнопка видалення для адміна -->
                             {% if current_user.is_authenticated and current_user.is_admin %}
                             <form class="delete-review-form" action="{{ url_for('delete_review', review_id=question.id) }}" method="POST" onsubmit="return confirm('Видалити цей запис?');">
@@ -54,7 +54,7 @@
                                     {% if reply.author and reply.author.is_admin %}
                                         <span class="owner-badge"><i class="fas fa-shield-alt"></i> Власник магазину</span>
                                     {% endif %}
-                                    <small class="review-date">{{ reply.timestamp.strftime('%d %B %Y') }}</small>
+                                    <small class="review-date">{{ question.timestamp.strftime('%d.%m.%Y') }}</small>
                                      <!-- [НОВЕ] Кнопка видалення для адміна (для відповідей) -->
                                     {% if current_user.is_authenticated and current_user.is_admin %}
                                     <form class="delete-review-form" action="{{ url_for('delete_review', review_id=reply.id) }}" method="POST" onsubmit="return confirm('Видалити цю відповідь?');">

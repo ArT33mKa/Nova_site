@@ -37,7 +37,7 @@
                             {% if review.rating > 0 %}
                                 <span class="rating" style="color: #ffc107;">{% for i in range(review.rating) %}★{% endfor %}<span style="color: #e0e0e0;">{% for i in range(5 - review.rating) %}★{% endfor %}</span></span>
                             {% endif %}
-                            <small class="review-date">{{ review.timestamp.strftime('%d %B %Y') }}</small>
+                            <small class="review-date">{{ review.timestamp.strftime('%d.%m.%Y') }}</small>
                             <!-- [НОВЕ] Кнопка видалення для адміна -->
                             {% if current_user.is_authenticated and current_user.is_admin %}
                             <form class="delete-review-form" action="{{ url_for('delete_review', review_id=review.id) }}" method="POST" onsubmit="return confirm('Видалити цей запис?');">
@@ -56,7 +56,7 @@
                                     {% if reply.author and reply.author.is_admin %}
                                         <span class="owner-badge"><i class="fas fa-shield-alt"></i> Власник магазину</span>
                                     {% endif %}
-                                    <small class="review-date">{{ reply.timestamp.strftime('%d %B %Y') }}</small>
+                                    <small class="review-date">{{ review.timestamp.strftime('%d.%m.%Y') }}</small>
                                     <!-- [НОВЕ] Кнопка видалення для адміна (для відповідей) -->
                                     {% if current_user.is_authenticated and current_user.is_admin %}
                                     <form class="delete-review-form" action="{{ url_for('delete_review', review_id=reply.id) }}" method="POST" onsubmit="return confirm('Видалити цю відповідь?');">
