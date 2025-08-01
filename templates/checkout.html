@@ -5,7 +5,7 @@
 <div class="checkout-page-v2">
     <div class="container">
         <h1 class="page-title" style="text-align: left; border: none; padding-bottom: 20px;">Оформлення замовлення</h1>
-        <form action="{{ url_for('checkout') }}" method="POST" class="checkout-grid-v2">
+        <form action="{{ url_for('checkout') }}" method="POST" class="checkout-grid-v2" id="checkout-form">
             <!-- Ліва колонка з даними -->
             <div>
                 <section class="checkout-section">
@@ -105,7 +105,7 @@
                             <span id="summary-grand-total">...</span>
                         </div>
                     </div>
-                     <button type="submit" class="btn btn-primary btn-block btn-lg">Підтвердити замовлення</button>
+                     <button type="submit" id="submit-checkout-btn" class="btn btn-primary btn-block btn-lg">Підтвердити замовлення</button>
                 </section>
             </aside>
         </form>
@@ -115,64 +115,38 @@
 
 {% block extra_css %}
 <style>
-    /* Стилі для випадаючого списку міст */
-    .suggestions-dropdown {
-        display: none;
-        position: absolute;
-        background-color: white;
-        border: 1px solid #ddd;
-        border-top: none;
-        width: 100%;
-        max-height: 200px;
-        overflow-y: auto;
-        z-index: 100;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    .suggestion-item {
-        padding: 10px 12px;
-        cursor: pointer;
-        font-size: 15px;
-    }
-    .suggestion-item:hover {
-        background-color: #f0f0f0;
-    }
-    .suggestion-item-loading {
-        padding: 10px 12px;
-        color: #888;
-        font-style: italic;
-    }
+    .suggestions-dropdown { display: none; position: absolute; background-color: white; border: 1px solid #ddd; border-top: none; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .suggestion-item { padding: 10px 12px; cursor: pointer; font-size: 15px; }
+    .suggestion-item:hover { background-color: #f0f0f0; }
+    .suggestion-item-loading { padding: 10px 12px; color: #888; font-style: italic; }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Ініціалізація основних компонентів сторінки
     setupRadioGroups();
     loadCartSummary();
     setupDeliveryLogic();
     setupEnterKeyNavigation();
 
-    /**
-     * Логіка інтеграції з API Нової Пошти для вибору міста та відділення.
-     */
     function setupDeliveryLogic() {
         const deliveryGroup = document.getElementById('delivery-method-group');
         const novaPoshtaDetails = document.getElementById('nova-poshta-details');
         const cityInput = document.getElementById('delivery_city');
         const citySuggestions = document.getElementById('city-suggestions');
         const warehouseSelect = document.getElementById('delivery_warehouse');
+        const submitBtn = document.getElementById('submit-checkout-btn');
         let searchTimeout;
 
-        // Показує/ховає блок Нової Пошти при виборі способу доставки
         deliveryGroup.addEventListener('deliveryChange', (e) => {
             const isNovaPoshta = e.target.value === 'Нова Пошта';
             novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
             cityInput.required = isNovaPoshta;
             warehouseSelect.required = isNovaPoshta;
+            toggleSubmitButton();
         });
 
-        // Обробка вводу в поле міста з затримкою для зменшення кількості запитів
         cityInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
             const query = this.value.trim();
@@ -182,7 +156,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Покращення UX: миттєво показуємо індикатор завантаження
             citySuggestions.innerHTML = '<div class="suggestion-item-loading">Завантаження...</div>';
             citySuggestions.style.display = 'block';
 
@@ -190,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
                     .then(res => res.json())
                     .then(cities => {
-                        citySuggestions.innerHTML = ''; // Очищуємо список
+                        citySuggestions.innerHTML = '';
                         if (cities.length > 0) {
                             cities.forEach(city => {
                                 const item = document.createElement('div');
@@ -201,29 +174,27 @@ document.addEventListener('DOMContentLoaded', function() {
                                 citySuggestions.appendChild(item);
                             });
                         } else {
-                            // Якщо нічого не знайдено, ховаємо випадаючий список
                             citySuggestions.style.display = 'none';
                         }
                     });
-            }, 300); // Затримка 300мс
+            }, 300);
         });
 
-        // Функція, що викликається при виборі міста зі списку
         function selectCity(city) {
-            cityInput.value = city.name; // Вставляємо відформатовану назву в поле вводу
-            citySuggestions.style.display = 'none'; // Ховаємо список підказок
-            fetchWarehouses(city.ref); // Завантажуємо відділення для обраного міста
+            cityInput.value = city.name;
+            citySuggestions.style.display = 'none';
+            fetchWarehouses(city.ref);
         }
 
-        // Функція для завантаження відділень для обраного міста
         function fetchWarehouses(cityRef) {
             warehouseSelect.disabled = true;
             warehouseSelect.innerHTML = '<option value="">Завантаження...</option>';
+            toggleSubmitButton();
 
             fetch(`/api/np/warehouses?city_ref=${cityRef}`)
                 .then(res => res.json())
                 .then(warehouses => {
-                    if (warehouses && warehouses.length > 0) {
+                    if (warehouses && warehouses.length > 0 && !warehouses.error) {
                         warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення --</option>';
                         warehouses.forEach(wh => {
                             const option = new Option(wh, wh);
@@ -231,26 +202,38 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                         warehouseSelect.disabled = false;
                     } else {
-                        warehouseSelect.innerHTML = '<option value="">Відділення не знайдені</option>';
+                        warehouseSelect.innerHTML = `<option value="">${warehouses.error || 'Відділення не знайдені'}</option>`;
                     }
+                    toggleSubmitButton();
                 })
                 .catch(err => {
                     console.error("Помилка завантаження відділень:", err);
                     warehouseSelect.innerHTML = '<option value="">Помилка завантаження</option>';
+                    toggleSubmitButton();
                 });
         }
 
-        // Ховаємо список підказок, якщо користувач клікнув поза полем вводу міста
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', (e) => {
             if (!novaPoshtaDetails.contains(e.target)) {
                 citySuggestions.style.display = 'none';
             }
         });
+
+        // [НОВЕ] Логіка для кнопки "Підтвердити"
+        warehouseSelect.addEventListener('change', toggleSubmitButton);
+        function toggleSubmitButton() {
+            const isNovaPoshta = document.querySelector('input[name="delivery_method"]:checked').value === 'Нова Пошта';
+            if (isNovaPoshta) {
+                // Блокуємо, якщо обрано Нову Пошту, але не обрано відділення
+                submitBtn.disabled = !warehouseSelect.value;
+            } else {
+                // Розблоковуємо для самовивозу
+                submitBtn.disabled = false;
+            }
+        }
     }
 
-    /**
-     * Керування візуальним станом радіо-кнопок.
-     */
+    // Решта функцій без змін
     function setupRadioGroups() {
         document.querySelectorAll('.radio-group').forEach(group => {
             group.addEventListener('click', e => {
@@ -261,7 +244,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const radio = label.querySelector('input');
                 if (radio) {
                     radio.checked = true;
-                    // Створюємо кастомну подію, щоб логіка доставки спрацювала
                     if (group.id === 'delivery-method-group') {
                         const event = new Event('deliveryChange', { bubbles: true });
                         radio.dispatchEvent(event);
@@ -271,45 +253,36 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    /**
-     * Завантажує та відображає підсумок замовлення (товари та загальну вартість).
-     */
     function loadCartSummary() {
-        fetch('/get_cart')
-            .then(res => res.json())
-            .then(data => {
-                const listContainer = document.getElementById('summary-item-list');
-                const subtotalEl = document.getElementById('summary-subtotal');
-                const grandTotalEl = document.getElementById('summary-grand-total');
-
-                listContainer.innerHTML = '';
-                if (data.items.length > 0) {
-                    data.items.forEach(item => {
-                        listContainer.insertAdjacentHTML('beforeend', `
-                            <div class="summary-item">
-                                <img src="${item.image}" alt="${item.name}">
-                                <div class="summary-item-details">
-                                    <div class="name">${item.name}</div>
-                                    <div class="price">${item.quantity} x ${item.price.toFixed(2)} ₴</div>
-                                </div>
-                            </div>`);
-                    });
-                }
-                subtotalEl.textContent = `${data.total.toFixed(2)} ₴`;
-                grandTotalEl.textContent = `${data.total.toFixed(2)} ₴`;
-            });
+        fetch('/get_cart').then(res => res.json()).then(data => {
+            const listContainer = document.getElementById('summary-item-list');
+            const subtotalEl = document.getElementById('summary-subtotal');
+            const grandTotalEl = document.getElementById('summary-grand-total');
+            listContainer.innerHTML = '';
+            if (data.items.length > 0) {
+                data.items.forEach(item => {
+                    listContainer.insertAdjacentHTML('beforeend', `
+                        <div class="summary-item">
+                            <img src="${item.image}" alt="${item.name}">
+                            <div class="summary-item-details">
+                                <div class="name">${item.name}</div>
+                                <div class="price">${item.quantity} x ${item.price.toFixed(2)} ₴</div>
+                            </div>
+                        </div>`);
+                });
+            }
+            subtotalEl.textContent = `${data.total.toFixed(2)} ₴`;
+            grandTotalEl.textContent = `${data.total.toFixed(2)} ₴`;
+        });
     }
 
-    /**
-     * Дозволяє переміщатись між полями форми натисканням клавіші Enter.
-     */
     function setupEnterKeyNavigation() {
-        const form = document.querySelector('.checkout-grid-v2');
+        const form = document.getElementById('checkout-form');
         if (!form) return;
-        form.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && !e.target.id === 'delivery_city') {
+        form.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'delivery_city') {
                 e.preventDefault();
-                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select'));
+                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select')).filter(el => !el.disabled);
                 const currentIndex = inputs.indexOf(e.target);
                 const nextInput = inputs[currentIndex + 1];
                 if (nextInput) {
