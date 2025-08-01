@@ -1,4 +1,3 @@
-# --- Початок файлу app.py ---
 import os
 import re
 import locale
@@ -25,8 +24,6 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 try:
     locale.setlocale(locale.LC_TIME, 'uk_UA.UTF-8')
 except locale.Error:
-    # Ми знаємо, що це може не спрацювати, тому просто ігноруємо помилку.
-    # Дати будемо форматувати числовим методом.
     pass
 
 load_dotenv()
@@ -209,6 +206,40 @@ def admin_required(f):
 @app.context_processor
 def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
 
+major_cities = {
+    "Київ", "Харків", "Одеса", "Дніпро", "Запоріжжя", "Львів", "Кривий Ріг",
+    "Миколаїв", "Вінниця", "Херсон", "Полтава", "Чернігів", "Черкаси",
+    "Житомир", "Суми", "Хмельницький", "Чернівці", "Рівне", "Івано-Франківськ",
+    "Кременчук", "Тернопіль", "Луцьк", "Ужгород"
+}
+
+
+def format_city_name(city_data):
+    """Форматує назву міста згідно з правилами."""
+    full_description = city_data.get('Present', '')
+    city_type = city_data.get('SettlementTypeDescription', '')
+
+    # Використовуємо regex, щоб розділити назву і опис в дужках
+    match = re.match(r'(.+?)\s*\((.+)\)', full_description)
+
+    if match:
+        name_part = match.group(1).strip()
+        desc_part = match.group(2).strip()
+
+        # Якщо це обласний центр, повертаємо тільки назву
+        if name_part in major_cities and city_type.lower() == 'місто':
+            return name_part
+
+        # Для інших міст повертаємо назву + область
+        if city_type.lower() == 'місто' and 'р-н' not in desc_part:
+            # Повертає щось на зразок "Бровари (Київська обл.)"
+            return f"{name_part} ({desc_part.split(',')[0]})"
+
+        # Для сіл та інших випадків повертаємо повну назву як є
+        return full_description
+
+    # Якщо дужок немає, повертаємо як є
+    return full_description
 
 # ────────────────────────────────
 #  МАРШРУТИ
@@ -694,19 +725,19 @@ def find_np_cities():
         "apiKey": api_key,
         "modelName": "Address",
         "calledMethod": "searchSettlements",
-        "methodProperties": {
-            "CityName": query,
-            "Limit": "20"
-        }
+        "methodProperties": { "CityName": query, "Limit": "20" }
     }
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
         response.raise_for_status()
         data = response.json()
         if data['success'] and data['data'][0]['TotalCount'] > 0:
-            cities = data['data'][0]['Addresses']
-            # Повертаємо список словників для зручності на фронтенді
-            return jsonify([{'ref': c['Ref'], 'name': c['Present']} for c in cities])
+            cities_from_api = data['data'][0]['Addresses']
+            # [ЗМІНЕНО] Застосовуємо форматування до кожного міста
+            formatted_cities = [
+                {'ref': c['Ref'], 'name': format_city_name(c)} for c in cities_from_api
+            ]
+            return jsonify(formatted_cities)
         else:
             return jsonify([])
     except requests.exceptions.RequestException as e:
@@ -728,17 +759,15 @@ def get_np_warehouses():
         "apiKey": api_key,
         "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
-        "methodProperties": {
-            "SettlementRef": city_ref
-        }
+        "methodProperties": { "SettlementRef": city_ref }
     }
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
         response.raise_for_status()
         data = response.json()
         if data['success']:
-            # [ВИРІШЕННЯ ПРОБЛЕМИ 2] Форматуємо назву відділення, додаючи вулицю
-            warehouses = [f"{w['Description']}" for w in data['data']]
+            # Назва відділення вже містить повну адресу
+            warehouses = [w['Description'] for w in data['data']]
             return jsonify(warehouses)
         else:
             return jsonify([])

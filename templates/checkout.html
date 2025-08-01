@@ -1,4 +1,3 @@
-<!-- templates/checkout.html -->
 {% extends "base.html" %}
 {% block title %}Оформлення замовлення{% endblock %}
 
@@ -130,11 +129,17 @@
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     .suggestion-item {
-        padding: 10px;
+        padding: 10px 12px;
         cursor: pointer;
+        font-size: 15px;
     }
     .suggestion-item:hover {
         background-color: #f0f0f0;
+    }
+    .suggestion-item-loading {
+        padding: 10px 12px;
+        color: #888;
+        font-style: italic;
     }
 </style>
 {% endblock %}
@@ -142,16 +147,15 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Ініціалізація основних компонентів сторінки
     setupRadioGroups();
     loadCartSummary();
     setupDeliveryLogic();
     setupEnterKeyNavigation();
 
-    function setupEnterKeyNavigation() { /* ... код без змін ... */ }
-    function setupRadioGroups() { /* ... код без змін ... */ }
-    function loadCartSummary() { /* ... код без змін ... */ }
-
-    // [ПОВНІСТЮ ОНОВЛЕНА ЛОГІКА]
+    /**
+     * Логіка інтеграції з API Нової Пошти для вибору міста та відділення.
+     */
     function setupDeliveryLogic() {
         const deliveryGroup = document.getElementById('delivery-method-group');
         const novaPoshtaDetails = document.getElementById('nova-poshta-details');
@@ -160,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const warehouseSelect = document.getElementById('delivery_warehouse');
         let searchTimeout;
 
-        // Показуємо/ховаємо блок Нової Пошти
+        // Показує/ховає блок Нової Пошти при виборі способу доставки
         deliveryGroup.addEventListener('deliveryChange', (e) => {
             const isNovaPoshta = e.target.value === 'Нова Пошта';
             novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
@@ -168,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
             warehouseSelect.required = isNovaPoshta;
         });
 
-        // Обробка вводу в поле міста
+        // Обробка вводу в поле міста з затримкою для зменшення кількості запитів
         cityInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
             const query = this.value.trim();
@@ -178,12 +182,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Затримка перед відправкою запиту (debouncing)
+            // Покращення UX: миттєво показуємо індикатор завантаження
+            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Завантаження...</div>';
+            citySuggestions.style.display = 'block';
+
             searchTimeout = setTimeout(() => {
                 fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
                     .then(res => res.json())
                     .then(cities => {
-                        citySuggestions.innerHTML = '';
+                        citySuggestions.innerHTML = ''; // Очищуємо список
                         if (cities.length > 0) {
                             cities.forEach(city => {
                                 const item = document.createElement('div');
@@ -193,23 +200,22 @@ document.addEventListener('DOMContentLoaded', function() {
                                 item.addEventListener('click', () => selectCity(city));
                                 citySuggestions.appendChild(item);
                             });
-                            citySuggestions.style.display = 'block';
                         } else {
+                            // Якщо нічого не знайдено, ховаємо випадаючий список
                             citySuggestions.style.display = 'none';
                         }
                     });
-            }, 300); // 300ms затримка
+            }, 300); // Затримка 300мс
         });
 
         // Функція, що викликається при виборі міста зі списку
         function selectCity(city) {
-            cityInput.value = city.name;
-            citySuggestions.innerHTML = '';
-            citySuggestions.style.display = 'none';
-            fetchWarehouses(city.ref);
+            cityInput.value = city.name; // Вставляємо відформатовану назву в поле вводу
+            citySuggestions.style.display = 'none'; // Ховаємо список підказок
+            fetchWarehouses(city.ref); // Завантажуємо відділення для обраного міста
         }
 
-        // Функція для завантаження відділень
+        // Функція для завантаження відділень для обраного міста
         function fetchWarehouses(cityRef) {
             warehouseSelect.disabled = true;
             warehouseSelect.innerHTML = '<option value="">Завантаження...</option>';
@@ -229,12 +235,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .catch(err => {
-                    console.error("Error fetching warehouses:", err);
+                    console.error("Помилка завантаження відділень:", err);
                     warehouseSelect.innerHTML = '<option value="">Помилка завантаження</option>';
                 });
         }
 
-        // Ховаємо список підказок, якщо клікнули поза ним
+        // Ховаємо список підказок, якщо користувач клікнув поза полем вводу міста
         document.addEventListener('click', function(e) {
             if (!novaPoshtaDetails.contains(e.target)) {
                 citySuggestions.style.display = 'none';
@@ -242,8 +248,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Залишок коду без змін
-    // (copy-paste з вашого оригінального файлу)
+    /**
+     * Керування візуальним станом радіо-кнопок.
+     */
     function setupRadioGroups() {
         document.querySelectorAll('.radio-group').forEach(group => {
             group.addEventListener('click', e => {
@@ -252,16 +259,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
                 label.classList.add('active');
                 const radio = label.querySelector('input');
-                if(radio) radio.checked = true;
-
-                if (group.id === 'delivery-method-group') {
-                    const event = new Event('deliveryChange', { bubbles: true });
-                    radio.dispatchEvent(event);
+                if (radio) {
+                    radio.checked = true;
+                    // Створюємо кастомну подію, щоб логіка доставки спрацювала
+                    if (group.id === 'delivery-method-group') {
+                        const event = new Event('deliveryChange', { bubbles: true });
+                        radio.dispatchEvent(event);
+                    }
                 }
             });
         });
     }
 
+    /**
+     * Завантажує та відображає підсумок замовлення (товари та загальну вартість).
+     */
     function loadCartSummary() {
         fetch('/get_cart')
             .then(res => res.json())
@@ -288,11 +300,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    /**
+     * Дозволяє переміщатись між полями форми натисканням клавіші Enter.
+     */
     function setupEnterKeyNavigation() {
         const form = document.querySelector('.checkout-grid-v2');
         if (!form) return;
         form.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && !e.target.id === 'delivery_city') {
                 e.preventDefault();
                 const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select'));
                 const currentIndex = inputs.indexOf(e.target);
