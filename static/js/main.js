@@ -1,13 +1,19 @@
+// static/js/main.js (ФІНАЛЬНА ВЕРСІЯ З ОПТИМІСТИЧНИМ ОНОВЛЕННЯМ)
+
 document.addEventListener('DOMContentLoaded', function() {
     // Ініціалізація всіх основних модулів
     initAuth();
     initHeaderActions();
     initContactForm();
+    initCatalogFilters();
     initReviewsPage();
     initHeroSlider();
     initSimilarProductsCarousel();
     initProductDescriptionToggle();
+
+    // [ОПТИМІЗАЦІЯ] Запускаємо нову, оптимізовану логіку кошика
     initOptimizedCartLogic();
+
     initFavoritesLogic();
 
     // Ініціалізуємо маску для полів вводу телефону
@@ -20,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ===================================================================
-//  ОПТИМІЗОВАНА ЛОГІКА КОШИКА
+//  НОВА ОПТИМІЗОВАНА ЛОГІКА КОШИКА
 // ===================================================================
 
 function initOptimizedCartLogic() {
@@ -28,17 +34,17 @@ function initOptimizedCartLogic() {
         const button = e.target.closest('button');
         if (!button) return;
 
-        const productCard = button.closest('[data-id]');
-        const productId = productCard?.dataset.id;
-
+        const productId = button.dataset.id || button.closest('[data-id]')?.dataset.id;
         if (!productId) return;
 
         // --- ДІЯ 1: ДОДАТИ В КОШИК ---
         if (button.matches('.add-to-cart-btn') && !button.classList.contains('in-cart')) {
+            // 1. Оптимістично оновлюємо UI
             setButtonAsInCart(button, true);
             updateCartCounter(1);
             showToast('Товар додано до кошика', 'success', `<a href="/checkout" class="btn btn-sm btn-primary">Оформити</a>`);
 
+            // 2. Відправляємо запит на сервер у фоні
             fetch('/add_to_cart', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -47,13 +53,16 @@ function initOptimizedCartLogic() {
             .then(res => res.json())
             .then(data => {
                 if (data.status !== 'success') {
+                    // 3. У разі невдачі - відкочуємо зміни
                     setButtonAsInCart(button, false);
                     updateCartCounter(-1);
                     showToast(data.message || 'Помилка додавання товару', 'error');
                 } else {
+                    // 4. Оновлюємо повний вигляд кошика для синхронізації
                     updateCartView();
                 }
             }).catch(() => {
+                // 3. У разі мережевої помилки - теж відкочуємо
                 setButtonAsInCart(button, false);
                 updateCartCounter(-1);
                 showToast('Мережева помилка', 'error');
@@ -74,12 +83,13 @@ function initOptimizedCartLogic() {
              const newQuantity = button.classList.contains('plus') ? currentQuantity + 1 : currentQuantity - 1;
 
              if (newQuantity >= 1) {
-                updateCartView();
+                // Оптимістично оновлюємо кількість і відправляємо запит
+                updateCartView(); // Найпростіший спосіб перерахувати все
                 fetch(`/update_cart_quantity/${productId}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({quantity: newQuantity})
-                }).then(() => updateCartView());
+                });
              }
         }
 
@@ -87,18 +97,25 @@ function initOptimizedCartLogic() {
         if (button.matches('.remove-item')) {
             const cartItemRow = button.closest('.cart-item');
             if (cartItemRow) {
+                // Оптимістично видаляємо елемент з UI
                 cartItemRow.style.transition = 'opacity 0.3s, transform 0.3s';
                 cartItemRow.style.opacity = '0';
                 cartItemRow.style.transform = 'translateX(50px)';
                 setTimeout(() => {
-                     updateCartView();
+                     updateCartView(); // Перемальовуємо кошик після анімації
                 }, 300);
+
+                // Відправляємо запит на видалення у фоні
                 fetch(`/remove_from_cart/${productId}`, { method: 'POST' });
             }
         }
     });
 }
 
+/**
+ * [НОВИЙ ХЕЛПЕР] Оновлює лічильник кошика на задане значення.
+ * @param {number} change - Значення, на яке змінити лічильник (напр. 1 або -1).
+ */
 function updateCartCounter(change) {
     const counter = document.getElementById('cart-count');
     if (counter) {
@@ -107,15 +124,25 @@ function updateCartCounter(change) {
     }
 }
 
+/**
+ * [НОВИЙ ХЕЛПЕР] Встановлює або знімає стан "в кошику" для кнопки.
+ * @param {HTMLElement} button - Елемент кнопки.
+ * @param {boolean} isInCart - True, якщо товар в кошику, false - якщо ні.
+ */
 function setButtonAsInCart(button, isInCart) {
-    const isLargeButton = button.classList.contains('btn-lg');
-    button.classList.toggle('in-cart', isInCart);
     if (isInCart) {
-        button.innerHTML = isLargeButton ? '<i class="fas fa-check"></i> Вже в кошику' : '<i class="fas fa-check"></i>';
+        button.classList.add('in-cart');
+        button.innerHTML = '<i class="fas fa-check"></i> В кошику';
     } else {
-        button.innerHTML = isLargeButton ? '<i class="fas fa-shopping-cart"></i> В кошик' : 'Додати в кошик';
+        button.classList.remove('in-cart');
+        button.innerHTML = 'Додати в кошик'; // Проста версія для відкочування
     }
 }
+
+// ===================================================================
+//  ФУНКЦІЇ, ЩО ЗАЛИШИЛИСЬ БЕЗ ЗМІН
+//  (або з мінімальними адаптаціями)
+// ===================================================================
 
 function setupPhoneMaskAdvanced(selector) {
     const phoneInput = document.querySelector(selector);
@@ -163,11 +190,9 @@ function setupPhoneMaskAdvanced(selector) {
         }
     });
     phoneInput.addEventListener('focus', (e) => {
-        if (!e.target.value) {
-            const { formattedValue, cursorPos } = applyMask("");
-            e.target.value = formattedValue;
-            setCursorPosition(cursorPos, e.target);
-        }
+        const { formattedValue, cursorPos } = applyMask(e.target.value);
+        e.target.value = formattedValue;
+        setCursorPosition(cursorPos, e.target);
     });
     phoneInput.addEventListener('click', (e) => {
         const { cursorPos } = applyMask(e.target.value);
@@ -233,6 +258,8 @@ function updateCartView() {
             itemsContainer.innerHTML = '<div class="empty-cart-message"><i class="fas fa-shopping-cart"></i><p>Ваш кошик порожній</p></div>';
         }
         totalEl.textContent = `${data.total.toFixed(2)} ₴`;
+
+        // Синхронізуємо кнопки на всій сторінці
         updateAllProductButtonStates(data.items);
     });
 }
@@ -243,7 +270,14 @@ function updateAllProductButtonStates(cartItems) {
         const productId = button.closest('[data-id]')?.dataset.id;
         if (productId) {
             const isInCart = cartProductIds.has(productId);
-            setButtonAsInCart(button, isInCart);
+            button.classList.toggle('in-cart', isInCart);
+            // Використовуємо .btn-lg як маркер для кнопок, що вимагають іншого тексту/іконок
+            const isLargeButton = button.classList.contains('btn-lg');
+            if (isInCart) {
+                button.innerHTML = isLargeButton ? '<i class="fas fa-check"></i> Вже в кошику' : '<i class="fas fa-check"></i> В кошику';
+            } else {
+                button.innerHTML = isLargeButton ? '<i class="fas fa-shopping-cart"></i> В кошик' : 'Додати в кошик';
+            }
         }
     });
 }
@@ -279,10 +313,6 @@ function toggleFavorite(productId) {
     }
     localStorage.setItem('favorites', JSON.stringify(favorites));
     updateFavoritesUI();
-    // Re-render modal if it's open
-    if (document.getElementById('favorites-modal')?.classList.contains('active')) {
-        renderFavoritesModal();
-    }
 }
 
 function updateFavoritesUI() {
@@ -417,6 +447,27 @@ function initContactForm() {
     }
 }
 
+function initCatalogFilters() {
+    const showMoreBtn = document.getElementById('show-more-brands-btn');
+    if (showMoreBtn) {
+        showMoreBtn.addEventListener('click', function() {
+            const list = this.previousElementSibling;
+            const isExpanded = this.dataset.expanded === 'true';
+            if (isExpanded) {
+                list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
+                this.textContent = 'Показати більше';
+                this.dataset.expanded = 'false';
+            } else {
+                list.querySelectorAll('.brand-item.hidden').forEach(item => item.classList.remove('hidden'));
+                this.textContent = 'Приховати';
+                this.dataset.expanded = 'true';
+            }
+        });
+        const list = showMoreBtn.previousElementSibling;
+        list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
+    }
+}
+
 function initReviewsPage() {
     const openModal = modal => modal?.classList.add('active');
     const closeModalOnClick = modal => {
@@ -485,318 +536,14 @@ function initSimilarProductsCarousel() {
         nextBtn.disabled = scrollAmount >= maxScroll - 10;
     };
     nextBtn.addEventListener('click', () => {
-        scrollAmount = Math.min(scrollAmount + itemWidth * 2, maxScroll); // scroll by 2 items
+        scrollAmount = Math.min(scrollAmount + itemWidth, maxScroll);
         track.style.transform = `translateX(-${scrollAmount}px)`;
         updateButtons();
     });
     prevBtn.addEventListener('click', () => {
-        scrollAmount = Math.max(scrollAmount - itemWidth * 2, 0); // scroll by 2 items
+        scrollAmount = Math.max(scrollAmount - itemWidth, 0);
         track.style.transform = `translateX(-${scrollAmount}px)`;
         updateButtons();
     });
     updateButtons();
 }
-```
-
----
-### **`checkout.html` (Вирішальний файл)**
-*Тут головні зміни: `autocomplete="off"` для поля міста та оновлений JS для обробки вибору.*
-```html
-{% extends "base.html" %}
-{% block title %}Оформлення замовлення{% endblock %}
-
-{% block content %}
-<div class="checkout-page-v2">
-    <div class="container">
-        <h1 class="page-title" style="text-align: left; border: none; padding-bottom: 20px;">Оформлення замовлення</h1>
-        <form action="{{ url_for('checkout') }}" method="POST" class="checkout-grid-v2" id="checkout-form">
-            <!-- Ліва колонка з даними -->
-            <div>
-                <section class="checkout-section">
-                    <div class="checkout-section-header">
-                        <span class="icon">1</span><h4>Контактні дані</h4>
-                    </div>
-                    <div class="form-group-inline">
-                        <div class="form-group">
-                            <label for="customer_first_name">Ім'я</label>
-                            <input type="text" name="customer_first_name" id="customer_first_name" required value="{% if current_user.is_authenticated %}{{ current_user.first_name }}{% endif %}" placeholder="Іван">
-                        </div>
-                        <div class="form-group">
-                            <label for="customer_last_name">Прізвище</label>
-                            <input type="text" name="customer_last_name" id="customer_last_name" required value="{% if current_user.is_authenticated %}{{ current_user.last_name or '' }}{% endif %}" placeholder="Іванов">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="customer_phone">Номер телефону</label>
-                        <input type="tel" name="customer_phone" id="customer_phone" required>
-                    </div>
-                </section>
-
-                <section class="checkout-section">
-                    <div class="checkout-section-header">
-                        <span class="icon">2</span><h4>Доставка</h4>
-                    </div>
-                    <div class="radio-group" id="delivery-method-group">
-                        <label class="radio-option active">
-                            <input type="radio" name="delivery_method" value="Самовивіз з магазину" checked>
-                            <div>
-                                <strong>Самовивіз з магазину</strong>
-                                <p>Безкоштовно за адресою: {{ shop.city }}, {{ shop.address }}</p>
-                            </div>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="delivery_method" value="Нова Пошта">
-                             <div>
-                                <strong>Нова Пошта</strong>
-                                <p>Доставка у відділення або поштомат по Україні.</p>
-                            </div>
-                        </label>
-                    </div>
-                    <div id="nova-poshta-details" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; position: relative;">
-                        <div class="form-group">
-                            <label for="delivery_city">Населений пункт</label>
-                            <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста чи села" autocomplete="off">
-                            <div id="city-suggestions" class="suggestions-dropdown"></div>
-                        </div>
-                        <div class="form-group">
-                            <label for="delivery_warehouse">Відділення або поштомат</label>
-                            <select name="delivery_warehouse" id="delivery_warehouse" disabled>
-                                <option value="">Спочатку виберіть населений пункт</option>
-                            </select>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="checkout-section">
-                    <div class="checkout-section-header">
-                        <span class="icon">3</span><h4>Оплата</h4>
-                    </div>
-                    <div class="radio-group">
-                        <label class="radio-option active">
-                            <input type="radio" name="payment_method" value="Післяплата" checked>
-                            <div>
-                                <strong>Післяплата (при отриманні)</strong>
-                                <p>Оплата готівкою або карткою у відділенні "Нової Пошти".</p>
-                            </div>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="payment_method" value="Оплата на рахунок">
-                             <div>
-                                <strong>Оплата на рахунок</strong>
-                                <p>Реквізити для оплати будуть надіслані після підтвердження замовлення.</p>
-                            </div>
-                        </label>
-                    </div>
-                </section>
-            </div>
-
-            <!-- Права колонка з підсумком замовлення -->
-            <aside class="order-summary-v2">
-                <section class="checkout-section">
-                    <h4>Ваше замовлення</h4>
-                    <div id="summary-item-list"></div>
-                    <div class="summary-totals">
-                        <div class="summary-total-row">
-                            <span>Вартість товарів:</span>
-                            <span id="summary-subtotal">...</span>
-                        </div>
-                        <div class="summary-total-row">
-                            <span>Доставка:</span>
-                            <span>За тарифами</span>
-                        </div>
-                        <div class="summary-total-row grand-total">
-                            <span>Разом до сплати:</span>
-                            <span id="summary-grand-total">...</span>
-                        </div>
-                    </div>
-                     <button type="submit" id="submit-checkout-btn" class="btn btn-primary btn-block btn-lg">Підтвердити замовлення</button>
-                </section>
-            </aside>
-        </form>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .suggestions-dropdown { display: none; position: absolute; background-color: white; border: 1px solid #ddd; border-top: none; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .suggestion-item { padding: 10px 12px; cursor: pointer; font-size: 15px; }
-    .suggestion-item:hover { background-color: #f0f0f0; }
-    .suggestion-item-loading { padding: 10px 12px; color: #888; font-style: italic; }
-</style>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    setupRadioGroups();
-    loadCartSummary();
-    setupDeliveryLogic();
-    setupEnterKeyNavigation();
-
-    function setupDeliveryLogic() {
-        const deliveryGroup = document.getElementById('delivery-method-group');
-        const novaPoshtaDetails = document.getElementById('nova-poshta-details');
-        const cityInput = document.getElementById('delivery_city');
-        const citySuggestions = document.getElementById('city-suggestions');
-        const warehouseSelect = document.getElementById('delivery_warehouse');
-        const submitBtn = document.getElementById('submit-checkout-btn');
-        let searchTimeout;
-
-        deliveryGroup.addEventListener('change', (e) => {
-            const radio = e.target.closest('input[type="radio"]');
-            if (radio) {
-                const isNovaPoshta = radio.value === 'Нова Пошта';
-                novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
-                cityInput.required = isNovaPoshta;
-                warehouseSelect.required = isNovaPoshta;
-                toggleSubmitButton();
-            }
-        });
-
-        cityInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            const query = this.value.trim();
-
-            if (query.length < 2) {
-                citySuggestions.style.display = 'none';
-                return;
-            }
-
-            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Пошук...</div>';
-            citySuggestions.style.display = 'block';
-
-            searchTimeout = setTimeout(() => {
-                fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
-                    .then(res => res.json())
-                    .then(cities => {
-                        citySuggestions.innerHTML = '';
-                        if (cities && cities.length > 0) {
-                            cities.forEach(city => {
-                                const item = document.createElement('div');
-                                item.className = 'suggestion-item';
-                                item.textContent = city.name;
-                                item.dataset.ref = city.ref;
-                                item.addEventListener('click', () => selectCity(city));
-                                citySuggestions.appendChild(item);
-                            });
-                        } else {
-                            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Нічого не знайдено</div>';
-                        }
-                    });
-            }, 300);
-        });
-
-        function selectCity(city) {
-            cityInput.value = city.name;
-            citySuggestions.style.display = 'none';
-            fetchWarehouses(city.ref);
-        }
-
-        function fetchWarehouses(cityRef) {
-            warehouseSelect.disabled = true;
-            warehouseSelect.innerHTML = '<option value="">Завантаження відділень...</option>';
-            toggleSubmitButton();
-
-            fetch(`/api/np/warehouses?city_ref=${cityRef}`)
-                .then(res => res.json())
-                .then(warehouses => {
-                    if (warehouses && warehouses.length > 0 && !warehouses.error) {
-                        warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення --</option>';
-                        warehouses.forEach(wh => {
-                            const option = new Option(wh, wh);
-                            warehouseSelect.add(option);
-                        });
-                        warehouseSelect.disabled = false;
-                    } else {
-                        warehouseSelect.innerHTML = `<option value="">${warehouses.error || 'Відділення не знайдені'}</option>`;
-                    }
-                    toggleSubmitButton();
-                })
-                .catch(err => {
-                    console.error("Помилка завантаження відділень:", err);
-                    warehouseSelect.innerHTML = '<option value="">Помилка завантаження</option>';
-                    toggleSubmitButton();
-                });
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!novaPoshtaDetails.contains(e.target)) {
-                citySuggestions.style.display = 'none';
-            }
-        });
-
-        warehouseSelect.addEventListener('change', toggleSubmitButton);
-        function toggleSubmitButton() {
-            const isNovaPoshta = document.querySelector('input[name="delivery_method"]:checked').value === 'Нова Пошта';
-            if (isNovaPoshta) {
-                submitBtn.disabled = !warehouseSelect.value;
-            } else {
-                submitBtn.disabled = false;
-            }
-        }
-    }
-
-    function setupRadioGroups() {
-        document.querySelectorAll('.radio-group').forEach(group => {
-            group.addEventListener('click', e => {
-                const label = e.target.closest('.radio-option');
-                if (!label) return;
-                group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
-                label.classList.add('active');
-                const radio = label.querySelector('input');
-                if (radio) {
-                    radio.checked = true;
-                    // Створюємо та відправляємо подію, щоб інші слухачі могли її зловити
-                    const event = new Event('change', { bubbles: true });
-                    group.dispatchEvent(event);
-                }
-            });
-        });
-    }
-
-    function loadCartSummary() {
-        fetch('/get_cart').then(res => res.json()).then(data => {
-            const listContainer = document.getElementById('summary-item-list');
-            const subtotalEl = document.getElementById('summary-subtotal');
-            const grandTotalEl = document.getElementById('summary-grand-total');
-            listContainer.innerHTML = '';
-            if (data.items.length > 0) {
-                data.items.forEach(item => {
-                    listContainer.insertAdjacentHTML('beforeend', `
-                        <div class="summary-item">
-                            <img src="${item.image}" alt="${item.name}">
-                            <div class="summary-item-details">
-                                <div class="name">${item.name}</div>
-                                <div class="price">${item.quantity} x ${item.price.toFixed(2)} ₴</div>
-                            </div>
-                        </div>`);
-                });
-            } else {
-                 window.location.href = "{{ url_for('catalog') }}"; // Якщо кошик порожній, перекидаємо
-            }
-            subtotalEl.textContent = `${data.total.toFixed(2)} ₴`;
-            grandTotalEl.textContent = `${data.total.toFixed(2)} ₴`;
-        });
-    }
-
-    function setupEnterKeyNavigation() {
-        const form = document.getElementById('checkout-form');
-        if (!form) return;
-        form.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'delivery_city') {
-                e.preventDefault();
-                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select')).filter(el => !el.disabled);
-                const currentIndex = inputs.indexOf(e.target);
-                const nextInput = inputs[currentIndex + 1];
-                if (nextInput) {
-                    nextInput.focus();
-                } else {
-                    form.querySelector('button[type="submit"]').focus();
-                }
-            }
-        });
-    }
-});
-</script>
-{% endblock %}
