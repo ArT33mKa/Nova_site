@@ -2,7 +2,7 @@ import os
 import re
 import locale
 import smtplib
-import requests
+import requests  # для Telegram та Нової Пошти
 import cloudinary.utils
 from functools import wraps
 from datetime import datetime
@@ -224,6 +224,7 @@ def catalog():
     if category_arg := request.args.get('category'): query = query.filter(Product.category == category_arg.strip())
     if min_price := request.args.get('min_price', type=float): query = query.filter(Product.price >= min_price)
     if max_price := request.args.get('max_price', type=float): query = query.filter(Product.price <= max_price)
+    if request.args.get('in_stock'): query = query.filter(Product.in_stock == True)
     if request.args.get('min_rating'): query = query.filter(Product.rating >= 4.0)
     products = query.paginate(page=page, per_page=25, error_out=False)
     categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0]]
@@ -232,7 +233,7 @@ def catalog():
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
-    similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id, Product.in_stock == True, and_(Product.description != None, Product.description != ''), Product.image != 'default_tovar.jpg').limit(5).all()
+    similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id, Product.in_stock == True, and_(Product.description != None, Product.description != ''), Product.image != 'default_tovar.jpg').limit(8).all()
     return render_template("product_detail.html", product=product, similar_products=similar_products)
 
 @app.route('/get_products_by_ids', methods=['POST'])
@@ -274,7 +275,7 @@ def add_review(product_id):
     if new_review_data['review_type'] == 'review': new_review_data['rating'] = int(form.get('rating', 0))
     if current_user.is_authenticated:
         new_review_data['user_id'] = current_user.id
-        new_review_data['author_name'] = current_user.username
+        new_review_data['author_name'] = current_user.first_name or current_user.username
     db.session.add(Review(**new_review_data))
     if new_review_data['review_type'] == 'review' and not new_review_data['parent_id']:
         result = db.session.query(func.avg(Review.rating), func.count(Review.id)).filter(Review.product_id == product_id, Review.rating > 0).one()
@@ -540,9 +541,6 @@ def send_message():
     if send_email(os.getenv("SMTP_USER"), subject, html_body): return jsonify(status="success", message="✅ Повідомлення успішно надіслано!")
     else: return jsonify(status="error", message="❌ Помилка сервера при відправці повідомлення."), 500
 
-@app.route("/favorites")
-def favorites_page(): return render_template("favorites.html")
-
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -593,11 +591,8 @@ def bas_import():
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
-            image_filename = (product_node.findtext('Картинка') or '').strip()
-            image_url = 'https://res.cloudinary.com/your_cloud_name/image/upload/v1/products/default_tovar.jpg'
-            if image_filename:
-                public_id = f"products/{os.path.splitext(image_filename)[0]}"
-                image_url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
+            image_filename = (product_node.findtext('Картинка') or 'default_tovar.jpg').strip()
+            image_url = f"static/img/products/{image_filename}"
             price = 0.0
             in_stock = False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
@@ -623,11 +618,7 @@ def bas_import():
                         if stock_prop_node_alt.text.lower() == 'true': in_stock = True
             product = existing_products.get(name)
             if product:
-                product.price = price
-                product.description = description
-                product.category = category
-                product.image = image_url
-                product.in_stock = in_stock
+                product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image_url, in_stock
                 updated_count += 1
             else:
                 new_product = Product(name=name, price=price, description=description, category=category, image=image_url, in_stock=in_stock)
@@ -675,13 +666,18 @@ def api_get_orders():
     orders_data = [{"id": o.id, "date": o.timestamp.strftime('%Y-%m-%d'), "name": o.customer_name, "total": o.total_cost} for o in orders]
     return jsonify({"status": "success", "orders": orders_data})
 
+# [НОВЕ] API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
 def find_np_cities():
     """Пошук населених пунктів."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     query = request.args.get('q', '')
-    if not api_key: return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
-    if len(query) < 2: return jsonify([])
+
+    if not api_key:
+        return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
+    if len(query) < 2:
+        return jsonify([])
+
     payload = {
         "apiKey": api_key,
         "modelName": "Address",
@@ -693,11 +689,9 @@ def find_np_cities():
         response.raise_for_status()
         data = response.json()
         if data['success'] and data['data'][0]['TotalCount'] > 0:
-            cities_from_api = data['data'][0]['Addresses']
-            formatted_cities = [{'ref': c['Ref'], 'name': format_city_name(c)} for c in cities_from_api]
-            return jsonify(formatted_cities)
-        else:
-            return jsonify([])
+            cities = data['data'][0]['Addresses']
+            return jsonify([{'ref': c['Ref'], 'name': c['Present']} for c in cities])
+        return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (міста): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
@@ -707,16 +701,17 @@ def get_np_warehouses():
     """Отримання відділень для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
-    if not api_key: return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
-    if not city_ref: return jsonify([])
+
+    if not api_key:
+        return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
+    if not city_ref:
+        return jsonify([])
+
     payload = {
         "apiKey": api_key,
-        "modelName": "Address",
+        "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
-        "methodProperties": {
-            "SettlementRef": city_ref,
-            "Limit": 200
-        }
+        "methodProperties": { "SettlementRef": city_ref }
     }
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
@@ -725,8 +720,7 @@ def get_np_warehouses():
         if data['success']:
             warehouses = [w['Description'] for w in data['data']]
             return jsonify(warehouses)
-        else:
-            return jsonify({'error': data.get('errors', ['Невідома помилка API'])})
+        return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
@@ -748,4 +742,4 @@ if __name__ == "__main__":
             admin.set_password('admin123')
             db.session.add(admin); db.session.commit()
             print(">>> Адміністратора створено. Логін: admin, Пароль: admin123")
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
