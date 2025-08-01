@@ -49,10 +49,11 @@
                             </div>
                         </label>
                     </div>
-                    <div id="nova-poshta-details" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+                    <div id="nova-poshta-details" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; position: relative;">
                         <div class="form-group">
                             <label for="delivery_city">Населений пункт</label>
-                            <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста чи села">
+                            <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста чи села" autocomplete="off">
+                            <div id="city-suggestions" class="suggestions-dropdown"></div>
                         </div>
                         <div class="form-group">
                             <label for="delivery_warehouse">Відділення або поштомат</label>
@@ -113,34 +114,136 @@
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Стилі для випадаючого списку міст */
+    .suggestions-dropdown {
+        display: none;
+        position: absolute;
+        background-color: white;
+        border: 1px solid #ddd;
+        border-top: none;
+        width: 100%;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 100;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .suggestion-item {
+        padding: 10px;
+        cursor: pointer;
+    }
+    .suggestion-item:hover {
+        background-color: #f0f0f0;
+    }
+</style>
+{% endblock %}
+
 {% block extra_js %}
 <script>
-// Цей скрипт містить лише логіку, специфічну для сторінки checkout,
-// а маска телефону тепер працює з глобального файлу main.js
 document.addEventListener('DOMContentLoaded', function() {
     setupRadioGroups();
     loadCartSummary();
     setupDeliveryLogic();
     setupEnterKeyNavigation();
 
-    function setupEnterKeyNavigation() {
-        const form = document.querySelector('.checkout-grid-v2');
-        if (!form) return;
-        form.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
-                e.preventDefault();
-                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select'));
-                const currentIndex = inputs.indexOf(e.target);
-                const nextInput = inputs[currentIndex + 1];
-                if (nextInput) {
-                    nextInput.focus();
-                } else {
-                    form.querySelector('button[type="submit"]').focus();
-                }
+    function setupEnterKeyNavigation() { /* ... код без змін ... */ }
+    function setupRadioGroups() { /* ... код без змін ... */ }
+    function loadCartSummary() { /* ... код без змін ... */ }
+
+    // [ПОВНІСТЮ ОНОВЛЕНА ЛОГІКА]
+    function setupDeliveryLogic() {
+        const deliveryGroup = document.getElementById('delivery-method-group');
+        const novaPoshtaDetails = document.getElementById('nova-poshta-details');
+        const cityInput = document.getElementById('delivery_city');
+        const citySuggestions = document.getElementById('city-suggestions');
+        const warehouseSelect = document.getElementById('delivery_warehouse');
+        let searchTimeout;
+
+        // Показуємо/ховаємо блок Нової Пошти
+        deliveryGroup.addEventListener('deliveryChange', (e) => {
+            const isNovaPoshta = e.target.value === 'Нова Пошта';
+            novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
+            cityInput.required = isNovaPoshta;
+            warehouseSelect.required = isNovaPoshta;
+        });
+
+        // Обробка вводу в поле міста
+        cityInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                citySuggestions.style.display = 'none';
+                return;
+            }
+
+            // Затримка перед відправкою запиту (debouncing)
+            searchTimeout = setTimeout(() => {
+                fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(cities => {
+                        citySuggestions.innerHTML = '';
+                        if (cities.length > 0) {
+                            cities.forEach(city => {
+                                const item = document.createElement('div');
+                                item.className = 'suggestion-item';
+                                item.textContent = city.name;
+                                item.dataset.ref = city.ref;
+                                item.addEventListener('click', () => selectCity(city));
+                                citySuggestions.appendChild(item);
+                            });
+                            citySuggestions.style.display = 'block';
+                        } else {
+                            citySuggestions.style.display = 'none';
+                        }
+                    });
+            }, 300); // 300ms затримка
+        });
+
+        // Функція, що викликається при виборі міста зі списку
+        function selectCity(city) {
+            cityInput.value = city.name;
+            citySuggestions.innerHTML = '';
+            citySuggestions.style.display = 'none';
+            fetchWarehouses(city.ref);
+        }
+
+        // Функція для завантаження відділень
+        function fetchWarehouses(cityRef) {
+            warehouseSelect.disabled = true;
+            warehouseSelect.innerHTML = '<option value="">Завантаження...</option>';
+
+            fetch(`/api/np/warehouses?city_ref=${cityRef}`)
+                .then(res => res.json())
+                .then(warehouses => {
+                    if (warehouses && warehouses.length > 0) {
+                        warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення --</option>';
+                        warehouses.forEach(wh => {
+                            const option = new Option(wh, wh);
+                            warehouseSelect.add(option);
+                        });
+                        warehouseSelect.disabled = false;
+                    } else {
+                        warehouseSelect.innerHTML = '<option value="">Відділення не знайдені</option>';
+                    }
+                })
+                .catch(err => {
+                    console.error("Error fetching warehouses:", err);
+                    warehouseSelect.innerHTML = '<option value="">Помилка завантаження</option>';
+                });
+        }
+
+        // Ховаємо список підказок, якщо клікнули поза ним
+        document.addEventListener('click', function(e) {
+            if (!novaPoshtaDetails.contains(e.target)) {
+                citySuggestions.style.display = 'none';
             }
         });
     }
 
+    // Залишок коду без змін
+    // (copy-paste з вашого оригінального файлу)
     function setupRadioGroups() {
         document.querySelectorAll('.radio-group').forEach(group => {
             group.addEventListener('click', e => {
@@ -185,52 +288,22 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    function setupDeliveryLogic() {
-        const deliveryGroup = document.getElementById('delivery-method-group');
-        const novaPoshtaDetails = document.getElementById('nova-poshta-details');
-        const cityInput = document.getElementById('delivery_city');
-        const warehouseSelect = document.getElementById('delivery_warehouse');
-
-        deliveryGroup.addEventListener('deliveryChange', (e) => {
-            const selectedMethod = e.target.value;
-            const isNovaPoshta = selectedMethod === 'Нова Пошта';
-            novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
-            cityInput.required = isNovaPoshta;
-            warehouseSelect.required = isNovaPoshta;
-        });
-
-        cityInput.addEventListener('input', function() {
-            const cityName = this.value.trim();
-            if (cityName.length > 2) {
-                fetchWarehouses(cityName);
-            } else {
-                warehouseSelect.innerHTML = '<option value="">Введіть назву населеного пункту</option>';
-                warehouseSelect.disabled = true;
+    function setupEnterKeyNavigation() {
+        const form = document.querySelector('.checkout-grid-v2');
+        if (!form) return;
+        form.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+                e.preventDefault();
+                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select'));
+                const currentIndex = inputs.indexOf(e.target);
+                const nextInput = inputs[currentIndex + 1];
+                if (nextInput) {
+                    nextInput.focus();
+                } else {
+                    form.querySelector('button[type="submit"]').focus();
+                }
             }
         });
-
-        function fetchWarehouses(city) {
-            warehouseSelect.disabled = true;
-            warehouseSelect.innerHTML = '<option value="">Завантаження...</option>';
-            // Це імітація запиту. Для реальної інтеграції тут буде fetch до API Нової Пошти
-            setTimeout(() => {
-                const warehousesByCity = { "Київ": ["Відділення №1", "Відділення №10"], "Миргород": ["Відділення №1", "Відділення №2"] };
-                let cityWarehouses = [];
-                for (const key in warehousesByCity) {
-                    if (key.toLowerCase().startsWith(city.toLowerCase())) {
-                        cityWarehouses = warehousesByCity[key];
-                        break;
-                    }
-                }
-                if (cityWarehouses.length > 0) {
-                    warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення --</option>';
-                    cityWarehouses.forEach(wh => warehouseSelect.add(new Option(wh, wh)));
-                    warehouseSelect.disabled = false;
-                } else {
-                    warehouseSelect.innerHTML = '<option value="">Відділення не знайдені</option>';
-                }
-            }, 500);
-        }
     }
 });
 </script>
