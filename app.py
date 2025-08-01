@@ -1,9 +1,10 @@
+# app.py (ВИПРАВЛЕНА ВЕРСІЯ)
+
 import os
 import re
 import locale
 import smtplib
-import requests  # для Telegram та Нової Пошти
-import cloudinary.utils
+import requests
 from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
@@ -203,7 +204,7 @@ app.register_blueprint(google_blueprint, url_prefix="/login")
 shop_info = {"name": "НОВА ХВИЛЯ",
              "categories": [{'name': 'ПОЛИВОЧНА СИСТЕМА', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
                             {'name': 'НАСОСИ', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
-                            {'name': 'БОЙЛЕРА', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
+                            {'name': 'БОЙЛЕРИ', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
                             {'name': 'ЗМІШУВАЧІ', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
                             {'name': "ВИТЯЖКИ", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
                             {'name': "КОЛОНКИ", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
@@ -236,6 +237,7 @@ def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
 # ────────────────────────────────
 #  МАРШРУТИ
 # ────────────────────────────────
+
 @app.route("/")
 def index():
     hero_slides = [{'image': 'hero-bg.jpg', 'title': 'Професійна сантехніка та обладнання',
@@ -524,7 +526,7 @@ def checkout():
 
 
 # ────────────────────────────────
-#  [НОВЕ] ПРОФІЛЬ КОРИСТУВАЧА
+#  ПРОФІЛЬ КОРИСТУВАЧА
 # ────────────────────────────────
 @app.route('/profile/orders')
 @login_required
@@ -700,6 +702,44 @@ def admin_unfinished():
 # ────────────────────────────────
 #  ІНШІ МАРШРУТИ ТА API
 # ────────────────────────────────
+
+@app.route('/track-order')
+def track_order_page():
+    """Відображає сторінку з формою для відстеження замовлення."""
+    return render_template('track_order.html')
+
+
+@app.route('/api/track_order', methods=['POST'])
+def track_order():
+    """
+    [ОНОВЛЕНО] Шукає замовлення ТІЛЬКИ за номером телефону.
+    Повертає список останніх 5 замовлень.
+    """
+    data = request.get_json()
+    phone = data.get('phone')
+
+    if not phone:
+        return jsonify({'status': 'error', 'message': "Номер телефону є обов'язковим."}), 400
+
+    # Шукаємо останні 5 замовлень за цим номером телефону
+    orders = Order.query.filter_by(customer_phone=phone).order_by(Order.timestamp.desc()).limit(5).all()
+
+    if orders:
+        # Створюємо список з даними про кожне замовлення
+        orders_data = [{
+            'id': order.id,
+            'status': order.status,
+            'date': order.timestamp.strftime('%d.%m.%Y'),
+            'total': order.total_cost
+        } for order in orders]
+
+        return jsonify({
+            'status': 'success',
+            'orders': orders_data
+        })
+    else:
+        return jsonify({'status': 'error', 'message': 'Замовлень за цим номером телефону не знайдено.'}), 404
+
 @app.route("/send_message", methods=["POST"])
 def send_message():
     form = request.form
@@ -852,7 +892,6 @@ def api_get_orders():
     return jsonify({"status": "success", "orders": orders_data})
 
 
-# [НОВЕ] API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
 def find_np_cities():
     """Пошук населених пунктів."""
@@ -906,14 +945,10 @@ def get_np_warehouses():
         data = response.json()
         if data['success']:
             all_warehouses = data.get('data', [])
-
-            # [ОСТАТОЧНЕ ВИПРАВЛЕННЯ] Фільтруємо, залишаючи ТІЛЬКИ відділення.
-            # Цей метод надійніший, бо він відсікає все, що не є відділенням.
             filtered_warehouses = [
                 w['Description'] for w in all_warehouses
                 if w['Description'].startswith('Відділення')
             ]
-
             return jsonify(filtered_warehouses)
         return jsonify([])
     except requests.exceptions.RequestException as e:
