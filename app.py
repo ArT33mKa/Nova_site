@@ -699,7 +699,7 @@ def find_np_cities():
 
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання ВІДФІЛЬТРОВАНИХ відділень для населеного пункту."""
+    """Отримання ТІЛЬКИ ВІДДІЛЕНЬ для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
 
@@ -708,15 +708,11 @@ def get_np_warehouses():
     if not city_ref:
         return jsonify([])
 
-    # [ВИПРАВЛЕНО] Ми запитуємо ВСІ відділення, без фільтрації за типом
     payload = {
         "apiKey": api_key,
         "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
-        "methodProperties": {
-            "SettlementRef": city_ref
-            # "Limit": "500" # Можна додати, якщо в якомусь місті більше 500 відділень
-        }
+        "methodProperties": {"SettlementRef": city_ref}
     }
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
@@ -725,11 +721,11 @@ def get_np_warehouses():
         if data['success']:
             all_warehouses = data.get('data', [])
 
-            # [НОВА ЛОГІКА ФІЛЬТРАЦІЇ] Фільтруємо список на стороні сервера
+            # [ОСТАТОЧНЕ ВИПРАВЛЕННЯ] Фільтруємо, залишаючи ТІЛЬКИ відділення.
+            # Цей метод надійніший, бо він відсікає все, що не є відділенням.
             filtered_warehouses = [
                 w['Description'] for w in all_warehouses
-                # Залишаємо тільки ті, в описі яких НЕМАЄ ключових фраз
-                if "ТІЛЬКИ ДЛЯ" not in w['Description'].upper() and "(ПРИВАТНИЙ)" not in w['Description'].upper()
+                if w['Description'].startswith('Відділення')
             ]
 
             return jsonify(filtered_warehouses)
