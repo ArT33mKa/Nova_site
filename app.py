@@ -124,8 +124,12 @@ class User(db.Model, UserMixin):
     is_admin = db.Column(db.Boolean, default=False)
     avatar_url = db.Column(db.String(255), nullable=True)
     reviews = db.relationship('Review', backref='author', lazy='dynamic')
+    orders = db.relationship('Order', backref='customer', lazy='dynamic')
+
     def set_password(self, password): self.password_hash = generate_password_hash(password)
+
     def check_password(self, password): return check_password_hash(self.password_hash, password)
+
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -139,6 +143,7 @@ class Product(db.Model):
     reviews_count = db.Column(db.Integer, default=0)
     reviews = db.relationship('Review', backref='product', lazy='dynamic', cascade="all, delete-orphan")
 
+
 class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     rating = db.Column(db.Integer, nullable=False, default=0)
@@ -150,7 +155,9 @@ class Review(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     review_type = db.Column(db.String(50), nullable=False, default='review')
     parent_id = db.Column(db.Integer, db.ForeignKey('review.id'), nullable=True)
-    replies = db.relationship('Review', backref=db.backref('parent', remote_side=[id]), lazy='dynamic', cascade="all, delete-orphan", order_by='Review.timestamp.asc()')
+    replies = db.relationship('Review', backref=db.backref('parent', remote_side=[id]), lazy='dynamic',
+                              cascade="all, delete-orphan", order_by='Review.timestamp.asc()')
+
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -166,12 +173,14 @@ class Order(db.Model):
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     items = db.relationship('OrderItem', backref='order', lazy='dynamic', cascade="all, delete-orphan")
 
+
 class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
+
 
 class OAuth(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -186,13 +195,28 @@ class OAuth(db.Model):
 #  GOOGLE AUTH ТА НАЛАШТУВАННЯ МАГАЗИНУ
 # ────────────────────────────────
 
-google_blueprint = make_google_blueprint(scope=["openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"], storage=SQLAlchemyStorage(OAuth, db.session, user=current_user))
+google_blueprint = make_google_blueprint(scope=["openid", "https://www.googleapis.com/auth/userinfo.email",
+                                                "https://www.googleapis.com/auth/userinfo.profile"],
+                                         storage=SQLAlchemyStorage(OAuth, db.session, user=current_user))
 app.register_blueprint(google_blueprint, url_prefix="/login")
 
-shop_info = {"name": "НОВА ХВИЛЯ", "categories": [{'name': 'ПОЛИВОЧНА СИСТЕМА', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'}, {'name': 'НАСОСИ', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'}, {'name': 'БОЙЛЕРА', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'}, {'name': 'ЗМІШУВАЧІ', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'}, {'name': "ВИТЯЖКИ", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'}, {'name': "КОЛОНКИ", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'}, {'name': "СУШКА ДЛЯ РУШНИКІВ", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'}, {'name': "ЗАПЧАСТИНИ ДО ГАЗ ОБЛАДНАННЯ", 'image': 'gas_parts.jpg', 'icon': 'gas_parts.jpg'}], "address": "вул. Гоголя, 47/2", "city": "м. Миргород", "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com", "hours": {"Пн - Пт:": "8:00 - 17:00", "Субота:": "8:00 - 15:00", "Неділя:": "8:00 - 15:00"}}
+shop_info = {"name": "НОВА ХВИЛЯ",
+             "categories": [{'name': 'ПОЛИВОЧНА СИСТЕМА', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
+                            {'name': 'НАСОСИ', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
+                            {'name': 'БОЙЛЕРА', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
+                            {'name': 'ЗМІШУВАЧІ', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
+                            {'name': "ВИТЯЖКИ", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
+                            {'name': "КОЛОНКИ", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
+                            {'name': "СУШКА ДЛЯ РУШНИКІВ", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
+                            {'name': "ЗАПЧАСТИНИ ДО ГАЗ ОБЛАДНАННЯ", 'image': 'gas_parts.jpg',
+                             'icon': 'gas_parts.jpg'}], "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
+             "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
+             "hours": {"Пн - Пт:": "8:00 - 17:00", "Субота:": "8:00 - 15:00", "Неділя:": "8:00 - 15:00"}}
+
 
 @login_manager.user_loader
 def load_user(user_id): return User.query.get(int(user_id))
+
 
 def admin_required(f):
     @wraps(f)
@@ -201,7 +225,9 @@ def admin_required(f):
             flash('Доступ до цієї сторінки мають тільки адміністратори.', 'danger')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 @app.context_processor
 def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
@@ -212,14 +238,20 @@ def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
 # ────────────────────────────────
 @app.route("/")
 def index():
-    hero_slides = [{'image': 'hero-bg.jpg', 'title': 'Професійна сантехніка та обладнання', 'subtitle': 'Якісні товари для вашого дому з гарантією та доставкою'}, {'image': 'hero-bg2.jpg', 'title': 'Надійні насоси для будь-яких потреб', 'subtitle': 'Від найкращих виробників'}, {'image': 'kotly.jpg', 'title': 'Все для систем опалення', 'subtitle': 'Котли, бойлери та комплектуючі'}]
+    hero_slides = [{'image': 'hero-bg.jpg', 'title': 'Професійна сантехніка та обладнання',
+                    'subtitle': 'Якісні товари для вашого дому з гарантією та доставкою'},
+                   {'image': 'hero-bg2.jpg', 'title': 'Надійні насоси для будь-яких потреб',
+                    'subtitle': 'Від найкращих виробників'}, {'image': 'kotly.jpg', 'title': 'Все для систем опалення',
+                                                              'subtitle': 'Котли, бойлери та комплектуючі'}]
     products = Product.query.order_by(Product.id.desc()).limit(5).all()
     return render_template("index.html", products=products, hero_slides=hero_slides)
+
 
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
-    query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''), Product.image.notlike('%default_tovar.jpg%'))
+    query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
+                                 Product.image.notlike('%default_tovar.jpg%'))
     if search_query := request.args.get('search', ''): query = query.filter(Product.name.ilike(f'%{search_query}%'))
     if category_arg := request.args.get('category'): query = query.filter(Product.category == category_arg.strip())
     if min_price := request.args.get('min_price', type=float): query = query.filter(Product.price >= min_price)
@@ -230,21 +262,30 @@ def catalog():
     categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0]]
     return render_template('catalog.html', products=products, categories=categories)
 
+
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
-    similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id, Product.in_stock == True, and_(Product.description != None, Product.description != ''), Product.image != 'default_tovar.jpg').limit(8).all()
+    similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id,
+                                            Product.in_stock == True,
+                                            and_(Product.description != None, Product.description != ''),
+                                            Product.image != 'default_tovar.jpg').limit(8).all()
     return render_template("product_detail.html", product=product, similar_products=similar_products)
+
 
 @app.route('/get_products_by_ids', methods=['POST'])
 def get_products_by_ids():
     product_ids = request.json.get('ids', [])
     if not product_ids: return jsonify([])
-    try: safe_product_ids = [int(pid) for pid in product_ids]
-    except (ValueError, TypeError): return jsonify({'error': 'Invalid IDs provided'}), 400
+    try:
+        safe_product_ids = [int(pid) for pid in product_ids]
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid IDs provided'}), 400
     products = Product.query.filter(Product.id.in_(safe_product_ids)).all()
-    products_data = [{'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'in_stock': p.in_stock, 'url': url_for('product_detail', product_id=p.id)} for p in products]
+    products_data = [{'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'in_stock': p.in_stock,
+                      'url': url_for('product_detail', product_id=p.id)} for p in products]
     return jsonify(products_data)
+
 
 def get_reviews_data(product_id):
     product = Product.query.get_or_404(product_id)
@@ -255,35 +296,45 @@ def get_reviews_data(product_id):
     total_with_rating_count = len(reviews_with_rating)
     rating_counts = Counter([r.rating for r in reviews_with_rating])
     rating_breakdown = {star: rating_counts.get(star, 0) for star in range(5, 0, -1)}
-    return {'product': product, 'reviews': reviews_only, 'questions': questions_only, 'review_only_count': len(reviews_only), 'rating_breakdown': rating_breakdown, 'total_reviews_with_rating': total_with_rating_count}
+    return {'product': product, 'reviews': reviews_only, 'questions': questions_only,
+            'review_only_count': len(reviews_only), 'rating_breakdown': rating_breakdown,
+            'total_reviews_with_rating': total_with_rating_count}
+
 
 @app.route("/product/<int:product_id>/reviews")
 def product_reviews(product_id):
     data = get_reviews_data(product_id)
     return render_template("reviews.html", **data, active_tab='reviews')
 
+
 @app.route("/product/<int:product_id>/questions")
 def product_questions(product_id):
     data = get_reviews_data(product_id)
     return render_template("questions.html", **data, active_tab='questions')
 
+
 @app.route('/product/<int:product_id>/add_review', methods=['POST'])
 def add_review(product_id):
     product = Product.query.get_or_404(product_id)
     form = request.form
-    new_review_data = {'product_id': product_id, 'text': form.get('text'), 'author_name': form.get('author_name', 'Анонім'), 'author_email': form.get('author_email'), 'review_type': form.get('review_type', 'review'), 'parent_id': form.get('parent_id') if form.get('parent_id') else None}
+    new_review_data = {'product_id': product_id, 'text': form.get('text'),
+                       'author_name': form.get('author_name', 'Анонім'), 'author_email': form.get('author_email'),
+                       'review_type': form.get('review_type', 'review'),
+                       'parent_id': form.get('parent_id') if form.get('parent_id') else None}
     if new_review_data['review_type'] == 'review': new_review_data['rating'] = int(form.get('rating', 0))
     if current_user.is_authenticated:
         new_review_data['user_id'] = current_user.id
         new_review_data['author_name'] = current_user.first_name or current_user.username
     db.session.add(Review(**new_review_data))
     if new_review_data['review_type'] == 'review' and not new_review_data['parent_id']:
-        result = db.session.query(func.avg(Review.rating), func.count(Review.id)).filter(Review.product_id == product_id, Review.rating > 0).one()
+        result = db.session.query(func.avg(Review.rating), func.count(Review.id)).filter(
+            Review.product_id == product_id, Review.rating > 0).one()
         product.rating = float(result[0] or 0)
         product.reviews_count = int(result[1] or 0)
     db.session.commit()
     flash('Дякуємо! Ваш запис було успішно додано.', 'success')
-    return redirect(url_for('product_questions' if request.form.get('review_type') == 'question' else 'product_reviews', product_id=product_id))
+    return redirect(url_for('product_questions' if request.form.get('review_type') == 'question' else 'product_reviews',
+                            product_id=product_id))
 
 
 # ────────────────────────────────
@@ -298,12 +349,16 @@ def login():
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Невірний email або пароль"}), 401
 
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
-    email, first_name, last_name, phone = data.get('email'), data.get('first_name'), data.get('last_name'), data.get('phone')
-    if not email or not first_name or not data.get('password'): return jsonify({"status": "error", "message": "Ім'я, Email та Пароль є обов'язковими"}), 400
-    if User.query.filter_by(email=email).first(): return jsonify({"status": "error", "message": "Цей email вже зареєстровано"}), 400
+    email, first_name, last_name, phone = data.get('email'), data.get('first_name'), data.get('last_name'), data.get(
+        'phone')
+    if not email or not first_name or not data.get('password'): return jsonify(
+        {"status": "error", "message": "Ім'я, Email та Пароль є обов'язковими"}), 400
+    if User.query.filter_by(email=email).first(): return jsonify(
+        {"status": "error", "message": "Цей email вже зареєстровано"}), 400
     username_base = first_name.strip()
     username, counter = username_base, 1
     while User.query.filter_by(username=username).first():
@@ -314,8 +369,10 @@ def register():
     db.session.add(new_user)
     db.session.commit()
     login_user(new_user, remember=True)
-    send_email(new_user.email, f"Вітаємо у {shop_info['name']}!", render_template("email/welcome.html", user=new_user, shop=shop_info))
+    send_email(new_user.email, f"Вітаємо у {shop_info['name']}!",
+               render_template("email/welcome.html", user=new_user, shop=shop_info))
     return jsonify({"status": "success"})
+
 
 @app.route("/logout")
 @login_required
@@ -323,6 +380,7 @@ def logout():
     logout_user()
     flash("Ви успішно вийшли з акаунту.", "success")
     return redirect(url_for('index'))
+
 
 @oauth_authorized.connect_via(google_blueprint)
 def google_logged_in(blueprint, token):
@@ -345,7 +403,8 @@ def google_logged_in(blueprint, token):
         while User.query.filter_by(username=username).first():
             username = f"{username_base}{counter}"
             counter += 1
-        user = User(email=email, username=username, first_name=first_name, last_name=last_name, avatar_url=google_info.get('picture'))
+        user = User(email=email, username=username, first_name=first_name, last_name=last_name,
+                    avatar_url=google_info.get('picture'))
         db.session.add(user)
         db.session.commit()
         subject = f"Вітаємо у {shop_info['name']}!"
@@ -373,17 +432,21 @@ def add_to_cart():
     session["cart"] = cart
     return jsonify(status="success", message="Товар додано до кошика", cart_count=sum(cart.values()))
 
+
 @app.route('/update_cart_quantity/<int:product_id>', methods=['POST'])
 def update_cart_quantity(product_id):
     cart = session.get("cart", {})
     product_id_str = str(product_id)
     new_quantity = request.json.get('quantity')
     if product_id_str in cart:
-        if new_quantity and new_quantity > 0: cart[product_id_str] = new_quantity
-        else: del cart[product_id_str]
+        if new_quantity and new_quantity > 0:
+            cart[product_id_str] = new_quantity
+        else:
+            del cart[product_id_str]
         session["cart"] = cart
         return jsonify(status="success")
     return jsonify(status="error", message="Товар не знайдено"), 404
+
 
 @app.route('/get_cart')
 def get_cart():
@@ -395,9 +458,13 @@ def get_cart():
         product_map = {str(p.id): p for p in products}
         for product_id, quantity in cart.items():
             if product := product_map.get(product_id):
-                cart_items.append({"id": product.id, "name": product.name, "price": product.price, "image": product.image, "quantity": quantity, "in_stock": product.in_stock, "url": url_for('product_detail', product_id=product.id)})
+                cart_items.append(
+                    {"id": product.id, "name": product.name, "price": product.price, "image": product.image,
+                     "quantity": quantity, "in_stock": product.in_stock,
+                     "url": url_for('product_detail', product_id=product.id)})
                 total += product.price * quantity
     return jsonify({"items": cart_items, "total": total})
+
 
 @app.route("/remove_from_cart/<int:product_id>", methods=["POST"])
 def remove_from_cart(product_id):
@@ -406,10 +473,12 @@ def remove_from_cart(product_id):
     session["cart"] = cart
     return jsonify(status="success")
 
+
 @app.route('/buy_now', methods=['POST'])
 def buy_now():
     session["cart"] = {str(request.get_json().get("product_id")): 1}
     return jsonify(status="success")
+
 
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
@@ -422,8 +491,15 @@ def checkout():
         products = Product.query.filter(Product.id.in_(product_ids)).all()
         product_map = {str(p.id): p for p in products}
         total_cost = sum(product_map[pid].price * qty for pid, qty in cart.items())
-        first_name, last_name = request.form.get('customer_first_name', '').strip(), request.form.get('customer_last_name', '').strip()
-        order = Order(customer_name=f"{first_name} {last_name}".strip(), customer_phone=request.form.get('customer_phone'), delivery_method=request.form.get('delivery_method'), delivery_city=request.form.get('delivery_city'), delivery_warehouse=request.form.get('delivery_warehouse'), payment_method=request.form.get('payment_method'), total_cost=total_cost, user_id=current_user.id if current_user.is_authenticated else None)
+        first_name, last_name = request.form.get('customer_first_name', '').strip(), request.form.get(
+            'customer_last_name', '').strip()
+        order = Order(customer_name=f"{first_name} {last_name}".strip(),
+                      customer_phone=request.form.get('customer_phone'),
+                      delivery_method=request.form.get('delivery_method'),
+                      delivery_city=request.form.get('delivery_city'),
+                      delivery_warehouse=request.form.get('delivery_warehouse'),
+                      payment_method=request.form.get('payment_method'), total_cost=total_cost,
+                      user_id=current_user.id if current_user.is_authenticated else None)
         db.session.add(order)
         db.session.flush()
         order_items_for_email_and_tg = []
@@ -433,13 +509,85 @@ def checkout():
                 order_items_for_email_and_tg.append({'product': p, 'quantity': qty, 'price': p.price})
         db.session.commit()
         try:
-            if admin_email := os.getenv("SMTP_USER"): send_email(admin_email, f"Нове замовлення #{order.id}", render_template("email/order_notification.html", order=order, items=order_items_for_email_and_tg, shop=shop_info))
+            if admin_email := os.getenv("SMTP_USER"): send_email(admin_email, f"Нове замовлення #{order.id}",
+                                                                 render_template("email/order_notification.html",
+                                                                                 order=order,
+                                                                                 items=order_items_for_email_and_tg,
+                                                                                 shop=shop_info))
             send_telegram_notification(order, order_items_for_email_and_tg)
-        except Exception as e: print(f">>> ПОМИЛКА СПОВІЩЕННЯ: {e}")
+        except Exception as e:
+            print(f">>> ПОМИЛКА СПОВІЩЕННЯ: {e}")
         session.pop('cart', None)
         flash('Дякуємо! Ваше замовлення прийнято.', 'success')
         return redirect(url_for('index'))
     return render_template('checkout.html')
+
+
+# ────────────────────────────────
+#  [НОВЕ] ПРОФІЛЬ КОРИСТУВАЧА
+# ────────────────────────────────
+@app.route('/profile/orders')
+@login_required
+def my_orders():
+    page = request.args.get('page', 1, type=int)
+    orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.timestamp.desc()).paginate(page=page,
+                                                                                                      per_page=10,
+                                                                                                      error_out=False)
+    return render_template('my_orders.html', orders=orders)
+
+
+@app.route('/profile/reviews')
+@login_required
+def my_reviews():
+    page = request.args.get('page', 1, type=int)
+    reviews = Review.query.filter_by(user_id=current_user.id).order_by(Review.timestamp.desc()).paginate(page=page,
+                                                                                                         per_page=10,
+                                                                                                         error_out=False)
+    return render_template('my_reviews.html', reviews=reviews)
+
+
+@app.route('/profile/settings', methods=['GET', 'POST'])
+@login_required
+def profile_settings():
+    if request.method == 'POST':
+        # Handle personal info update
+        if 'update_info' in request.form:
+            current_user.first_name = request.form.get('first_name')
+            current_user.last_name = request.form.get('last_name')
+            current_user.phone = request.form.get('phone')
+
+            new_email = request.form.get('email')
+            if new_email != current_user.email:
+                if User.query.filter_by(email=new_email).first():
+                    flash('Цей email вже використовується іншим користувачем.', 'danger')
+                    return redirect(url_for('profile_settings'))
+                current_user.email = new_email
+
+            db.session.commit()
+            flash('Ваші дані успішно оновлено.', 'success')
+
+        # Handle password change
+        elif 'change_password' in request.form:
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+
+            if not current_user.password_hash:
+                flash('Неможливо змінити пароль, оскільки ви увійшли через соціальну мережу.', 'warning')
+            elif not current_user.check_password(current_password):
+                flash('Невірний поточний пароль.', 'danger')
+            elif not new_password or len(new_password) < 6:
+                flash('Новий пароль має бути не менше 6 символів.', 'danger')
+            elif new_password != confirm_password:
+                flash('Паролі не співпадають.', 'danger')
+            else:
+                current_user.set_password(new_password)
+                db.session.commit()
+                flash('Пароль успішно змінено.', 'success')
+
+        return redirect(url_for('profile_settings'))
+
+    return render_template('profile_settings.html')
 
 
 # ────────────────────────────────
@@ -463,6 +611,7 @@ def admin_orders():
     all_statuses = ['Нове', 'Відправлено', 'Виконано', 'Скасовано']
     return render_template('admin_orders.html', orders=orders, all_statuses=all_statuses, current_status=status_filter)
 
+
 @app.route('/admin/reviews')
 @login_required
 @admin_required
@@ -471,16 +620,21 @@ def admin_reviews():
     reviews = Review.query.order_by(Review.timestamp.desc()).paginate(page=page, per_page=15, error_out=False)
     return render_template('admin_reviews.html', reviews=reviews)
 
+
 @app.route("/admin/add_product", methods=['GET', 'POST'])
 @login_required
 @admin_required
 def add_product():
     if request.method == 'POST':
-        new_product = Product(name=request.form['name'], price=float(request.form['price']), description=request.form['description'], image=request.form['image'], category=request.form['category'], in_stock='in_stock' in request.form)
-        db.session.add(new_product); db.session.commit()
+        new_product = Product(name=request.form['name'], price=float(request.form['price']),
+                              description=request.form['description'], image=request.form['image'],
+                              category=request.form['category'], in_stock='in_stock' in request.form)
+        db.session.add(new_product);
+        db.session.commit()
         flash(f"Товар '{new_product.name}' додано!", "success")
         return redirect(url_for('catalog'))
     return render_template("add_product.html")
+
 
 @app.route("/admin/edit_product/<int:product_id>", methods=['GET', 'POST'])
 @login_required
@@ -488,29 +642,36 @@ def add_product():
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == 'POST':
-        product.name, product.price, product.description, product.image, product.category, product.in_stock = request.form['name'], float(request.form['price']), request.form['description'], request.form['image'], request.form['category'], 'in_stock' in request.form
+        product.name, product.price, product.description, product.image, product.category, product.in_stock = \
+        request.form['name'], float(request.form['price']), request.form['description'], request.form['image'], \
+        request.form['category'], 'in_stock' in request.form
         db.session.commit()
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
     return render_template("edit_product.html", product=product)
+
 
 @app.route("/admin/delete_review/<int:review_id>", methods=["POST"])
 @login_required
 @admin_required
 def delete_review(review_id):
     review = Review.query.get_or_404(review_id)
-    db.session.delete(review); db.session.commit()
+    db.session.delete(review);
+    db.session.commit()
     flash("Запис видалено.", "success")
     return redirect(request.referrer or url_for('admin_reviews'))
+
 
 @app.route("/admin/delete_product/<int:product_id>", methods=["POST"])
 @login_required
 @admin_required
 def delete_product(product_id):
     product = Product.query.get_or_404(product_id)
-    db.session.delete(product); db.session.commit()
+    db.session.delete(product);
+    db.session.commit()
     flash(f"Товар '{product.name}' видалено.", "success")
     return redirect(url_for('catalog'))
+
 
 @app.route('/admin/unfinished')
 @login_required
@@ -519,12 +680,19 @@ def admin_unfinished():
     page = request.args.get('page', 1, type=int)
     query = Product.query
     active_filters = [k for k in request.args if k in ['no_stock', 'no_description', 'no_image']]
-    if not active_filters: query = query.filter(db.or_(Product.in_stock == False, (Product.description == None) | (Product.description == ''), Product.image.like('%default_tovar.jpg%')))
+    if not active_filters:
+        query = query.filter(
+            db.or_(Product.in_stock == False, (Product.description == None) | (Product.description == ''),
+                   Product.image.like('%default_tovar.jpg%')))
     else:
         if 'no_stock' in active_filters: query = query.filter(Product.in_stock == False)
-        if 'no_description' in active_filters: query = query.filter((Product.description == None) | (Product.description == ''))
+        if 'no_description' in active_filters: query = query.filter(
+            (Product.description == None) | (Product.description == ''))
         if 'no_image' in active_filters: query = query.filter(Product.image.like('%default_tovar.jpg%'))
-    counts = {'no_stock': Product.query.filter(Product.in_stock == False).count(), 'no_description': Product.query.filter((Product.description == None) | (Product.description == '')).count(), 'no_image': Product.query.filter(Product.image.like('%default_tovar.jpg%')).count()}
+    counts = {'no_stock': Product.query.filter(Product.in_stock == False).count(),
+              'no_description': Product.query.filter(
+                  (Product.description == None) | (Product.description == '')).count(),
+              'no_image': Product.query.filter(Product.image.like('%default_tovar.jpg%')).count()}
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
     return render_template('admin_unfinished.html', products=products, counts=counts)
 
@@ -538,8 +706,11 @@ def send_message():
     form_data = {'name': form.get('name'), 'email': form.get('email'), 'message': form.get('message')}
     subject = f"Нове повідомлення з сайту від {form_data['name']}"
     html_body = render_template('email/contact_form_notification.html', data=form_data, shop=shop_info)
-    if send_email(os.getenv("SMTP_USER"), subject, html_body): return jsonify(status="success", message="✅ Повідомлення успішно надіслано!")
-    else: return jsonify(status="error", message="❌ Помилка сервера при відправці повідомлення."), 500
+    if send_email(os.getenv("SMTP_USER"), subject, html_body):
+        return jsonify(status="success", message="✅ Повідомлення успішно надіслано!")
+    else:
+        return jsonify(status="error", message="❌ Помилка сервера при відправці повідомлення."), 500
+
 
 def require_api_key(f):
     @wraps(f)
@@ -548,12 +719,15 @@ def require_api_key(f):
         provided_key = request.headers.get('X-API-KEY') or request.args.get('key')
         if not api_key or provided_key != api_key: return "failure\nInvalid API key.", 401
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 @app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
 def handle_bas_handshake():
     print("BAS: пройдено етап handshake.")
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
+
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
@@ -600,14 +774,17 @@ def bas_import():
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
                     price_text = price_node.text.replace(',', '.')
-                    try: price = float(re.match(r"[\d.]+", price_text).group(0))
-                    except (ValueError, AttributeError): price = 0.0
+                    try:
+                        price = float(re.match(r"[\d.]+", price_text).group(0))
+                    except (ValueError, AttributeError):
+                        price = 0.0
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
                         stock_quantity = int(float(quantity_node.text.strip()))
                         if stock_quantity > 0: in_stock = True
-                    except (ValueError, TypeError): pass
+                    except (ValueError, TypeError):
+                        pass
             if not in_stock:
                 stock_prop_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
                 if stock_prop_node is not None and stock_prop_node.text is not None:
@@ -621,7 +798,8 @@ def bas_import():
                 product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image_url, in_stock
                 updated_count += 1
             else:
-                new_product = Product(name=name, price=price, description=description, category=category, image=image_url, in_stock=in_stock)
+                new_product = Product(name=name, price=price, description=description, category=category,
+                                      image=image_url, in_stock=in_stock)
                 db.session.add(new_product)
                 added_count += 1
         print("Завершення циклу. Зберігаю зміни в базі даних...")
@@ -637,14 +815,18 @@ def bas_import():
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
 
+
 def require_bot_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         api_key = os.getenv('BOT_API_KEY')
         provided_key = request.headers.get('X-Bot-API-Key')
-        if not api_key or provided_key != api_key: return jsonify({"status": "error", "message": "Invalid API key"}), 401
+        if not api_key or provided_key != api_key: return jsonify(
+            {"status": "error", "message": "Invalid API key"}), 401
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 @app.route('/api/order/<int:order_id>/update_status', methods=['POST'])
 @require_bot_api_key
@@ -657,14 +839,18 @@ def api_update_order_status(order_id):
         return jsonify({"status": "success", "message": f"Order #{order.id} status updated to {new_status}"})
     return jsonify({"status": "error", "message": "Invalid status"}), 400
 
+
 @app.route('/api/orders')
 @require_bot_api_key
 def api_get_orders():
     status = request.args.get('status')
     if not status: return jsonify({"status": "error", "message": "Status parameter is required"}), 400
     orders = Order.query.filter_by(status=status).order_by(Order.timestamp.desc()).limit(10).all()
-    orders_data = [{"id": o.id, "date": o.timestamp.strftime('%Y-%m-%d'), "name": o.customer_name, "total": o.total_cost} for o in orders]
+    orders_data = [
+        {"id": o.id, "date": o.timestamp.strftime('%Y-%m-%d'), "name": o.customer_name, "total": o.total_cost} for o in
+        orders]
     return jsonify({"status": "success", "orders": orders_data})
+
 
 # [НОВЕ] API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
@@ -682,7 +868,7 @@ def find_np_cities():
         "apiKey": api_key,
         "modelName": "Address",
         "calledMethod": "searchSettlements",
-        "methodProperties": { "CityName": query, "Limit": "20" }
+        "methodProperties": {"CityName": query, "Limit": "20"}
     }
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
@@ -747,7 +933,7 @@ if __name__ == "__main__":
         db.create_all()
         if not User.query.filter_by(is_admin=True).first():
             print(">>> Створення адміністратора...")
-            admin = User(username='admin', first_name='Admin', email='artemcool200911@gmail.com', is_admin=True)
+            admin = User(username='admin', first_name='Admin', last_name='User', email='artemcool200911@gmail.com', is_admin=True)
             admin.set_password('admin123')
             db.session.add(admin); db.session.commit()
             print(">>> Адміністратора створено. Логін: admin, Пароль: admin123")

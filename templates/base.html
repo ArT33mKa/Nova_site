@@ -23,7 +23,8 @@
     {% include '_footer.html' %}
     {% include '_modals.html' %}
 
-    <!-- [НОВЕ] Додайте цей скрипт перед main.js -->
+    <div id="page-overlay"></div>
+
     <script>
         window.isAdmin = {{ current_user.is_authenticated and current_user.is_admin|tojson }};
     </script>

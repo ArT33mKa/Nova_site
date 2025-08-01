@@ -1,34 +1,154 @@
-// static/js/main.js (ФІНАЛЬНА ВЕРСІЯ З ОПТИМІСТИЧНИМ ОНОВЛЕННЯМ)
+// static/js/main.js
 
 document.addEventListener('DOMContentLoaded', function() {
+    // [НОВЕ] Отримуємо елемент затемнення один раз при завантаженні
+    const pageOverlay = document.getElementById('page-overlay');
+
+    // [НОВЕ] Універсальна функція для закриття всіх бічних панелей та затемнення
+    function closeAllSidebars() {
+        document.querySelector('.cart-sidebar.active')?.classList.remove('active');
+        document.querySelector('.cabinet-sidebar.active')?.classList.remove('active');
+        if (pageOverlay) {
+            pageOverlay.classList.remove('active');
+            pageOverlay.classList.remove('dark'); // Скидаємо модифікатор темного фону
+        }
+    }
+
     // Ініціалізація всіх основних модулів
     initAuth();
-    initHeaderActions();
+    initHeaderActions(pageOverlay, closeAllSidebars); // [ЗМІНЕНО] Передаємо залежності
     initContactForm();
     initCatalogFilters();
     initReviewsPage();
-    initHeroSlider(); // <--- ОСЬ ТУТ БУДЕ НОВА ФУНКЦІЯ
+    initHeroSlider();
     initSimilarProductsCarousel();
     initProductDescriptionToggle();
-
-    // [ОПТИМІЗАЦІЯ] Запускаємо нову, оптимізовану логіку кошика
     initOptimizedCartLogic();
-
     initFavoritesLogic();
+    initCabinetModal(pageOverlay, closeAllSidebars); // [ЗМІНЕНО] Передаємо залежності
 
-    // Ініціалізуємо маску для полів вводу телефону
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
 
-    // Первинне завантаження стану кошика та кнопок при завантаженні сторінки
     updateCartView();
     updateFavoritesUI();
+
+    // [НОВЕ] Обробник кліку на саме затемнення для закриття панелей
+    if (pageOverlay) {
+        pageOverlay.addEventListener('click', closeAllSidebars);
+    }
 });
 
+
 // ===================================================================
-//  НОВА ОПТИМІЗОВАНА ЛОГІКА КОШИКА
+//  ЛОГІКА КАБІНЕТУ ТА АВТОРИЗАЦІЇ
 // ===================================================================
 
+function initAuth() {
+    const authModal = document.getElementById('auth-modal');
+    if (!authModal) return;
+
+    document.getElementById('open-auth-modal-login')?.addEventListener('click', () => {
+        switchAuthTab('login');
+        authModal.classList.add('active');
+    });
+
+    document.getElementById('open-auth-modal-register')?.addEventListener('click', () => {
+        switchAuthTab('register');
+        authModal.classList.add('active');
+    });
+
+    authModal.addEventListener('click', e => {
+        if (e.target.classList.contains('close-modal') || e.target.id === 'auth-modal') {
+            authModal.classList.remove('active');
+        }
+    });
+
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchAuthTab(tab.dataset.tab));
+    });
+
+    const handleFormSubmit = (formId, url, errorElId) => {
+        const form = document.getElementById(formId);
+        if(!form) return;
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(this).entries());
+            fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+            .then(res => res.json()).then(result => {
+                if (result.status === 'success') window.location.reload();
+                else {
+                    const errorEl = document.getElementById(errorElId);
+                    errorEl.textContent = result.message;
+                    errorEl.style.display = 'block';
+                }
+            });
+        });
+    };
+    handleFormSubmit('loginForm', '/login', 'loginError');
+    handleFormSubmit('registerForm', '/register', 'registerError');
+}
+
+function switchAuthTab(tabId) {
+    document.querySelectorAll('.auth-tab, .tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.auth-tab[data-tab="${tabId}"]`)?.classList.add('active');
+    document.getElementById(tabId)?.classList.add('active');
+}
+
+// [ЗМІНЕНО] Функція тепер приймає залежності
+function initCabinetModal(pageOverlay, closeAllSidebars) {
+    const cabinetModal = document.getElementById('cabinet-modal');
+    if (!cabinetModal) return;
+
+    document.getElementById('open-cabinet-modal')?.addEventListener('click', () => {
+        cabinetModal.classList.add('active');
+        if (pageOverlay) {
+            pageOverlay.classList.add('active');
+            pageOverlay.classList.add('dark'); // Темне затемнення для кабінету
+        }
+    });
+
+    // [ЗМІНЕНО] Використовуємо універсальну функцію закриття
+    cabinetModal.addEventListener('click', e => {
+        if (e.target.classList.contains('cabinet-close') || e.target.id === 'cabinet-modal') {
+            closeAllSidebars();
+        }
+    });
+
+    document.getElementById('cabinet-open-favorites')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeAllSidebars();
+        setTimeout(() => {
+            renderFavoritesModal();
+            document.getElementById('favorites-modal')?.classList.add('active');
+        }, 300);
+    });
+}
+
+// [ЗМІНЕНО] Функція тепер приймає залежності
+function initHeaderActions(pageOverlay, closeAllSidebars) {
+    const cartModal = document.getElementById('cart-modal');
+    if(!cartModal) return;
+
+    document.getElementById('open-cart-btn')?.addEventListener('click', () => {
+        updateCartView();
+        cartModal.classList.add('active');
+        if (pageOverlay) {
+            pageOverlay.classList.add('active'); // Сіре затемнення (за замовчуванням)
+        }
+    });
+
+    // [ЗМІНЕНО] Використовуємо універсальну функцію закриття
+    cartModal.addEventListener('click', e => {
+        if (e.target.matches('.close-modal') || e.target.id === 'cart-modal') {
+            closeAllSidebars();
+        }
+    });
+}
+
+// ===================================================================
+//  ІНША ЛОГІКА (без змін, просто залишаємо як є)
+// ===================================================================
 function initOptimizedCartLogic() {
     document.body.addEventListener('click', e => {
         const button = e.target.closest('button');
@@ -37,85 +157,58 @@ function initOptimizedCartLogic() {
         const productId = button.dataset.id || button.closest('[data-id]')?.dataset.id;
         if (!productId) return;
 
-        // --- ДІЯ 1: ДОДАТИ В КОШИК ---
         if (button.matches('.add-to-cart-btn') && !button.classList.contains('in-cart')) {
-            // 1. Оптимістично оновлюємо UI
             setButtonAsInCart(button, true);
             updateCartCounter(1);
             showToast('Товар додано до кошика', 'success', `<a href="/checkout" class="btn btn-sm btn-primary">Оформити</a>`);
-
-            // 2. Відправляємо запит на сервер у фоні
-            fetch('/add_to_cart', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ product_id: productId })
-            })
+            fetch('/add_to_cart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: productId })})
             .then(res => res.json())
             .then(data => {
                 if (data.status !== 'success') {
-                    // 3. У разі невдачі - відкочуємо зміни
                     setButtonAsInCart(button, false);
                     updateCartCounter(-1);
                     showToast(data.message || 'Помилка додавання товару', 'error');
                 } else {
-                    // 4. Оновлюємо повний вигляд кошика для синхронізації
                     updateCartView();
                 }
             }).catch(() => {
-                // 3. У разі мережевої помилки - теж відкочуємо
                 setButtonAsInCart(button, false);
                 updateCartCounter(-1);
                 showToast('Мережева помилка', 'error');
             });
         }
 
-        // --- ДІЯ 2: КУПИТИ ЗАРАЗ ---
         if (button.matches('.buy-now-btn')) {
              fetch('/buy_now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: productId })})
              .then(res => res.json()).then(data => { if(data.status === 'success') window.location.href = '/checkout'; });
         }
 
-        // --- ДІЯ 3: КНОПКИ +/- У БІЧНОМУ КОШИКУ ---
         if (button.matches('.qty-btn')) {
              const cartItemRow = button.closest('.cart-item');
+             if (!cartItemRow) return;
              const quantityDisplay = cartItemRow.querySelector('.quantity-display');
              const currentQuantity = parseInt(quantityDisplay.textContent);
              const newQuantity = button.classList.contains('plus') ? currentQuantity + 1 : currentQuantity - 1;
 
              if (newQuantity >= 1) {
-                // Оптимістично оновлюємо кількість і відправляємо запит
-                updateCartView(); // Найпростіший спосіб перерахувати все
-                fetch(`/update_cart_quantity/${productId}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({quantity: newQuantity})
-                });
+                updateCartView(); // Optimistic update
+                fetch(`/update_cart_quantity/${productId}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({quantity: newQuantity}) });
              }
         }
 
-        // --- ДІЯ 4: ВИДАЛИТИ З БІЧНОГО КОШИКА ---
         if (button.matches('.remove-item')) {
             const cartItemRow = button.closest('.cart-item');
             if (cartItemRow) {
-                // Оптимістично видаляємо елемент з UI
                 cartItemRow.style.transition = 'opacity 0.3s, transform 0.3s';
                 cartItemRow.style.opacity = '0';
                 cartItemRow.style.transform = 'translateX(50px)';
-                setTimeout(() => {
-                     updateCartView(); // Перемальовуємо кошик після анімації
-                }, 300);
-
-                // Відправляємо запит на видалення у фоні
+                setTimeout(() => updateCartView(), 300);
                 fetch(`/remove_from_cart/${productId}`, { method: 'POST' });
             }
         }
     });
 }
 
-/**
- * [НОВИЙ ХЕЛПЕР] Оновлює лічильник кошика на задане значення.
- * @param {number} change - Значення, на яке змінити лічильник (напр. 1 або -1).
- */
 function updateCartCounter(change) {
     const counter = document.getElementById('cart-count');
     if (counter) {
@@ -124,52 +217,29 @@ function updateCartCounter(change) {
     }
 }
 
-/**
- * [НОВИЙ ХЕЛПЕР] Встановлює або знімає стан "в кошику" для кнопки.
- * @param {HTMLElement} button - Елемент кнопки.
- * @param {boolean} isInCart - True, якщо товар в кошику, false - якщо ні.
- */
 function setButtonAsInCart(button, isInCart) {
     if (isInCart) {
         button.classList.add('in-cart');
         button.innerHTML = '<i class="fas fa-check"></i> В кошику';
     } else {
         button.classList.remove('in-cart');
-        button.innerHTML = 'Додати в кошик'; // Проста версія для відкочування
+        button.innerHTML = 'Додати в кошик';
     }
 }
-
-// ===================================================================
-//  ФУНКЦІЇ, ЩО ЗАЛИШИЛИСЬ БЕЗ ЗМІН
-//  (або з мінімальними адаптаціями)
-// ===================================================================
 
 function setupPhoneMaskAdvanced(selector) {
     const phoneInput = document.querySelector(selector);
     if (!phoneInput) return;
     const matrix = "+380 (__) ___-__-__";
     const prefixNumber = "380";
-    const setCursorPosition = (pos, elem) => {
-        requestAnimationFrame(() => {
-            elem.focus();
-            elem.setSelectionRange(pos, pos);
-        });
-    };
+    const setCursorPosition = (pos, elem) => requestAnimationFrame(() => { elem.focus(); elem.setSelectionRange(pos, pos); });
     const applyMask = (value) => {
         let digits = value.replace(/\D/g, "");
-        if (digits.length < prefixNumber.length) {
-            digits = prefixNumber;
-        } else {
-            digits = prefixNumber + digits.substring(prefixNumber.length);
-        }
+        digits = (digits.length < prefixNumber.length) ? prefixNumber : prefixNumber + digits.substring(prefixNumber.length);
         let i = 0;
-        let formattedValue = matrix.replace(/[_\d]/g, (char) => {
-            return i < digits.length ? digits.charAt(i++) : char;
-        });
+        let formattedValue = matrix.replace(/[_\d]/g, (char) => (i < digits.length) ? digits.charAt(i++) : char);
         let cursorPos = formattedValue.indexOf('_');
-        if (cursorPos === -1) {
-            cursorPos = formattedValue.length;
-        }
+        if (cursorPos === -1) cursorPos = formattedValue.length;
         return { formattedValue, cursorPos };
     };
     phoneInput.addEventListener('input', (e) => {
@@ -182,27 +252,15 @@ function setupPhoneMaskAdvanced(selector) {
             e.preventDefault();
             let digits = e.target.value.replace(/\D/g, "");
             if (digits.length > prefixNumber.length) {
-                const newDigits = digits.slice(0, -1);
-                const { formattedValue, cursorPos } = applyMask(newDigits);
+                const { formattedValue, cursorPos } = applyMask(digits.slice(0, -1));
                 e.target.value = formattedValue;
                 setCursorPosition(cursorPos, e.target);
             }
         }
     });
-    phoneInput.addEventListener('focus', (e) => {
-        const { formattedValue, cursorPos } = applyMask(e.target.value);
-        e.target.value = formattedValue;
-        setCursorPosition(cursorPos, e.target);
-    });
-    phoneInput.addEventListener('click', (e) => {
-        const { cursorPos } = applyMask(e.target.value);
-        setCursorPosition(cursorPos, e.target);
-    });
-    phoneInput.addEventListener('blur', (e) => {
-        if (e.target.value.replace(/\D/g, "") === prefixNumber) {
-            e.target.value = '';
-        }
-    });
+    phoneInput.addEventListener('focus', (e) => { const { formattedValue, cursorPos } = applyMask(e.target.value); e.target.value = formattedValue; setCursorPosition(cursorPos, e.target); });
+    phoneInput.addEventListener('click', (e) => { const { cursorPos } = applyMask(e.target.value); setCursorPosition(cursorPos, e.target); });
+    phoneInput.addEventListener('blur', (e) => { if (e.target.value.replace(/\D/g, "") === prefixNumber) e.target.value = ''; });
 }
 
 function initProductDescriptionToggle() {
@@ -258,8 +316,6 @@ function updateCartView() {
             itemsContainer.innerHTML = '<div class="empty-cart-message"><i class="fas fa-shopping-cart"></i><p>Ваш кошик порожній</p></div>';
         }
         totalEl.textContent = `${data.total.toFixed(2)} ₴`;
-
-        // Синхронізуємо кнопки на всій сторінці
         updateAllProductButtonStates(data.items);
     });
 }
@@ -271,7 +327,6 @@ function updateAllProductButtonStates(cartItems) {
         if (productId) {
             const isInCart = cartProductIds.has(productId);
             button.classList.toggle('in-cart', isInCart);
-            // Використовуємо .btn-lg як маркер для кнопок, що вимагають іншого тексту/іконок
             const isLargeButton = button.classList.contains('btn-lg');
             if (isInCart) {
                 button.innerHTML = isLargeButton ? '<i class="fas fa-check"></i> Вже в кошику' : '<i class="fas fa-check"></i> В кошику';
@@ -387,53 +442,6 @@ function showToast(message, type = 'success', actions = '') {
     }, 10);
 }
 
-function initAuth() {
-    const authModal = document.getElementById('auth-modal');
-    if (!authModal) return;
-    document.getElementById('open-auth-modal')?.addEventListener('click', () => authModal.classList.add('active'));
-    authModal.addEventListener('click', e => {
-        if (e.target.classList.contains('close-modal') || e.target.id === 'auth-modal') authModal.classList.remove('active');
-    });
-    document.querySelectorAll('.auth-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.auth-tab, .tab-content').forEach(el => el.classList.remove('active'));
-            this.classList.add('active');
-            document.getElementById(this.dataset.tab).classList.add('active');
-        });
-    });
-    const handleFormSubmit = (formId, url, errorElId) => {
-        const form = document.getElementById(formId);
-        if(!form) return;
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(this).entries());
-            fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-            .then(res => res.json()).then(result => {
-                if (result.status === 'success') window.location.reload();
-                else {
-                    const errorEl = document.getElementById(errorElId);
-                    errorEl.textContent = result.message;
-                    errorEl.style.display = 'block';
-                }
-            });
-        });
-    };
-    handleFormSubmit('loginForm', '/login', 'loginError');
-    handleFormSubmit('registerForm', '/register', 'registerError');
-}
-
-function initHeaderActions() {
-    const cartModal = document.getElementById('cart-modal');
-    if(!cartModal) return;
-    document.getElementById('open-cart-btn')?.addEventListener('click', () => {
-        updateCartView();
-        cartModal.classList.add('active');
-    });
-    cartModal.addEventListener('click', e => {
-        if (e.target.matches('.close-modal') || e.target.id === 'cart-modal') cartModal.classList.remove('active');
-    });
-}
-
 function initContactForm() {
     const contactForm = document.getElementById('contactForm');
     if (contactForm) {
@@ -489,9 +497,6 @@ function initReviewsPage() {
     [reviewModal, questionModal, replyModal].forEach(closeModalOnClick);
 }
 
-// ===================================================================
-// [ПОВНІСТЮ НОВА ФУНКЦІЯ] ІНІЦІАЛІЗАЦІЯ СЛАЙДЕРА-КАРУСЕЛІ
-// ===================================================================
 function initHeroSlider() {
     const slider = document.querySelector('.card-slider');
     if (!slider) return;
@@ -512,84 +517,58 @@ function initHeroSlider() {
     let currentIndex = 0;
     let autoPlayInterval;
 
-    // Створюємо точки
     dotsContainer.innerHTML = '';
     slides.forEach((_, i) => {
         const dot = document.createElement('button');
         dot.classList.add('dot');
-        dot.addEventListener('click', () => {
-            // Перехід по кліку на точку поки не реалізовано, щоб не ускладнювати
-            // Але можна буде додати
-        });
+        dot.addEventListener('click', () => {});
         dotsContainer.appendChild(dot);
     });
     const dots = dotsContainer.querySelectorAll('.dot');
 
-    function updateSlider(direction = 'next', newIndex = -1) {
-        // Зупиняємо анімацію, щоб не було конфліктів
+    function updateSlider(direction = 'next') {
         clearInterval(autoPlayInterval);
-
         const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
         const nextIndexFromCurrent = (currentIndex + 1) % totalSlides;
-
         const currentCenterSlide = slides[currentIndex];
         const currentLeftSlide = slides[prevIndex];
         const currentRightSlide = slides[nextIndexFromCurrent];
-
-        // Знімаємо всі класи позицій
         slides.forEach(s => s.className = 'hero-slide');
 
         if (direction === 'next') {
             currentIndex = (currentIndex + 1) % totalSlides;
             const newRightIndex = (currentIndex + 1) % totalSlides;
-
             currentLeftSlide.classList.add('slide-exit');
             currentCenterSlide.classList.add('slide-left');
             currentRightSlide.classList.add('slide-center');
             if (totalSlides > 3) {
                 slides[newRightIndex].classList.add('slide-new');
-                // Через мить перетворюємо на slide-right для анімації "виповзання"
-                setTimeout(() => {
-                    slides[newRightIndex].classList.remove('slide-new');
-                    slides[newRightIndex].classList.add('slide-right');
-                }, 50);
+                setTimeout(() => { slides[newRightIndex].classList.remove('slide-new'); slides[newRightIndex].classList.add('slide-right'); }, 50);
             } else {
                  slides[newRightIndex].classList.add('slide-right');
             }
-
-        } else { // direction === 'prev'
+        } else {
             currentIndex = (currentIndex - 1 + totalSlides) % totalSlides;
             const newLeftIndex = (currentIndex - 1 + totalSlides) % totalSlides;
-
-            currentRightSlide.classList.add('slide-exit'); // "exit" to the right
+            currentRightSlide.classList.add('slide-exit');
             currentCenterSlide.classList.add('slide-right');
             currentLeftSlide.classList.add('slide-center');
-
             if (totalSlides > 3) {
-                 slides[newLeftIndex].classList.add('slide-new'); // "new" from the left
-                 setTimeout(() => {
-                    slides[newLeftIndex].classList.remove('slide-new');
-                    slides[newLeftIndex].classList.add('slide-left');
-                }, 50);
+                 slides[newLeftIndex].classList.add('slide-new');
+                 setTimeout(() => { slides[newLeftIndex].classList.remove('slide-new'); slides[newLeftIndex].classList.add('slide-left'); }, 50);
             } else {
                  slides[newLeftIndex].classList.add('slide-left');
             }
         }
-
-        // Оновлюємо стилі слайдів без анімації
         updateInitialPositions();
         updateDots();
-
-        // Перезапускаємо автопрокрутку
         startAutoPlay();
     }
 
     function updateInitialPositions() {
-        slides.forEach(s => s.className = 'hero-slide'); // Очищення
-
+        slides.forEach(s => s.className = 'hero-slide');
         const leftIndex = (currentIndex - 1 + totalSlides) % totalSlides;
         const rightIndex = (currentIndex + 1) % totalSlides;
-
         if (totalSlides === 2) {
             slides[currentIndex].classList.add('slide-center');
             slides[rightIndex].classList.add('slide-right');
@@ -603,9 +582,7 @@ function initHeroSlider() {
     }
 
     function updateDots() {
-        dots.forEach((dot, i) => {
-            dot.classList.toggle('active', i === currentIndex);
-        });
+        dots.forEach((dot, i) => dot.classList.toggle('active', i === currentIndex));
     }
 
     function startAutoPlay() {
@@ -615,7 +592,6 @@ function initHeroSlider() {
     nextBtn.addEventListener('click', () => updateSlider('next'));
     prevBtn.addEventListener('click', () => updateSlider('prev'));
 
-    // Ініціалізація
     updateInitialPositions();
     updateDots();
     startAutoPlay();

@@ -1,4 +1,4 @@
-<!-- templates/_modals.html (ОНОВЛЕНА І ВИПРАВЛЕНА ВЕРСІЯ) -->
+<!-- templates/_modals.html -->
 <div id="auth-modal" class="modal">
     <div class="modal-content">
         <button class="close-modal">×</button>
@@ -18,40 +18,92 @@
             <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block"><img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"> Увійти через Google</a>
         </div>
 
-        <!-- templates/_modals.html -> Замініть старий блок реєстрації на цей -->
-
         <div id="register" class="tab-content">
             <form id="registerForm" class="auth-form">
-                <!-- [НОВЕ] Поля для імені та прізвища в один рядок -->
                 <div class="form-group-inline" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group">
-                        <input type="text" name="first_name" placeholder="Ім'я" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="text" name="last_name" placeholder="Прізвище">
-                    </div>
+                    <div class="form-group"><input type="text" name="first_name" placeholder="Ім'я" required></div>
+                    <div class="form-group"><input type="text" name="last_name" placeholder="Прізвище"></div>
                 </div>
-                <div class="form-group">
-                    <!-- [ЗМІНЕНО] Додаємо id="register_phone" -->
-                    <input type="tel" name="phone" id="register_phone" placeholder="Номер телефону">
-                </div>
-                <div class="form-group">
-                    <input type="email" name="email" placeholder="Email" required>
-                </div>
-                <div class="form-group">
-                    <input type="password" name="password" placeholder="Пароль" required>
-                </div>
+                <div class="form-group"><input type="tel" name="phone" id="register_phone" placeholder="Номер телефону"></div>
+                <div class="form-group"><input type="email" name="email" placeholder="Email" required></div>
+                <div class="form-group"><input type="password" name="password" placeholder="Пароль" required></div>
                 <div id="registerError" class="error-message" style="display: none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">Зареєструватися</button>
             </form>
-            <!-- [НОВЕ] Додаємо розділювач та кнопку Google -->
             <div class="auth-divider"><span>або</span></div>
-            <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block">
-                <img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"> Зареєструватися через Google
-            </a>
+            <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block"><img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"> Зареєструватися через Google</a>
         </div>
     </div>
 </div>
+
+<!-- [НОВЕ] МОДАЛЬНЕ ВІКНО ОСОБИСТОГО КАБІНЕТУ -->
+<div id="cabinet-modal" class="cabinet-sidebar">
+    <div class="cabinet-header">
+        {% if current_user.is_authenticated %}
+        <img src="{{ current_user.avatar_url or url_for('static', filename='img/default_avatar.png') }}" alt="Avatar" class="user-avatar">
+        <h4>{{ current_user.first_name or current_user.username }}</h4>
+        {% endif %}
+        <button class="close-modal cabinet-close">×</button>
+    </div>
+    <div class="cabinet-body">
+        <nav class="cabinet-nav">
+            <ul>
+                <li class="nav-item-dropdown">
+                    <a href="#" class="cabinet-nav-item">
+                        <i class="fas fa-globe"></i>
+                        <span>Українська</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </a>
+                    <!-- Примітка: Функціонал зміни мови потребує значної бекенд логіки.
+                         Це візуальний елемент для майбутньої реалізації. -->
+                </li>
+                <li>
+                    <a href="{{ url_for('my_orders') }}" class="cabinet-nav-item">
+                        <i class="fas fa-receipt"></i>
+                        <span>Мої замовлення</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('my_orders') }}" class="cabinet-nav-item">
+                        <i class="fas fa-truck-fast"></i>
+                        <span>Відстеження замовлення</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" id="cabinet-open-favorites" class="cabinet-nav-item">
+                        <i class="fas fa-heart"></i>
+                        <span>Обране</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('my_reviews') }}" class="cabinet-nav-item">
+                        <i class="fas fa-star"></i>
+                        <span>Мої відгуки</span>
+                    </a>
+                </li>
+                 <li>
+                    <a href="{{ url_for('profile_settings') }}" class="cabinet-nav-item">
+                        <i class="fas fa-cog"></i>
+                        <span>Налаштування</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('index', _anchor='contacts') }}" class="cabinet-nav-item">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Довідка</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    <div class="cabinet-footer">
+         <a href="{{ url_for('logout') }}" class="cabinet-nav-item logout-link">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Вийти</span>
+        </a>
+    </div>
+</div>
+
 
 <!-- БОКОВА ПАНЕЛЬ КОШИКА -->
 <div id="cart-modal" class="cart-sidebar">
@@ -59,12 +111,7 @@
         <h3>Ваш кошик</h3>
         <button class="close-modal cart-close">×</button>
     </div>
-    <!-- Цей контейнер буде заповнюватись через JS -->
-    <div class="cart-body">
-        <div class="cart-items-container">
-            <!-- Сюди будуть додані товари -->
-        </div>
-    </div>
+    <div class="cart-body"><div class="cart-items-container"></div></div>
     <div class="cart-footer">
         <div class="cart-total">
             <span>Всього:</span>
@@ -79,8 +126,6 @@
     <div class="modal-content" id="favorites-modal-content">
         <button class="close-modal">×</button>
         <h3>Обрані товари</h3>
-        <div id="favorites-list-container" class="products-grid">
-            <!-- Сюди JS буде динамічно додавати товари -->
-        </div>
+        <div id="favorites-list-container" class="products-grid"></div>
     </div>
 </div>
