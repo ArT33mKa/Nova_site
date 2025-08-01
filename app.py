@@ -2,7 +2,7 @@ import os
 import re
 import locale
 import smtplib
-import requests  # для Telegram та Нової Пошти
+import requests
 import cloudinary.utils
 from functools import wraps
 from datetime import datetime
@@ -206,40 +206,6 @@ def admin_required(f):
 @app.context_processor
 def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
 
-major_cities = {
-    "Київ", "Харків", "Одеса", "Дніпро", "Запоріжжя", "Львів", "Кривий Ріг",
-    "Миколаїв", "Вінниця", "Херсон", "Полтава", "Чернігів", "Черкаси",
-    "Житомир", "Суми", "Хмельницький", "Чернівці", "Рівне", "Івано-Франківськ",
-    "Кременчук", "Тернопіль", "Луцьк", "Ужгород"
-}
-
-
-def format_city_name(city_data):
-    """Форматує назву міста згідно з правилами."""
-    full_description = city_data.get('Present', '')
-    city_type = city_data.get('SettlementTypeDescription', '')
-
-    # Використовуємо regex, щоб розділити назву і опис в дужках
-    match = re.match(r'(.+?)\s*\((.+)\)', full_description)
-
-    if match:
-        name_part = match.group(1).strip()
-        desc_part = match.group(2).strip()
-
-        # Якщо це обласний центр, повертаємо тільки назву
-        if name_part in major_cities and city_type.lower() == 'місто':
-            return name_part
-
-        # Для інших міст повертаємо назву + область
-        if city_type.lower() == 'місто' and 'р-н' not in desc_part:
-            # Повертає щось на зразок "Бровари (Київська обл.)"
-            return f"{name_part} ({desc_part.split(',')[0]})"
-
-        # Для сіл та інших випадків повертаємо повну назву як є
-        return full_description
-
-    # Якщо дужок немає, повертаємо як є
-    return full_description
 
 # ────────────────────────────────
 #  МАРШРУТИ
@@ -709,18 +675,13 @@ def api_get_orders():
     orders_data = [{"id": o.id, "date": o.timestamp.strftime('%Y-%m-%d'), "name": o.customer_name, "total": o.total_cost} for o in orders]
     return jsonify({"status": "success", "orders": orders_data})
 
-# [НОВЕ] API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
 def find_np_cities():
     """Пошук населених пунктів."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     query = request.args.get('q', '')
-
-    if not api_key:
-        return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
-    if len(query) < 2:
-        return jsonify([])
-
+    if not api_key: return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
+    if len(query) < 2: return jsonify([])
     payload = {
         "apiKey": api_key,
         "modelName": "Address",
@@ -733,10 +694,7 @@ def find_np_cities():
         data = response.json()
         if data['success'] and data['data'][0]['TotalCount'] > 0:
             cities_from_api = data['data'][0]['Addresses']
-            # [ЗМІНЕНО] Застосовуємо форматування до кожного міста
-            formatted_cities = [
-                {'ref': c['Ref'], 'name': format_city_name(c)} for c in cities_from_api
-            ]
+            formatted_cities = [{'ref': c['Ref'], 'name': format_city_name(c)} for c in cities_from_api]
             return jsonify(formatted_cities)
         else:
             return jsonify([])
@@ -749,24 +707,15 @@ def get_np_warehouses():
     """Отримання відділень для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
-
     if not api_key: return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
     if not city_ref: return jsonify([])
-
     payload = {
         "apiKey": api_key,
-        "modelName": "Address", # [ВИПРАВЛЕНО] Правильна модель для запиту відділень
+        "modelName": "Address",
         "calledMethod": "getWarehouses",
         "methodProperties": {
             "SettlementRef": city_ref,
-            # [НОВЕ] Фільтр, щоб прибрати службові та непотрібні відділення
-            "TypeOfWarehouseRef": [
-                "9a68df70-0267-42a8-bb5c-37f427e36ee4", # Поштове відділення
-                "f9316480-5f2d-425d-bc2c-ac7cd29decf0", # Поштомат
-                "6f8c7162-4b72-4b0a-88e5-906948c6a92f", # Вантажне відділення
-                "841339c7-591a-42e2-8233-7a0a00f0ed6f"  # Parcel Shop
-            ],
-            "Limit": 200 # Збільшимо ліміт на випадок великих міст
+            "Limit": 200
         }
     }
     try:
@@ -777,7 +726,6 @@ def get_np_warehouses():
             warehouses = [w['Description'] for w in data['data']]
             return jsonify(warehouses)
         else:
-            # Якщо API повернуло помилку, повертаємо її текст для діагностики
             return jsonify({'error': data.get('errors', ['Невідома помилка API'])})
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
@@ -801,5 +749,3 @@ if __name__ == "__main__":
             db.session.add(admin); db.session.commit()
             print(">>> Адміністратора створено. Логін: admin, Пароль: admin123")
     app.run(debug=True)
-
-# --- Кінець файлу app.py ---
