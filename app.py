@@ -696,9 +696,10 @@ def find_np_cities():
         print(f"Помилка API Нової Пошти (міста): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
 
+
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання відділень для населеного пункту."""
+    """Отримання ВІДФІЛЬТРОВАНИХ відділень для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
 
@@ -707,19 +708,32 @@ def get_np_warehouses():
     if not city_ref:
         return jsonify([])
 
+    # [НОВЕ] Запитуємо також тип відділення для надійної фільтрації
     payload = {
         "apiKey": api_key,
         "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
-        "methodProperties": { "SettlementRef": city_ref }
+        "methodProperties": {
+            "SettlementRef": city_ref,
+            "TypeOfWarehouseRef": "841339c7-591a-42e2-8234-2a02b3c0a420,f9316480-5f2d-425d-bc2c-ac7cd29decf0,9a6886f2-d5c4-4a3a-850d-66b04a8b831b"
+        }
     }
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
         response.raise_for_status()
         data = response.json()
         if data['success']:
-            warehouses = [w['Description'] for w in data['data']]
-            return jsonify(warehouses)
+            # [ВИПРАВЛЕНО] Фільтруємо список, щоб виключити приватні точки
+            all_warehouses = data.get('data', [])
+
+            # Фільтруємо, щоб виключити точки "Тільки для працівників"
+            # Це додаткова перевірка, якщо фільтр за TypeOfWarehouseRef не спрацює
+            filtered_warehouses = [
+                w['Description'] for w in all_warehouses
+                if "ТІЛЬКИ ДЛЯ" not in w['Description'].upper()
+            ]
+
+            return jsonify(filtered_warehouses)
         return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
