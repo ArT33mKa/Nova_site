@@ -750,10 +750,8 @@ def get_np_warehouses():
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
 
-    if not api_key:
-        return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
-    if not city_ref:
-        return jsonify([])
+    if not api_key: return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
+    if not city_ref: return jsonify([])
 
     payload = {
         "apiKey": api_key,
@@ -763,7 +761,9 @@ def get_np_warehouses():
             "SettlementRef": city_ref,
             # [НОВЕ] Фільтр, щоб прибрати службові та непотрібні відділення
             "TypeOfWarehouseRef": [
+                "9a68df70-0267-42a8-bb5c-37f427e36ee4", # Поштове відділення
                 "f9316480-5f2d-425d-bc2c-ac7cd29decf0", # Поштомат
+                "6f8c7162-4b72-4b0a-88e5-906948c6a92f", # Вантажне відділення
                 "841339c7-591a-42e2-8233-7a0a00f0ed6f"  # Parcel Shop
             ],
             "Limit": 200 # Збільшимо ліміт на випадок великих міст
@@ -774,11 +774,11 @@ def get_np_warehouses():
         response.raise_for_status()
         data = response.json()
         if data['success']:
-            # Назва відділення вже містить повну адресу
             warehouses = [w['Description'] for w in data['data']]
             return jsonify(warehouses)
         else:
-            return jsonify([])
+            # Якщо API повернуло помилку, повертаємо її текст для діагностики
+            return jsonify({'error': data.get('errors', ['Невідома помилка API'])})
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
