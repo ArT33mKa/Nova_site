@@ -708,14 +708,14 @@ def get_np_warehouses():
     if not city_ref:
         return jsonify([])
 
-    # [НОВЕ] Запитуємо також тип відділення для надійної фільтрації
+    # [ВИПРАВЛЕНО] Ми запитуємо ВСІ відділення, без фільтрації за типом
     payload = {
         "apiKey": api_key,
         "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
         "methodProperties": {
-            "SettlementRef": city_ref,
-            "TypeOfWarehouseRef": "841339c7-591a-42e2-8234-2a02b3c0a420,f9316480-5f2d-425d-bc2c-ac7cd29decf0,9a6886f2-d5c4-4a3a-850d-66b04a8b831b"
+            "SettlementRef": city_ref
+            # "Limit": "500" # Можна додати, якщо в якомусь місті більше 500 відділень
         }
     }
     try:
@@ -723,14 +723,13 @@ def get_np_warehouses():
         response.raise_for_status()
         data = response.json()
         if data['success']:
-            # [ВИПРАВЛЕНО] Фільтруємо список, щоб виключити приватні точки
             all_warehouses = data.get('data', [])
 
-            # Фільтруємо, щоб виключити точки "Тільки для працівників"
-            # Це додаткова перевірка, якщо фільтр за TypeOfWarehouseRef не спрацює
+            # [НОВА ЛОГІКА ФІЛЬТРАЦІЇ] Фільтруємо список на стороні сервера
             filtered_warehouses = [
                 w['Description'] for w in all_warehouses
-                if "ТІЛЬКИ ДЛЯ" not in w['Description'].upper()
+                # Залишаємо тільки ті, в описі яких НЕМАЄ ключових фраз
+                if "ТІЛЬКИ ДЛЯ" not in w['Description'].upper() and "(ПРИВАТНИЙ)" not in w['Description'].upper()
             ]
 
             return jsonify(filtered_warehouses)
