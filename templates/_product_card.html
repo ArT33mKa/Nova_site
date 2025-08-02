@@ -1,4 +1,6 @@
+<!-- templates/_product_card.html -->
 <div class="product-card" data-id="{{ product.id }}">
+
     <div class="product-image">
         <a href="{{ url_for('product_detail', product_id=product.id) }}" class="product-image-link">
             <img src="{{ product.image }}" alt="{{ product.name }}">
@@ -38,102 +40,3 @@
         </div>
     </div>
 </div>
-```
-
-#### `templates/index.html` (Головна сторінка)
-_Перероблено для використання нового слайдера та карток категорій._
-```html
-<!-- templates/index.html -->
-{% extends "base.html" %}
-{% block title %}Інтернет магазин сантехніки{% endblock %}
-
-{% block content %}
-<section class="hero-container">
-    <div class="card-slider-wrapper">
-        <div class="card-slider">
-            {% for slide in hero_slides %}
-            <div class="hero-slide" style="background-image: url('{{ url_for('static', filename='img/' + slide.image) }}');">
-                <div class="hero-content">
-                    <h2>{{ slide.title }}</h2>
-                    <p>{{ slide.subtitle }}</p>
-                    <a href="{{ url_for('catalog') }}" class="btn btn-primary btn-lg">Перейти до каталогу</a>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        <div class="slider-nav">
-            <button class="prev-btn" aria-label="Попередній слайд">‹</button>
-            <button class="next-btn" aria-label="Наступний слайд">›</button>
-        </div>
-        <div class="slider-dots"></div>
-    </div>
-</section>
-
-<section class="categories-section">
-    <div class="container">
-        <h2 class="section-title">Категорії товарів</h2>
-        <div class="products-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            {% for category in shop.categories %}
-            <a href="{{ url_for('catalog', category=category.name) }}" class="category-card">
-                <div class="category-icon-wrapper">
-                    <img src="{{ url_for('static', filename='img/' + category.icon) }}" alt="{{ category.name }}">
-                </div>
-                <h3>{{ category.name }}</h3>
-            </a>
-            {% endfor %}
-        </div>
-    </div>
-</section>
-
-<section class="featured-products container" style="padding-bottom: 80px;">
-    <h2 class="section-title">Популярні товари</h2>
-    <div class="products-grid">
-        {% if products %}
-            {% for product in products %}
-                {% include '_product_card.html' %}
-            {% endfor %}
-        {% else %}
-            <p class="text-center" style="grid-column: 1 / -1;">Популярних товарів ще немає.</p>
-        {% endif %}
-    </div>
-    <div class="text-center" style="margin-top: 40px;">
-        <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-lg">Дивитись всі товари</a>
-    </div>
-</section>
-
-<section id="about" class="about-section">
-    <div class="container">
-        <div class="about-content">
-            <div class="about-text">
-                <h2 class="section-title" style="text-align: left;">Про компанію {{ shop.name }}</h2>
-                <p>Ми - магазин сантехніки та обладнання, який працює на ринку понад 2-3 років. Наша мета - забезпечити клієнтів якісними товарами за доступними цінами.</p>
-                <ul class="advantages-list" style="list-style: none; padding-left: 0;">
-                    <li style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Оригінальна продукція від виробників</li>
-                    <li style="display: flex; align-items: center; gap: 10px;"><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Швидка доставка по всій Україні</li>
-                </ul>
-            </div>
-            <div class="about-image">
-                <img src="{{ url_for('static', filename='img/shop.jpg') }}" alt="Про магазин">
-            </div>
-        </div>
-    </div>
-</section>
-
-<section id="contacts" class="contacts-section container">
-    <h2 class="section-title">Контакти</h2>
-    <div class="contacts-grid">
-        <div class="contact-info">
-            <!-- ... контактна інформація ... -->
-        </div>
-        <div class="contact-form">
-            <h3>Написати нам</h3>
-            <form id="contactForm">
-                <div class="form-group"><input type="text" name="name" placeholder="Ваше ім'я" required></div>
-                <div class="form-group"><input type="email" name="email" placeholder="Email" required></div>
-                <div class="form-group"><textarea name="message" placeholder="Ваше повідомлення..." required></textarea></div>
-                <button type="submit" class="btn btn-primary">Надіслати</button>
-            </form>
-        </div>
-    </div>
-</section>
-{% endblock %}
