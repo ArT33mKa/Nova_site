@@ -3,22 +3,21 @@
         <div class="footer-grid">
             <div class="footer-about">
                 <h3>{{ shop.name }}</h3>
-                <p>Інтернет-магазин сантехніки та обладнання. Якість, надійність.</p>
-                <!-- [ОНОВЛЕНО] Змінено посилання та іконки соцмереж -->
+                <p>Інтернет-магазин сантехніки та обладнання. Якість, надійність та професійний підхід до кожного клієнта.</p>
                 <div class="social-links">
-                    <a href="https://www.facebook.com/groups/795617102375588/" target="_blank" rel="noopener noreferrer"><i class="fab fa-facebook-f"></i></a>
-                    <a href="https://www.instagram.com/nowahvulia/" target="_blank" rel="noopener noreferrer"><i class="fab fa-instagram"></i></a>
-                    <a href="https://www.tiktok.com/@nowahvulia" target="_blank" rel="noopener noreferrer"><i class="fab fa-tiktok"></i></a>
+                    <a href="https://www.facebook.com/groups/795617102375588/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                    <a href="https://www.instagram.com/nowahvulia/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                    <a href="https://www.tiktok.com/@nowahvulia" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><i class="fab fa-tiktok"></i></a>
                 </div>
             </div>
 
             <div class="footer-links">
-                <h3>Меню</h3>
+                <h3>Навігація</h3>
                 <ul>
                     <li><a href="{{ url_for('index') }}">Головна</a></li>
                     <li><a href="{{ url_for('catalog') }}">Каталог</a></li>
-                    <li><a href="{{ url_for('index') }}#about">Про нас</a></li>
-                    <li><a href="{{ url_for('index') }}#contacts">Контакти</a></li>
+                    <li><a href="{{ url_for('index', _anchor='about') }}">Про нас</a></li>
+                    <li><a href="{{ url_for('index', _anchor='contacts') }}">Контакти</a></li>
                 </ul>
             </div>
 

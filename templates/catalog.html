@@ -1,49 +1,39 @@
-
 {% extends "base.html" %}
-{% block title %}Каталог товарів{% endblock %}
+{% block title %}{{ request.args.get('category') or 'Каталог товарів' }}{% endblock %}
 
 {% block content %}
-<div class="container catalog-page">
-    <div class="breadcrumbs">
-        <a href="{{ url_for('index') }}">Головна</a> / <span>Каталог</span>
+<header class="page-header">
+    <div class="container">
+        <h1 class="page-title">{{ request.args.get('category') or 'Каталог товарів' }}</h1>
+        <div class="breadcrumbs">
+            <a href="{{ url_for('index') }}">Головна</a> / <span>Каталог</span>
+        </div>
     </div>
-
+</header>
+<div class="container catalog-page">
     <div class="catalog-content">
-        <!-- БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ -->
         <aside class="filters-sidebar">
             <h3 class="filter-section-title">Фільтри</h3>
             <form id="filters-form" method="GET" action="{{ url_for('catalog') }}">
-
-                <div class="filter-group">
-                    <input type="text" name="search" class="form-control" placeholder="Пошук за назвою..." value="{{ request.args.get('search', '') }}">
-                </div>
+                <!-- Важливо: передаємо поточний пошуковий запит, щоб він не зникав при зміні категорії -->
+                <input type="hidden" name="search" value="{{ request.args.get('search', '') }}">
 
                 {% if categories %}
                 <div class="filter-group">
                     <h4 class="filter-title">Категорії</h4>
-                    <div class="category-filter-list">
-
-                            <!-- Опція "Усі категорії" -->
-                            <label class="checkbox-item">
-                                <input type="radio" name="category" value=""
-                                       {% if not request.args.get('category') %}checked{% endif %}
-                                       onchange="this.form.submit()">
-                                <strong>Усі категорії</strong>
-                            </label>
-
-                            <!-- Цикл для виводу конкретних категорій -->
-                            {% for cat in categories %}
-                            <label class="checkbox-item">
-                                <input type="radio" name="category" value="{{ cat }}"
-                                       {% if request.args.get('category') == cat %}checked{% endif %}
-                                       onchange="this.form.submit()">
-                                {{ cat }}
-                            </label>
-                            {% endfor %}
-                        </div>
-
-                    </div>
-                    {% endif %}
+                    <!-- Використовуємо радіокнопки для вибору однієї категорії -->
+                    <label class="radio-item">
+                        <input type="radio" name="category" value="" {% if not request.args.get('category') %}checked{% endif %} onchange="this.form.submit()">
+                        <span>Усі категорії</span>
+                    </label>
+                    {% for cat in categories %}
+                    <label class="radio-item">
+                        <input type="radio" name="category" value="{{ cat }}" {% if request.args.get('category') == cat %}checked{% endif %} onchange="this.form.submit()">
+                        <span>{{ cat }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% endif %}
 
                 <div class="filter-group">
                     <h4 class="filter-title">Ціна, ₴</h4>
@@ -55,32 +45,30 @@
                 </div>
 
                 <div class="filter-group">
-                    <h4 class="filter-title">Інші критерії</h4>
-                    <label class="checkbox-item">
-                        <input type="checkbox" name="in_stock" value="true" {% if request.args.get('in_stock') %}checked{% endif %}>
-                        В наявності
-                    </label>
-                     <label class="checkbox-item">
-                        <input type="checkbox" name="min_rating" value="4" {% if request.args.get('min_rating') %}checked{% endif %}>
-                        <span style="color:#ffc107;">★★★★</span><span style="color:#ddd;">★</span> і вище
-                    </label>
+                    <h4 class="filter-title">Інше</h4>
+                    <label class="checkbox-item"><input type="checkbox" name="in_stock" value="true" {% if request.args.get('in_stock') %}checked{% endif %}> В наявності</label>
+                    <label class="checkbox-item"><input type="checkbox" name="min_rating" value="4" {% if request.args.get('min_rating') %}checked{% endif %}> Рейтинг 4+ <span style="color:#ffc107;">★★★★</span></label>
                 </div>
-
                 <button type="submit" class="btn btn-primary btn-block">Застосувати</button>
-                <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути все</a>
+                <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути</a>
             </form>
         </aside>
 
-        <!-- Основний контент з товарами -->
         <div class="products-container">
-            <h1 class="page-title">{{ request.args.get('category', 'Каталог товарів') }}</h1>
+             <!-- Форма пошуку, яка тепер над товарами -->
+             <form method="GET" action="{{ url_for('catalog') }}" class="catalog-search-form">
+                <!-- Передаємо приховану категорію, щоб фільтр не злітав при пошуку -->
+                <input type="hidden" name="category" value="{{ request.args.get('category', '') }}">
+                <input type="search" name="search" class="form-control" placeholder="Пошук за назвою товару..." value="{{ request.args.get('search', '') }}">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
+            </form>
+
             {% if products.items %}
                 <div class="products-grid">
                     {% for product in products.items %}
                         {% include '_product_card.html' %}
                     {% endfor %}
                 </div>
-
                 <!-- Пагінація -->
                 <div class="pagination">
                     <div class="pagination-controls">
@@ -93,7 +81,7 @@
                     </div>
                 </div>
             {% else %}
-                <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
+                <div class="text-center" style="padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
                     <h3>Товарів за вашими критеріями не знайдено.</h3>
                     <p>Спробуйте змінити або скинути фільтри.</p>
                 </div>

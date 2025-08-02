@@ -2,21 +2,19 @@
 <header class="main-header">
     <div class="container">
         <div class="header-top">
-            <div class="logo">
-                <a href="{{ url_for('index') }}" class="logo-link">
-                    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Логотип Нова Хвиля" class="logo-image">
-                    <div class="logo-text">
-                        <h1>{{ shop.name }}</h1>
-                        <p>Магазин сантехніки</p>
-                    </div>
-                </a>
-            </div>
+            <a href="{{ url_for('index') }}" class="logo-link">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Логотип Нова Хвиля" class="logo-image">
+                <div class="logo-text">
+                    <h1>{{ shop.name }}</h1>
+                    <p>Магазин сантехніки</p>
+                </div>
+            </a>
             <div class="header-contacts">
                 <div class="contact-item">
                     <i class="fas fa-phone"></i>
                     <div>
                         {% for phone in shop.phone %}
-                            <a href="tel:{{ phone }}">{{ phone }}</a><br>
+                            <a href="tel:{{ phone|replace(' ', '')|replace('(', '')|replace(')', '') }}">{{ phone }}</a><br>
                         {% endfor %}
                     </div>
                 </div>
@@ -30,18 +28,16 @@
                 </div>
             </div>
         </div>
-
         <nav class="main-nav">
             <ul>
                 <li><a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}">Головна</a></li>
                 <li><a href="{{ url_for('catalog') }}" class="{{ 'active' if request.endpoint == 'catalog' else '' }}">Каталог</a></li>
                 {% if current_user.is_authenticated and current_user.is_admin %}
-                    <!-- ДОДАЄМО ПОСИЛАННЯ НА ЗАМОВЛЕННЯ -->
-                    <li class="admin-link"><a href="{{ url_for('admin_orders') }}" class="{{ 'active' if request.endpoint == 'admin_orders' else '' }}">Замовлення</a></li>
-                    <li class="admin-link"><a href="{{ url_for('admin_unfinished') }}" class="{{ 'active' if request.endpoint == 'admin_unfinished' else '' }}">Незавершені</a></li>
+                    <li class="admin-link"><a href="{{ url_for('admin_orders') }}" class="{{ 'active' if 'admin_orders' in request.endpoint else '' }}">Замовлення</a></li>
+                    <li class="admin-link"><a href="{{ url_for('admin_unfinished') }}" class="{{ 'active' if 'admin_unfinished' in request.endpoint else '' }}">Незавершені</a></li>
                 {% endif %}
-                <li><a href="{{ url_for('index') }}#about">Про нас</a></li>
-                <li><a href="{{ url_for('index') }}#contacts">Контакти</a></li>
+                <li><a href="{{ url_for('index', _anchor='about') }}">Про нас</a></li>
+                <li><a href="{{ url_for('index', _anchor='contacts') }}">Контакти</a></li>
             </ul>
             <div class="header-actions">
                 {% if current_user.is_authenticated %}
@@ -50,9 +46,8 @@
                         <span>Кабінет</span>
                     </div>
                 {% else %}
-                    <!-- [ВИПРАВЛЕНО] Дві окремі кнопки для входу та реєстрації -->
-                    <button id="open-auth-modal-login" class="btn btn-outline">Увійти</button>
-                    <button id="open-auth-modal-register" class="btn btn-primary">Реєстрація</button>
+                    <button id="open-auth-modal-login" class="btn btn-outline btn-sm">Увійти</button>
+                    <button id="open-auth-modal-register" class="btn btn-primary btn-sm">Реєстрація</button>
                 {% endif %}
 
                 <div class="action-icons">
