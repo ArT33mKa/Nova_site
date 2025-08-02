@@ -1,4 +1,4 @@
-# app.py (ВИПРАВЛЕНА ВЕРСІЯ)
+# app.py (ПОВНА ВИПРАВЛЕНА ВЕРСІЯ)
 
 import os
 import re
@@ -181,6 +181,8 @@ class OrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
+    # [ВИПРАВЛЕННЯ] Додаємо зв'язок з моделлю Product
+    product = db.relationship("Product")
 
 
 class OAuth(db.Model):
