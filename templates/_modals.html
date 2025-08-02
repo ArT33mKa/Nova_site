@@ -1,7 +1,7 @@
 <!-- templates/_modals.html -->
 <div id="auth-modal" class="modal">
     <div class="modal-content">
-        <button class="close-modal" aria-label="Закрити">×</button>
+        <button class="close-modal">×</button>
         <div class="auth-tabs">
             <button class="auth-tab active" data-tab="login">Вхід</button>
             <button class="auth-tab" data-tab="register">Реєстрація</button>
@@ -37,36 +37,80 @@
 </div>
 
 <!-- [НОВЕ] МОДАЛЬНЕ ВІКНО ОСОБИСТОГО КАБІНЕТУ -->
-<aside id="cabinet-modal" class="cabinet-sidebar">
+<div id="cabinet-modal" class="cabinet-sidebar">
     <div class="cabinet-header">
         {% if current_user.is_authenticated %}
         <img src="{{ current_user.avatar_url or url_for('static', filename='img/default_avatar.png') }}" alt="Avatar" class="user-avatar">
         <h4>{{ current_user.first_name or current_user.username }}</h4>
         {% endif %}
-        <button class="close-modal cabinet-close" aria-label="Закрити">×</button>
+        <button class="close-modal cabinet-close">×</button>
     </div>
     <div class="cabinet-body">
         <nav class="cabinet-nav">
             <ul>
-                <li><a href="{{ url_for('my_orders') }}" class="cabinet-nav-item"><i class="fas fa-receipt"></i><span>Мої замовлення</span></a></li>
-                <li><a href="{{ url_for('track_order_page') }}" class="cabinet-nav-item"><i class="fas fa-truck-fast"></i><span>Відстеження замовлення</span></a></li>
-                <li><a href="#" id="cabinet-open-favorites" class="cabinet-nav-item"><i class="fas fa-heart"></i><span>Обране</span></a></li>
-                <li><a href="{{ url_for('my_reviews') }}" class="cabinet-nav-item"><i class="fas fa-star"></i><span>Мої відгуки</span></a></li>
-                <li><a href="{{ url_for('profile_settings') }}" class="cabinet-nav-item"><i class="fas fa-cog"></i><span>Налаштування</span></a></li>
-                <li><a href="{{ url_for('index', _anchor='contacts') }}" class="cabinet-nav-item"><i class="fas fa-question-circle"></i><span>Довідка</span></a></li>
+                <li class="nav-item-dropdown">
+                    <a href="#" class="cabinet-nav-item">
+                        <i class="fas fa-globe"></i>
+                        <span>Українська</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </a>
+                    <!-- Примітка: Функціонал зміни мови потребує значної бекенд логіки.
+                         Це візуальний елемент для майбутньої реалізації. -->
+                </li>
+                <li>
+                    <a href="{{ url_for('my_orders') }}" class="cabinet-nav-item">
+                        <i class="fas fa-receipt"></i>
+                        <span>Мої замовлення</span>
+                    </a>
+                </li>
+                <li>
+                    <!-- [ВИПРАВЛЕНО] Посилання тепер веде на правильну сторінку -->
+                    <a href="{{ url_for('track_order_page') }}" class="cabinet-nav-item">
+                        <i class="fas fa-truck-fast"></i>
+                        <span>Відстеження замовлення</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" id="cabinet-open-favorites" class="cabinet-nav-item">
+                        <i class="fas fa-heart"></i>
+                        <span>Обране</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('my_reviews') }}" class="cabinet-nav-item">
+                        <i class="fas fa-star"></i>
+                        <span>Мої відгуки</span>
+                    </a>
+                </li>
+                 <li>
+                    <a href="{{ url_for('profile_settings') }}" class="cabinet-nav-item">
+                        <i class="fas fa-cog"></i>
+                        <span>Налаштування</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('index', _anchor='contacts') }}" class="cabinet-nav-item">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Довідка</span>
+                    </a>
+                </li>
             </ul>
         </nav>
     </div>
     <div class="cabinet-footer">
-         <a href="{{ url_for('logout') }}" class="cabinet-nav-item logout-link"><i class="fas fa-sign-out-alt"></i><span>Вийти</span></a>
+         <a href="{{ url_for('logout') }}" class="cabinet-nav-item logout-link">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Вийти</span>
+        </a>
     </div>
-</aside>
+</div>
+
 
 <!-- БОКОВА ПАНЕЛЬ КОШИКА -->
-<aside id="cart-modal" class="cart-sidebar">
+<div id="cart-modal" class="cart-sidebar">
     <div class="cart-header">
         <h3>Ваш кошик</h3>
-        <button class="close-modal cart-close" aria-label="Закрити">×</button>
+        <button class="close-modal cart-close">×</button>
     </div>
     <div class="cart-body"><div class="cart-items-container"></div></div>
     <div class="cart-footer">
@@ -76,12 +120,12 @@
         </div>
         <a href="{{ url_for('checkout') }}" id="checkout-link" class="btn btn-primary btn-block">Оформити замовлення</a>
     </div>
-</aside>
+</div>
 
 <!-- МОДАЛЬНЕ ВІКНО ОБРАНОГО -->
 <div id="favorites-modal" class="modal">
     <div class="modal-content" id="favorites-modal-content">
-        <button class="close-modal" aria-label="Закрити">×</button>
+        <button class="close-modal">×</button>
         <h3>Обрані товари</h3>
         <div id="favorites-list-container" class="products-grid"></div>
     </div>

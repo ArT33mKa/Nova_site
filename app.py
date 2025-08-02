@@ -1,3 +1,5 @@
+# app.py (ПОВНА ВИПРАВЛЕНА ВЕРСІЯ)
+
 import os
 import re
 import locale
@@ -140,8 +142,6 @@ class Product(db.Model):
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
     reviews_count = db.Column(db.Integer, default=0)
-    # [НОВЕ] Поле для відстеження популярності товару
-    order_count = db.Column(db.Integer, default=0, nullable=False)
     reviews = db.relationship('Review', backref='product', lazy='dynamic', cascade="all, delete-orphan")
 
 
@@ -181,7 +181,7 @@ class OrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
-    # [ПОКРАЩЕНО] Додаємо зв'язок з моделлю Product для зручного доступу
+    # [ВИПРАВЛЕННЯ] Додаємо зв'язок з моделлю Product
     product = db.relationship("Product")
 
 
@@ -203,7 +203,6 @@ google_blueprint = make_google_blueprint(scope=["openid", "https://www.googleapi
                                          storage=SQLAlchemyStorage(OAuth, db.session, user=current_user))
 app.register_blueprint(google_blueprint, url_prefix="/login")
 
-# [ОНОВЛЕНО] Інформація про магазин для гнучкого налаштування
 shop_info = {"name": "НОВА ХВИЛЯ",
              "categories": [{'name': 'ПОЛИВОЧНА СИСТЕМА', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
                             {'name': 'НАСОСИ', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
@@ -212,8 +211,8 @@ shop_info = {"name": "НОВА ХВИЛЯ",
                             {'name': "ВИТЯЖКИ", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
                             {'name': "КОЛОНКИ", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
                             {'name': "СУШКА ДЛЯ РУШНИКІВ", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
-                            {'name': "ЗАПЧАСТИНИ ДО ГАЗ ОБЛАДНАННЯ", 'image': 'gas_parts.jpg', 'icon': 'gas_parts.jpg'}],
-             "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
+                            {'name': "ЗАПЧАСТИНИ ДО ГАЗ ОБЛАДНАННЯ", 'image': 'gas_parts.jpg',
+                             'icon': 'gas_parts.jpg'}], "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
              "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
              "hours": {"Пн - Пт:": "8:00 - 17:00", "Субота:": "8:00 - 15:00", "Неділя:": "8:00 - 15:00"}}
 
@@ -243,23 +242,18 @@ def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
 
 @app.route("/")
 def index():
-    # [ОНОВЛЕНО] Слайди для головної сторінки
     hero_slides = [{'image': 'hero-bg.jpg', 'title': 'Професійна сантехніка та обладнання',
                     'subtitle': 'Якісні товари для вашого дому з гарантією та доставкою'},
                    {'image': 'hero-bg2.jpg', 'title': 'Надійні насоси для будь-яких потреб',
                     'subtitle': 'Від найкращих виробників'}, {'image': 'kotly.jpg', 'title': 'Все для систем опалення',
                                                               'subtitle': 'Котли, бойлери та комплектуючі'}]
-
-    # [ОНОВЛЕНО] Показуємо справді популярні товари на основі кількості замовлень
-    products = Product.query.order_by(Product.order_count.desc(), Product.id.desc()).limit(5).all()
-
+    products = Product.query.order_by(Product.id.desc()).limit(5).all()
     return render_template("index.html", products=products, hero_slides=hero_slides)
 
 
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
-    # [ПОКРАЩЕНО] Фільтруємо товари, у яких є опис та нормальне зображення
     query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
                                  Product.image.notlike('%default_tovar.jpg%'))
     if search_query := request.args.get('search', ''): query = query.filter(Product.name.ilike(f'%{search_query}%'))
@@ -268,27 +262,18 @@ def catalog():
     if max_price := request.args.get('max_price', type=float): query = query.filter(Product.price <= max_price)
     if request.args.get('in_stock'): query = query.filter(Product.in_stock == True)
     if request.args.get('min_rating'): query = query.filter(Product.rating >= 4.0)
-
-    # [ПОКРАЩЕНО] Пагінація з 25 товарами на сторінку
-    products = query.order_by(Product.order_count.desc()).paginate(page=page, per_page=25, error_out=False)
-
-    # [ПОКРАЩЕНО] Отримуємо список категорій для фільтра
+    products = query.paginate(page=page, per_page=25, error_out=False)
     categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0]]
-
     return render_template('catalog.html', products=products, categories=categories)
 
 
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
-    # [ПОКРАЩЕНО] Логіка підбору схожих товарів
-    similar_products = Product.query.filter(
-        Product.category == product.category,
-        Product.id != product.id,
-        Product.in_stock == True,
-        and_(Product.description != None, Product.description != ''),
-        Product.image.notlike('%default_tovar.jpg%')
-    ).order_by(func.random()).limit(8).all()
+    similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id,
+                                            Product.in_stock == True,
+                                            and_(Product.description != None, Product.description != ''),
+                                            Product.image != 'default_tovar.jpg').limit(8).all()
     return render_template("product_detail.html", product=product, similar_products=similar_products)
 
 
@@ -397,8 +382,6 @@ def register():
 @login_required
 def logout():
     logout_user()
-    # [ПОКРАЩЕНО] Очищуємо кошик при виході, щоб уникнути плутанини між акаунтами
-    session.pop('cart', None)
     flash("Ви успішно вийшли з акаунту.", "success")
     return redirect(url_for('index'))
 
@@ -507,52 +490,40 @@ def checkout():
     if not cart:
         flash('Ваш кошик порожній.', 'info')
         return redirect(url_for('catalog'))
-
     if request.method == 'POST':
         product_ids = [int(pid) for pid in cart.keys() if pid.isdigit()]
         products = Product.query.filter(Product.id.in_(product_ids)).all()
         product_map = {str(p.id): p for p in products}
         total_cost = sum(product_map[pid].price * qty for pid, qty in cart.items())
-
-        first_name = request.form.get('customer_first_name', '').strip()
-        last_name = request.form.get('customer_last_name', '').strip()
+        first_name, last_name = request.form.get('customer_first_name', '').strip(), request.form.get(
+            'customer_last_name', '').strip()
         order = Order(customer_name=f"{first_name} {last_name}".strip(),
                       customer_phone=request.form.get('customer_phone'),
                       delivery_method=request.form.get('delivery_method'),
                       delivery_city=request.form.get('delivery_city'),
                       delivery_warehouse=request.form.get('delivery_warehouse'),
-                      payment_method=request.form.get('payment_method'),
-                      total_cost=total_cost,
+                      payment_method=request.form.get('payment_method'), total_cost=total_cost,
                       user_id=current_user.id if current_user.is_authenticated else None)
-
         db.session.add(order)
-        db.session.flush() # Отримуємо ID замовлення до коміту
-
+        db.session.flush()
         order_items_for_email_and_tg = []
         for pid, qty in cart.items():
             if p := product_map.get(pid):
-                # Додаємо товар до замовлення
                 db.session.add(OrderItem(order_id=order.id, product_id=p.id, quantity=qty, price=p.price))
-                # [НОВЕ] Збільшуємо лічильник популярності товару
-                p.order_count = (p.order_count or 0) + qty
                 order_items_for_email_and_tg.append({'product': p, 'quantity': qty, 'price': p.price})
-
-        db.session.commit() # Зберігаємо все в базі даних
-
+        db.session.commit()
         try:
-            if admin_email := os.getenv("SMTP_USER"):
-                send_email(admin_email, f"Нове замовлення #{order.id}",
-                           render_template("email/order_notification.html",
-                                           order=order, items=order_items_for_email_and_tg, shop=shop_info))
+            if admin_email := os.getenv("SMTP_USER"): send_email(admin_email, f"Нове замовлення #{order.id}",
+                                                                 render_template("email/order_notification.html",
+                                                                                 order=order,
+                                                                                 items=order_items_for_email_and_tg,
+                                                                                 shop=shop_info))
             send_telegram_notification(order, order_items_for_email_and_tg)
         except Exception as e:
             print(f">>> ПОМИЛКА СПОВІЩЕННЯ: {e}")
-
         session.pop('cart', None)
         flash('Дякуємо! Ваше замовлення прийнято.', 'success')
         return redirect(url_for('index'))
-
-    # Для GET-запиту просто показуємо сторінку
     return render_template('checkout.html')
 
 
@@ -976,7 +947,6 @@ def get_np_warehouses():
         data = response.json()
         if data['success']:
             all_warehouses = data.get('data', [])
-            # [ПОКРАЩЕНО] Фільтруємо, щоб залишити тільки відділення, а не поштомати
             filtered_warehouses = [
                 w['Description'] for w in all_warehouses
                 if w['Description'].startswith('Відділення')
