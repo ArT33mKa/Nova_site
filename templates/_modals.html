@@ -36,7 +36,7 @@
     </div>
 </div>
 
-<!-- [ОНОВЛЕНО] МОДАЛЬНЕ ВІКНО ОСОБИСТОГО КАБІНЕТУ -->
+<!-- [НОВЕ] МОДАЛЬНЕ ВІКНО ОСОБИСТОГО КАБІНЕТУ -->
 <div id="cabinet-modal" class="cabinet-sidebar">
     <div class="cabinet-header">
         {% if current_user.is_authenticated %}
@@ -63,7 +63,13 @@
                         <span>Мої замовлення</span>
                     </a>
                 </li>
-                <!-- [ВИДАЛЕНО] Зайва кнопка відстеження -->
+                <li>
+                    <!-- [ВИПРАВЛЕНО] Посилання тепер веде на правильну сторінку -->
+                    <a href="{{ url_for('track_order_page') }}" class="cabinet-nav-item">
+                        <i class="fas fa-truck-fast"></i>
+                        <span>Відстеження замовлення</span>
+                    </a>
+                </li>
                 <li>
                     <a href="#" id="cabinet-open-favorites" class="cabinet-nav-item">
                         <i class="fas fa-heart"></i>
