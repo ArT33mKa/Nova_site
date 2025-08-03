@@ -30,9 +30,12 @@
             <a href="{{ url_for('product_reviews', product_id=product.id) }}" class="reviews-summary-link">
                 <span class="rating">
                     {% set r = product.rating|round|int %}
-                    {% for i in range(r) %}★{% endfor %}{% for i in range(5 - r) %}<span>★</span>{% endfor %}
+                    {# Малюємо золоті зірочки #}
+                    {% for i in range(r) %}★{% endfor %}
+                    {# Малюємо сірі зірочки для решти #}
+                    {% for i in range(5 - r) %}<span>★</span>{% endfor %}
                 </span>
-                <span class="reviews-count-text">{{ product.reviews.count() }} відгуків/питань</span>
+                <span class="reviews-count-text">{{ product.reviews_count }} відгуків</span>
             </a>
 
             <!-- Ціна товару -->

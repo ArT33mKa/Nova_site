@@ -1008,46 +1008,69 @@ img {
     background: var(--dark-color);
     transform: scale(1.3);
 }
-
 /* --- Carousel --- */
 .carousel-container {
-    position: relative;
+    position: relative; /* Необхідно для позиціонування стрілок */
+    margin: 0 -15px; /* Компенсує відступи контейнера для повноекранних стрілок */
+    padding: 0 15px;
 }
+
+/* Обгортка, яка приховує все, що не влазить */
 .products-carousel {
     overflow: hidden;
 }
+
+/* "Доріжка" з товарами, яка буде рухатись */
 .products-grid-carousel {
-    display: flex;
+    display: flex; /* Головне правило, яке ставить картки в ряд */
     gap: 20px;
-    transition: transform 0.5s ease;
+    padding: 5px; /* Невеликий відступ, щоб тінь від карток не обрізалась */
+    transition: transform 0.5s ease-in-out;
 }
+
+/* Картка товару всередині каруселі */
+.products-grid-carousel .product-card {
+    /* Кожна картка займає чверть ширини, з урахуванням відступу */
+    flex: 0 0 calc(25% - 15px);
+    min-width: 230px; /* Мінімальна ширина, щоб картки не стискались занадто сильно */
+}
+
+/* Стрілки "назад" і "вперед" */
 .carousel-btn {
     position: absolute;
-    top: 50%;
+    top: 40%; /* Розташовуємо по центру висоти фото */
     transform: translateY(-50%);
-    background: white;
+    background: rgba(255, 255, 255, 0.9);
     border: 1px solid #ddd;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+    font-size: 1.8rem;
     cursor: pointer;
     z-index: 10;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     transition: all 0.2s;
 }
+
 .carousel-btn:hover {
-    background-color: #f5f5f5;
+    background-color: white;
+    transform: translateY(-50%) scale(1.1);
 }
+
 .carousel-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.3;
     cursor: not-allowed;
+    transform: translateY(-50%) scale(1);
 }
+
 .carousel-prev-btn {
-    left: -20px;
+    left: 25px; /* Розташовуємо зліва */
 }
+
 .carousel-next-btn {
-    right: -20px;
+    right: 25px; /* Розташовуємо справа */
 }
+
 
 /* --- Tabs --- */
 .tabs {
@@ -1697,6 +1720,16 @@ img {
 .admin-action-btn.edit-btn:hover { background-color: var(--secondary-color); }
 .admin-action-btn.delete-btn { background-color: var(--danger-color); }
 .admin-action-btn.delete-btn:hover { background-color: #c82333; }
+
+.rating {
+    font-size: 1.2rem;
+    color: #ffc107; /* Колір для "золотих" зірок */
+}
+
+/* Робимо "порожні" зірки сірими */
+.rating span {
+    color: #e0e0e0;
+}
 
 /* 404 Page */
 .error-page-container {
