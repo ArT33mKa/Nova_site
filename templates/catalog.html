@@ -47,10 +47,11 @@
 
                 <div class="filter-group">
                     <h4 class="filter-title">Ціна, ₴</h4>
+<!-- Переконайтесь, що у вас цей блок -->
                     <div class="price-inputs">
                         <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
-                        <span>—</span>
                         <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
+                        <button type="submit" class="price-ok-btn">Ок</button>
                     </div>
                 </div>
 

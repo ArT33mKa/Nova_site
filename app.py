@@ -895,7 +895,6 @@ def api_get_orders():
         orders]
     return jsonify({"status": "success", "orders": orders_data})
 
-
 # [НОВЕ] API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
 def find_np_cities():
