@@ -2,10 +2,7 @@ import os
 import re
 import locale
 import smtplib
-import requests
-import cloudinary.utils
-import cloudinary
-import cloudinary.uploader
+import requests  # для Telegram та Нової Пошти
 import cloudinary.utils
 from functools import wraps
 from datetime import datetime
@@ -31,14 +28,6 @@ except locale.Error:
 
 load_dotenv()
 app = Flask(__name__)
-
-# [НОВЕ] Налаштування Cloudinary
-cloudinary.config(
-  cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"),
-  api_key = os.getenv("CLOUDINARY_API_KEY"),
-  api_secret = os.getenv("CLOUDINARY_API_SECRET"),
-  secure = True
-)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 app.jinja_env.add_extension('jinja2.ext.do')
@@ -147,8 +136,7 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
-    # [ЗМІНЕНО] Збільшуємо довжину поля для URL від Cloudinary
-    image = db.Column(db.String(255))
+    image = db.Column(db.String(100))
     category = db.Column(db.String(100))
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
@@ -634,47 +622,15 @@ def admin_reviews():
     return render_template('admin_reviews.html', reviews=reviews)
 
 
-def slugify(s):
-    s = s.lower().strip()
-    s = re.sub(r'[^\w\s-]', '', s)
-    s = re.sub(r'[\s_-]+', '-', s)
-    s = re.sub(r'^-+|-+$', '', s)
-    return s
-
-
 @app.route("/admin/add_product", methods=['GET', 'POST'])
 @login_required
 @admin_required
 def add_product():
     if request.method == 'POST':
-        image_url = 'https://res.cloudinary.com/dysrpsvi2/image/upload/v123456789/default_tovar.jpg'  # [ВАЖЛИВО] Вставте URL до вашого дефолтного зображення на Cloudinary
-
-        if image_file := request.files.get('image'):
-            try:
-                # Створюємо унікальне ім'я для файлу на основі назви товару
-                public_id = slugify(request.form['name'])
-
-                # Завантажуємо на Cloudinary
-                upload_result = cloudinary.uploader.upload(
-                    image_file,
-                    folder="products",  # Створює папку на Cloudinary
-                    public_id=public_id,  # Задаємо ім'я файлу
-                    overwrite=True  # Дозволяє перезаписувати файл з таким же іменем
-                )
-                image_url = upload_result['secure_url']
-            except Exception as e:
-                flash(f"Помилка завантаження зображення: {e}", "danger")
-                return redirect(url_for('add_product'))
-
-        new_product = Product(
-            name=request.form['name'],
-            price=float(request.form['price']),
-            description=request.form['description'],
-            image=image_url,  # [ЗМІНЕНО] Зберігаємо URL з Cloudinary
-            category=request.form['category'],
-            in_stock='in_stock' in request.form
-        )
-        db.session.add(new_product)
+        new_product = Product(name=request.form['name'], price=float(request.form['price']),
+                              description=request.form['description'], image=request.form['image'],
+                              category=request.form['category'], in_stock='in_stock' in request.form)
+        db.session.add(new_product);
         db.session.commit()
         flash(f"Товар '{new_product.name}' додано!", "success")
         return redirect(url_for('catalog'))
@@ -687,28 +643,9 @@ def add_product():
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == 'POST':
-        # Оновлюємо текстові поля
-        product.name = request.form['name']
-        product.price = float(request.form['price'])
-        product.description = request.form['description']
-        product.category = request.form['category']
-        product.in_stock = 'in_stock' in request.form
-
-        # [НОВЕ] Обробляємо зображення, тільки якщо його завантажили
-        if image_file := request.files.get('image'):
-            try:
-                public_id = slugify(request.form['name'])
-                upload_result = cloudinary.uploader.upload(
-                    image_file,
-                    folder="products",
-                    public_id=public_id,
-                    overwrite=True
-                )
-                product.image = upload_result['secure_url']
-            except Exception as e:
-                flash(f"Помилка завантаження зображення: {e}", "danger")
-                return redirect(url_for('edit_product', product_id=product.id))
-
+        product.name, product.price, product.description, product.image, product.category, product.in_stock = \
+        request.form['name'], float(request.form['price']), request.form['description'], request.form['image'], \
+        request.form['category'], 'in_stock' in request.form
         db.session.commit()
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
@@ -824,38 +761,13 @@ def bas_import():
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
-
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
-
-            # =========================================================================
-            # [ВИПРАВЛЕНО] Логіка генерації URL зображення
-            # =========================================================================
-            image_filename = product_node.findtext('Картинка')
-
-            if image_filename and image_filename.strip():
-                # 1. Беремо ім'я файлу без розширення, це буде наш public_id
-                public_id = os.path.splitext(image_filename.strip())[0]
-
-                # 2. Генеруємо URL, вказуючи, що зображення знаходиться в папці "products"
-                #    Cloudinary автоматично підбере потрібне розширення (jpg, png, webp)
-                #    і виконає оптимізацію.
-                image_url = cloudinary.utils.url(
-                    f"products/{public_id}",
-                    secure=True,
-                    transformation=[
-                        {'width': 800, 'height': 800, 'crop': 'limit'},
-                        {'quality': 'auto', 'fetch_format': 'auto'}
-                    ]
-                )
-            else:
-                # 3. Якщо зображення в XML не вказано, використовуємо дефолтне
-                image_url = 'https://res.cloudinary.com/dysrpsvi2/image/upload/v123456789/default_tovar.jpg'  # Ваш дефолтний URL
-            # =========================================================================
-
+            image_filename = (product_node.findtext('Картинка') or 'default_tovar.jpg').strip()
+            image_url = f"static/img/products/{image_filename}"
             price = 0.0
             in_stock = False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
@@ -882,14 +794,11 @@ def bas_import():
                     stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
                     if stock_prop_node_alt is not None and stock_prop_node_alt.text:
                         if stock_prop_node_alt.text.lower() == 'true': in_stock = True
-
             product = existing_products.get(name)
             if product:
-                # [ВИПРАВЛЕНО] Тепер ми записуємо правильний URL з Cloudinary
                 product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image_url, in_stock
                 updated_count += 1
             else:
-                # [ВИПРАВЛЕНО] І для нових товарів також
                 new_product = Product(name=name, price=price, description=description, category=category,
                                       image=image_url, in_stock=in_stock)
                 db.session.add(new_product)
