@@ -72,7 +72,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    {% if product.image != 'default_tovar.png' %}
+                    {% if 'default_tovar' not in product.image %}
                         <span style="color: var(--success-color);">Є</span>
                     {% else %}
                          <span style="color: var(--danger-color);">Відсутнє</span>

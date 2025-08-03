@@ -32,6 +32,7 @@ load_dotenv()
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+
 try:
     cloudinary.config(
         cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -643,14 +644,12 @@ def add_product():
         image_filename = request.form['image'].strip()
         if image_filename:
             public_id = f"products/{os.path.splitext(image_filename)[0]}"
-            # [ВИПРАВЛЕНО] Додаємо fetch_format="auto" для автоматичного вибору формату.
-            image_url, _ = cloudinary.utils.cloudinary_url(public_id, fetch_format="auto", secure=True)
+            image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
         else:
-            # [ВИПРАВЛЕНО] Те ж саме для зображення за замовчуванням.
-            image_url, _ = cloudinary.utils.cloudinary_url("products/default_tovar", fetch_format="auto", secure=True)
+            image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
 
         new_product = Product(name=request.form['name'], price=float(request.form['price']),
-                              description=request.form['description'], image=image_url,
+                              description=request.form['description'], image=image_url,  # <-- Зберігаємо URL
                               category=request.form['category'], in_stock='in_stock' in request.form)
         db.session.add(new_product)
         db.session.commit()
@@ -659,6 +658,7 @@ def add_product():
     return render_template("add_product.html")
 
 
+# ВИПРАВЛЕНО: /admin/edit_product
 @app.route("/admin/edit_product/<int:product_id>", methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -667,20 +667,19 @@ def edit_product(product_id):
     if request.method == 'POST':
         image_filename = request.form['image'].strip()
         if image_filename:
+            # Перевіряємо, чи це вже URL, чи просто назва файлу
             if not image_filename.startswith('http'):
                 public_id = f"products/{os.path.splitext(image_filename)[0]}"
-                # [ВИПРАВЛЕНО] Додаємо fetch_format="auto" для автоматичного вибору формату.
-                image_url, _ = cloudinary.utils.cloudinary_url(public_id, fetch_format="auto", secure=True)
+                image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
             else:
-                image_url = image_filename
+                image_url = image_filename  # Якщо це вже URL, залишаємо як є
         else:
-            # [ВИПРАВЛЕНО] Те ж саме для зображення за замовчуванням.
-            image_url, _ = cloudinary.utils.cloudinary_url("products/default_tovar", fetch_format="auto", secure=True)
+            image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
 
         product.name = request.form['name']
         product.price = float(request.form['price'])
         product.description = request.form['description']
-        product.image = image_url
+        product.image = image_url  # <-- Зберігаємо URL
         product.category = request.form['category']
         product.in_stock = 'in_stock' in request.form
 
@@ -688,6 +687,7 @@ def edit_product(product_id):
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
 
+    # Показуємо тільки назву файлу в формі, а не повний URL
     image_to_display = os.path.basename(product.image) if product.image.startswith('http') else product.image
     return render_template("edit_product.html", product=product, image_to_display=image_to_display)
 
@@ -724,16 +724,16 @@ def admin_unfinished():
     if not active_filters:
         query = query.filter(
             db.or_(Product.in_stock == False, (Product.description == None) | (Product.description == ''),
-                   Product.image.like('%/products/default_tovar%')))
+                   Product.image.like('%/products/default_tovar%'))) # <-- ЗМІНА 1
     else:
         if 'no_stock' in active_filters: query = query.filter(Product.in_stock == False)
         if 'no_description' in active_filters: query = query.filter(
             (Product.description == None) | (Product.description == ''))
-        if 'no_image' in active_filters: query = query.filter(Product.image.like('%/products/default_tovar%'))
+        if 'no_image' in active_filters: query = query.filter(Product.image.like('%/products/default_tovar%')) # <-- ЗМІНА 2
     counts = {'no_stock': Product.query.filter(Product.in_stock == False).count(),
               'no_description': Product.query.filter(
                   (Product.description == None) | (Product.description == '')).count(),
-              'no_image': Product.query.filter(Product.image.like('%/products/default_tovar%')).count()}
+              'no_image': Product.query.filter(Product.image.like('%/products/default_tovar%')).count()} # <-- ЗМІНА 3
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
     return render_template('admin_unfinished.html', products=products, counts=counts)
 
@@ -776,6 +776,9 @@ def handle_bas_handshake():
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
 
+# [ВАЖЛИВО] Старий маршрут /upload_image більше не потрібен, оскільки uploader.py
+# тепер завантажує фото напряму в Cloudinary. Його можна повністю видалити.
+
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
@@ -808,6 +811,9 @@ def bas_import():
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
+        # --- [ВИДАЛЕНО БЛОК ОПТИМІЗАЦІЇ] ---
+        # Ми більше не завантажуємо всі товари в пам'ять.
+
         updated_count, added_count = 0, 0
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю цикл обробки...")
@@ -826,14 +832,10 @@ def bas_import():
             image_filename = (product_node.findtext('Картинка') or '').strip()
 
             if image_filename:
-                # Беремо назву файлу без розширення для public_id
                 public_id = f"products/{os.path.splitext(image_filename)[0]}"
-                # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Генеруємо URL з автоматичним вибором формату (f_auto)
-                image_url, _ = cloudinary.utils.cloudinary_url(public_id, fetch_format="auto", secure=True)
+                image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
             else:
-                # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Те ж саме для зображення за замовчуванням
-                image_url, _ = cloudinary.utils.cloudinary_url("products/default_tovar", fetch_format="auto",
-                                                               secure=True)
+                image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
 
             price = 0.0
             in_stock = False
@@ -869,6 +871,9 @@ def bas_import():
                         if stock_prop_node_alt.text.lower() == 'true':
                             in_stock = True
 
+            # --- [НОВА ЛОГІКА] ---
+            # Робимо один маленький запит до БД для КОЖНОГО товару з XML.
+            # Це набагато безпечніше для Heroku.
             product = db.session.query(Product).filter_by(name=name).first()
 
             if product:
@@ -936,7 +941,6 @@ def api_get_orders():
         {"id": o.id, "date": o.timestamp.strftime('%Y-%m-%d'), "name": o.customer_name, "total": o.total_cost} for o in
         orders]
     return jsonify({"status": "success", "orders": orders_data})
-
 
 # [НОВЕ] API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
@@ -1006,7 +1010,6 @@ def get_np_warehouses():
         print(f"Помилка API Нової Пошти (відділення): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
 
-
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
@@ -1020,10 +1023,8 @@ if __name__ == "__main__":
         db.create_all()
         if not User.query.filter_by(is_admin=True).first():
             print(">>> Створення адміністратора...")
-            admin = User(username='admin', first_name='Admin', last_name='User', email='artemcool200911@gmail.com',
-                         is_admin=True)
+            admin = User(username='admin', first_name='Admin', last_name='User', email='artemcool200911@gmail.com', is_admin=True)
             admin.set_password('admin123')
-            db.session.add(admin);
-            db.session.commit()
+            db.session.add(admin); db.session.commit()
             print(">>> Адміністратора створено. Логін: admin, Пароль: admin123")
     app.run(debug=True, port=5000)
