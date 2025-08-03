@@ -136,7 +136,7 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
-    image = db.Column(db.String(100))
+    image = db.Column(db.String(500))
     category = db.Column(db.String(100))
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
