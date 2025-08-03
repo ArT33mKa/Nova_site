@@ -715,6 +715,11 @@ def send_message():
         return jsonify(status="error", message="❌ Помилка сервера при відправці повідомлення."), 500
 
 
+# ────────────────────────────────
+#  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
+# ───────────────────────────────
+
+
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -733,50 +738,14 @@ def handle_bas_handshake():
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
 
-@app.route('/upload_image', methods=['POST'])
-def upload_image_debug():
-    filename = request.args.get('filename')
-    if not filename:
-        print("HTTP UPLOAD: Запит прийшов, але без імені файлу.")
-        return "failure: filename parameter is missing", 400
-
-    print(f"HTTP UPLOAD: Отримано запит на завантаження файлу '{filename}'!")
-
-    try:
-        upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, filename)
-
-        with open(file_path, 'wb') as f:
-            f.write(request.data)
-
-        print(f"HTTP UPLOAD: Файл '{filename}' успішно збережено!")
-        return "success"
-
-    except Exception as e:
-        print(f"HTTP UPLOAD: Критична помилка при збереженні файлу: {e}")
-        return f"failure: {e}", 500
+# [ВАЖЛИВО] Старий маршрут /upload_image більше не потрібен, оскільки uploader.py
+# тепер завантажує фото напряму в Cloudinary. Його можна повністю видалити.
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    filename = request.args.get('filename')
-
-    # --- Прийом та збереження файлу зображення ---
-    if filename and any(filename.lower().endswith(ext) for ext in ['.jpeg', '.jpg', '.png', '.gif']):
-        upload_folder = os.path.join(app.root_path, 'static', 'img', 'products')
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, filename)
-
-        with open(file_path, 'wb') as f:
-            f.write(request.data)
-
-        print(f"BAS Image Upload: Успішно збережено '{filename}'.")
-        return "success"
-
     if 'file' not in request.files:
         return "failure\nFile part is missing in the request.", 400
-
     cml_file = request.files['file']
     if cml_file.filename == '':
         return "failure\nNo selected file.", 400
@@ -785,69 +754,126 @@ def bas_import():
 
     try:
         raw_data = cml_file.read()
-
-        # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Використовуємо lxml, який може відновлюватися після помилок
-        # Створюємо парсер, який буде намагатися виправити помилки в XML
-        parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
         try:
-            # Спробуємо спочатку UTF-8
-            root = lxml_etree.fromstring(raw_data, parser=lxml_etree.XMLParser(recover=True, encoding='utf-8'))
+            parser_utf8 = lxml_etree.XMLParser(recover=True, encoding='utf-8')
+            root = lxml_etree.fromstring(raw_data, parser=parser_utf8)
             print("Info: Файл успішно розібрано з кодуванням UTF-8.")
         except Exception:
-            # Якщо не вийшло, використовуємо windows-1251
-            root = lxml_etree.fromstring(raw_data, parser=parser)
+            parser_win1251 = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
+            root = lxml_etree.fromstring(raw_data, parser=parser_win1251)
             print("Info: Файл успішно розібрано з кодуванням windows-1251.")
 
-        # Видаляємо неймспейси, використовуючи можливості lxml
         for elem in root.getiterator():
             if '}' in elem.tag:
                 elem.tag = elem.tag.split('}', 1)[1]
 
-        # Подальша логіка залишається такою ж, але працює з об'єктами lxml
         catalog_node = root.find('.//Каталог')
         if catalog_node is None:
             return "failure\nНе знайдено тег <Каталог>.", 400
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
+        # --- [ГОЛОВНА ОПТИМІЗАЦІЯ] ---
+        # 1. Завантажуємо всі існуючі товари ОДНИМ запитом.
+        #    Створюємо словник: { 'Назва товару': об'єкт_Product }
+        print("Оптимізація: завантаження існуючих товарів в пам'ять...")
+        existing_products = {p.name: p for p in Product.query.all()}
+        print(f"Завантажено {len(existing_products)} товарів для порівняння.")
+        # --------------------------------
+
         updated_count, added_count = 0, 0
-        for product_node in catalog_node.findall('.//Товар'):
-            product_id = product_node.findtext('Ид')
-            if not product_id: continue
+        products_from_xml = catalog_node.findall('.//Товар')
+        print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю цикл обробки...")
+
+        for product_node in products_from_xml:
+            product_id_from_xml = product_node.findtext('Ид')
+            if not product_id_from_xml: continue
 
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
+
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
 
-            image_node = product_node.find('Картинка')
-            image = image_node.text.strip() if image_node is not None and image_node.text else 'default_tovar.jpg'
+            image_filename = (product_node.findtext('Картинка') or '').strip()
+            # [ВАЖЛИВО] Замініть 'your_cloud_name' на вашу реальну назву хмари
+            image_url = 'https://res.cloudinary.com/your_cloud_name/image/upload/v1/products/default_tovar.jpg'
+            if image_filename:
+                public_id = f"products/{os.path.splitext(image_filename)[0]}"
+                image_url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
 
             price = 0.0
-            offer_node = catalog_node.find(f".//Предложение[Ид='{product_id}']")
+            in_stock = False  # За замовчуванням товару немає в наявності
+
+            # Шукаємо відповідний вузол <Предложение> для поточного товару
+            offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
+
             if offer_node is not None:
-                price_text = (offer_node.findtext('.//ЦенаЗаЕдиницу') or '0').replace(',', '.')
-                try:
-                    price = float(re.match(r"[\d.]+", price_text).group(0))
-                except (ValueError, AttributeError):
-                    pass
+                # 1. Визначаємо ціну з пропозиції
+                price_node = offer_node.find('.//ЦенаЗаЕдиницу')
+                if price_node is not None and price_node.text:
+                    price_text = price_node.text.replace(',', '.')
+                    try:
+                        price = float(re.match(r"[\d.]+", price_text).group(0))
+                    except (ValueError, AttributeError):
+                        price = 0.0  # Якщо не вдалося розпарсити, ціна буде 0
 
-            in_stock = False
-            stock_prop = product_node.find(f".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
-            if stock_prop is not None and stock_prop.text:
-                in_stock = stock_prop.text.lower() == 'true'
+                # 2. Визначаємо наявність з пропозиції (найбільш поширений варіант)
+                quantity_node = offer_node.find('Количество')
+                if quantity_node is not None and quantity_node.text:
+                    try:
+                        # Перетворюємо кількість на число і перевіряємо, чи вона більша за нуль
+                        stock_quantity = int(float(quantity_node.text.strip()))
+                        if stock_quantity > 0:
+                            in_stock = True
+                    except (ValueError, TypeError):
+                        # Якщо в тезі не число, ігноруємо його
+                        pass
 
-            product = Product.query.filter_by(name=name).first()
+            # 3. Як ЗАПАСНИЙ варіант, шукаємо спеціальний реквізит "Наличие"
+            #    Це спрацює, якщо логіка вище не знайшла тег <Количество>
+            if not in_stock:
+                # Шукаємо реквізит у вузлі самого товару
+                stock_prop_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
+                if stock_prop_node is not None and stock_prop_node.text is not None:
+                    # Перевіряємо, чи значення реквізиту є "true", "да", або "є"
+                    if stock_prop_node.text.strip().lower() in ['true', 'да', 'є', 'yes']:
+                        in_stock = True
+                else:
+                    # Якщо і там не знайшли, спробуємо знайти властивість "Наличие"
+                    # Цей пошук менш точний, але може допомогти
+                    stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
+                    if stock_prop_node_alt is not None and stock_prop_node_alt.text:
+                        if stock_prop_node_alt.text.lower() == 'true':
+                            in_stock = True
+
+            # --- [ГОЛОВНА ОПТИМІЗАЦІЯ] ---
+            # 2. Перевіряємо існування товару в нашому словнику (це миттєво),
+            #    а не робимо запит до БД.
+            product = existing_products.get(name)
+            # --------------------------------
+
             if product:
-                product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image, in_stock
+                product.price = price
+                product.description = description
+                product.category = category
+                product.image = image_url
+                product.in_stock = in_stock
                 updated_count += 1
             else:
-                db.session.add(Product(name=name, price=price, description=description, category=category, image=image,
-                                       in_stock=in_stock,))
+                new_product = Product(
+                    name=name, price=price, description=description,
+                    category=category, image=image_url, in_stock=in_stock
+                )
+                db.session.add(new_product)
                 added_count += 1
 
+        # Зберігаємо всі зміни в БД одним великим коммітом
+        print("Завершення циклу. Зберігаю зміни в базі даних...")
         db.session.commit()
+        print("Зміни успішно збережено.")
+
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)
         return "success"
