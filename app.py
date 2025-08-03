@@ -767,7 +767,15 @@ def bas_import():
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
             image_filename = (product_node.findtext('Картинка') or 'default_tovar.jpg').strip()
-            image_url = f"static/img/products/{image_filename}"
+
+            # --- ВАШЕ ВИПРАВЛЕННЯ ТУТ ---
+            # Старий код був: image_url = f"static/img/products/{image_filename}"
+            # Новий, правильний код:
+            public_id = os.path.splitext(image_filename)[0]
+            # `build_url` створить повне посилання типу https://res.cloudinary.com/ваш-cloud-name/image/upload/products/назва_картинки
+            image_url = cloudinary.utils.build_url(f"products/{public_id}", secure=True)
+            # ---------------------------
+
             price = 0.0
             in_stock = False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
