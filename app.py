@@ -733,10 +733,14 @@ def handle_bas_handshake():
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    if 'file' not in request.files: return "failure\nFile part is missing in the request.", 400
+    if 'file' not in request.files:
+        return "failure\nFile part is missing in the request.", 400
     cml_file = request.files['file']
-    if cml_file.filename == '': return "failure\nNo selected file.", 400
+    if cml_file.filename == '':
+        return "failure\nNo selected file.", 400
+
     print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку з lxml...")
+
     try:
         raw_data = cml_file.read()
         try:
@@ -747,68 +751,98 @@ def bas_import():
             parser_win1251 = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
             root = lxml_etree.fromstring(raw_data, parser=parser_win1251)
             print("Info: Файл успішно розібрано з кодуванням windows-1251.")
+
         for elem in root.getiterator():
-            if '}' in elem.tag: elem.tag = elem.tag.split('}', 1)[1]
+            if '}' in elem.tag:
+                elem.tag = elem.tag.split('}', 1)[1]
+
         catalog_node = root.find('.//Каталог')
-        if catalog_node is None: return "failure\nНе знайдено тег <Каталог>.", 400
+        if catalog_node is None:
+            return "failure\nНе знайдено тег <Каталог>.", 400
+
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
+
+        # --- [ГОЛОВНА ОПТИМІЗАЦІЯ] ---
+        # 1. Завантажуємо всі існуючі товари ОДНИМ запитом.
+        #    Створюємо словник: { 'Назва товару': об'єкт_Product }
         print("Оптимізація: завантаження існуючих товарів в пам'ять...")
         existing_products = {p.name: p for p in Product.query.all()}
         print(f"Завантажено {len(existing_products)} товарів для порівняння.")
+        # --------------------------------
+
         updated_count, added_count = 0, 0
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю цикл обробки...")
+
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
+
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
+
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
-            image_filename = (product_node.findtext('Картинка') or 'default_tovar.jpg').strip()
-            image_url = f"static/img/products/{image_filename}"
+
+            image_filename = (product_node.findtext('Картинка') or '').strip()
+            # [ВАЖЛИВО] Замініть 'your_cloud_name' на вашу реальну назву хмари
+            image_url = 'https://res.cloudinary.com/dysrpsvi2/image/upload/v1/products/default_tovar.jpg'
+            if image_filename:
+                public_id = f"products/{os.path.splitext(image_filename)[0]}"
+                image_url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
+
             price = 0.0
-            in_stock = False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
             if offer_node is not None:
-                price_node = offer_node.find('.//ЦенаЗаЕдиницу')
-                if price_node is not None and price_node.text:
-                    price_text = price_node.text.replace(',', '.')
+                price_text = (offer_node.findtext('.//ЦенаЗаЕдиницу') or '0').replace(',', '.')
+                try:
+                    price = float(re.match(r"[\d.]+", price_text).group(0))
+                except (ValueError, AttributeError):
+                    pass
+
+            in_stock = False
+            stock_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
+            if stock_node is not None and stock_node.text is not None:
+                in_stock = stock_node.text.strip().lower() in ['true', 'да', 'є']
+            else:
+                offer_stock_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']/Количество")
+                if offer_stock_node is not None and offer_stock_node.text is not None:
                     try:
-                        price = float(re.match(r"[\d.]+", price_text).group(0))
-                    except (ValueError, AttributeError):
-                        price = 0.0
-                quantity_node = offer_node.find('Количество')
-                if quantity_node is not None and quantity_node.text:
-                    try:
-                        stock_quantity = int(float(quantity_node.text.strip()))
-                        if stock_quantity > 0: in_stock = True
+                        in_stock = int(float(offer_stock_node.text.strip())) > 0
                     except (ValueError, TypeError):
                         pass
-            if not in_stock:
-                stock_prop_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
-                if stock_prop_node is not None and stock_prop_node.text is not None:
-                    if stock_prop_node.text.strip().lower() in ['true', 'да', 'є', 'yes']: in_stock = True
-                else:
-                    stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
-                    if stock_prop_node_alt is not None and stock_prop_node_alt.text:
-                        if stock_prop_node_alt.text.lower() == 'true': in_stock = True
+
+            # --- [ГОЛОВНА ОПТИМІЗАЦІЯ] ---
+            # 2. Перевіряємо існування товару в нашому словнику (це миттєво),
+            #    а не робимо запит до БД.
             product = existing_products.get(name)
+            # --------------------------------
+
             if product:
-                product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image_url, in_stock
+                product.price = price
+                product.description = description
+                product.category = category
+                product.image = image_url
+                product.in_stock = in_stock
                 updated_count += 1
             else:
-                new_product = Product(name=name, price=price, description=description, category=category,
-                                      image=image_url, in_stock=in_stock)
+                new_product = Product(
+                    name=name, price=price, description=description,
+                    category=category, image=image_url, in_stock=in_stock
+                )
                 db.session.add(new_product)
                 added_count += 1
+
+        # Зберігаємо всі зміни в БД одним великим коммітом
         print("Завершення циклу. Зберігаю зміни в базі даних...")
         db.session.commit()
         print("Зміни успішно збережено.")
+
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)
         return "success"
+
     except Exception as e:
         db.session.rollback()
         import traceback

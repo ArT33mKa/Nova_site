@@ -4,8 +4,7 @@
 {% block content %}
 <div class="container" style="padding-top: 40px; padding-bottom: 60px; max-width: 700px;">
     <h1 class="page-title">Додати новий товар</h1>
-    <!-- [ЗМІНЕНО] Додаємо enctype для завантаження файлів -->
-    <form method="POST" class="checkout-form" style="display: block;" enctype="multipart/form-data">
+    <form method="POST" class="checkout-form" style="display: block;">
         <div class="form-group">
             <label for="name">Назва товару</label>
             <input type="text" id="name" name="name" class="form-control" required>
@@ -19,9 +18,8 @@
             <textarea id="description" name="description" class="form-control" rows="5" required></textarea>
         </div>
         <div class="form-group">
-            <!-- [ЗМІНЕНО] Змінюємо текстове поле на поле для завантаження файлу -->
-            <label for="image">Зображення товару</label>
-            <input type="file" id="image" name="image" class="form-control" accept="image/*">
+            <label for="image">Назва файлу зображення (напр., `boiler.jpg`)</label>
+            <input type="text" id="image" name="image" class="form-control" required>
         </div>
         <div class="form-group">
             <label for="category">Категорія</label>

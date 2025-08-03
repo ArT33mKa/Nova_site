@@ -1,11 +1,11 @@
+<!-- templates/edit_product.html (НОВИЙ ФАЙЛ) -->
 {% extends "base.html" %}
 {% block title %}Редагувати товар{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: 40px; padding-bottom: 60px; max-width: 700px;">
     <h1 class="page-title">Редагувати: {{ product.name }}</h1>
-    <!-- [ЗМІНЕНО] Додаємо enctype для завантаження файлів -->
-    <form method="POST" class="checkout-form" style="display: block;" enctype="multipart/form-data">
+    <form method="POST" class="checkout-form" style="display: block;">
         <div class="form-group">
             <label for="name">Назва товару</label>
             <input type="text" id="name" name="name" class="form-control" value="{{ product.name }}" required>
@@ -19,12 +19,8 @@
             <textarea id="description" name="description" class="form-control" rows="5" required>{{ product.description }}</textarea>
         </div>
         <div class="form-group">
-             <!-- [ЗМІНЕНО] Логіка для відображення поточного зображення та завантаження нового -->
-            <label for="image">Змінити зображення товару (залиште порожнім, щоб не змінювати)</label>
-            {% if product.image %}
-                <img src="{{ product.image }}" alt="Поточне зображення" style="max-width: 100px; margin-bottom: 10px; display: block;">
-            {% endif %}
-            <input type="file" id="image" name="image" class="form-control" accept="image/*">
+            <label for="image">Назва файлу зображення</label>
+            <input type="text" id="image" name="image" class="form-control" value="{{ product.image }}" required>
         </div>
         <div class="form-group">
             <label for="category">Категорія</label>
