@@ -6,6 +6,7 @@ import requests
 import cloudinary.utils
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
@@ -823,13 +824,38 @@ def bas_import():
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
+
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
-            image_filename = (product_node.findtext('Картинка') or 'default_tovar.jpg').strip()
-            image_url = f"static/img/products/{image_filename}"
+
+            # =========================================================================
+            # [ВИПРАВЛЕНО] Логіка генерації URL зображення
+            # =========================================================================
+            image_filename = product_node.findtext('Картинка')
+
+            if image_filename and image_filename.strip():
+                # 1. Беремо ім'я файлу без розширення, це буде наш public_id
+                public_id = os.path.splitext(image_filename.strip())[0]
+
+                # 2. Генеруємо URL, вказуючи, що зображення знаходиться в папці "products"
+                #    Cloudinary автоматично підбере потрібне розширення (jpg, png, webp)
+                #    і виконає оптимізацію.
+                image_url = cloudinary.utils.url(
+                    f"products/{public_id}",
+                    secure=True,
+                    transformation=[
+                        {'width': 800, 'height': 800, 'crop': 'limit'},
+                        {'quality': 'auto', 'fetch_format': 'auto'}
+                    ]
+                )
+            else:
+                # 3. Якщо зображення в XML не вказано, використовуємо дефолтне
+                image_url = 'https://res.cloudinary.com/dysrpsvi2/image/upload/v123456789/default_tovar.jpg'  # Ваш дефолтний URL
+            # =========================================================================
+
             price = 0.0
             in_stock = False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
@@ -856,11 +882,14 @@ def bas_import():
                     stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
                     if stock_prop_node_alt is not None and stock_prop_node_alt.text:
                         if stock_prop_node_alt.text.lower() == 'true': in_stock = True
+
             product = existing_products.get(name)
             if product:
+                # [ВИПРАВЛЕНО] Тепер ми записуємо правильний URL з Cloudinary
                 product.price, product.description, product.category, product.image, product.in_stock = price, description, category, image_url, in_stock
                 updated_count += 1
             else:
+                # [ВИПРАВЛЕНО] І для нових товарів також
                 new_product = Product(name=name, price=price, description=description, category=category,
                                       image=image_url, in_stock=in_stock)
                 db.session.add(new_product)
