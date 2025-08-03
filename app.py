@@ -1,10 +1,11 @@
-# app.py (ПОВНА ВИПРАВЛЕНА ВЕРСІЯ)
-
 import os
 import re
 import locale
 import smtplib
 import requests
+import cloudinary.utils
+import cloudinary
+import cloudinary.uploader
 from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
@@ -29,6 +30,14 @@ except locale.Error:
 
 load_dotenv()
 app = Flask(__name__)
+
+# [НОВЕ] Налаштування Cloudinary
+cloudinary.config(
+  cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"),
+  api_key = os.getenv("CLOUDINARY_API_KEY"),
+  api_secret = os.getenv("CLOUDINARY_API_SECRET"),
+  secure = True
+)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 app.jinja_env.add_extension('jinja2.ext.do')
@@ -137,7 +146,8 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
-    image = db.Column(db.String(100))
+    # [ЗМІНЕНО] Збільшуємо довжину поля для URL від Cloudinary
+    image = db.Column(db.String(255))
     category = db.Column(db.String(100))
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
@@ -181,8 +191,7 @@ class OrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
-    # [ВИПРАВЛЕННЯ] Додаємо зв'язок з моделлю Product
-    product = db.relationship("Product")
+    product = db.relationship('Product')
 
 
 class OAuth(db.Model):
@@ -206,7 +215,7 @@ app.register_blueprint(google_blueprint, url_prefix="/login")
 shop_info = {"name": "НОВА ХВИЛЯ",
              "categories": [{'name': 'ПОЛИВОЧНА СИСТЕМА', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
                             {'name': 'НАСОСИ', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
-                            {'name': 'БОЙЛЕРИ', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
+                            {'name': 'БОЙЛЕРА', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
                             {'name': 'ЗМІШУВАЧІ', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
                             {'name': "ВИТЯЖКИ", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
                             {'name': "КОЛОНКИ", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
@@ -239,7 +248,6 @@ def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
 # ────────────────────────────────
 #  МАРШРУТИ
 # ────────────────────────────────
-
 @app.route("/")
 def index():
     hero_slides = [{'image': 'hero-bg.jpg', 'title': 'Професійна сантехніка та обладнання',
@@ -528,7 +536,7 @@ def checkout():
 
 
 # ────────────────────────────────
-#  ПРОФІЛЬ КОРИСТУВАЧА
+#  [НОВЕ] ПРОФІЛЬ КОРИСТУВАЧА
 # ────────────────────────────────
 @app.route('/profile/orders')
 @login_required
@@ -625,15 +633,47 @@ def admin_reviews():
     return render_template('admin_reviews.html', reviews=reviews)
 
 
+def slugify(s):
+    s = s.lower().strip()
+    s = re.sub(r'[^\w\s-]', '', s)
+    s = re.sub(r'[\s_-]+', '-', s)
+    s = re.sub(r'^-+|-+$', '', s)
+    return s
+
+
 @app.route("/admin/add_product", methods=['GET', 'POST'])
 @login_required
 @admin_required
 def add_product():
     if request.method == 'POST':
-        new_product = Product(name=request.form['name'], price=float(request.form['price']),
-                              description=request.form['description'], image=request.form['image'],
-                              category=request.form['category'], in_stock='in_stock' in request.form)
-        db.session.add(new_product);
+        image_url = 'https://res.cloudinary.com/dysrpsvi2/image/upload/v123456789/default_tovar.jpg'  # [ВАЖЛИВО] Вставте URL до вашого дефолтного зображення на Cloudinary
+
+        if image_file := request.files.get('image'):
+            try:
+                # Створюємо унікальне ім'я для файлу на основі назви товару
+                public_id = slugify(request.form['name'])
+
+                # Завантажуємо на Cloudinary
+                upload_result = cloudinary.uploader.upload(
+                    image_file,
+                    folder="products",  # Створює папку на Cloudinary
+                    public_id=public_id,  # Задаємо ім'я файлу
+                    overwrite=True  # Дозволяє перезаписувати файл з таким же іменем
+                )
+                image_url = upload_result['secure_url']
+            except Exception as e:
+                flash(f"Помилка завантаження зображення: {e}", "danger")
+                return redirect(url_for('add_product'))
+
+        new_product = Product(
+            name=request.form['name'],
+            price=float(request.form['price']),
+            description=request.form['description'],
+            image=image_url,  # [ЗМІНЕНО] Зберігаємо URL з Cloudinary
+            category=request.form['category'],
+            in_stock='in_stock' in request.form
+        )
+        db.session.add(new_product)
         db.session.commit()
         flash(f"Товар '{new_product.name}' додано!", "success")
         return redirect(url_for('catalog'))
@@ -646,9 +686,28 @@ def add_product():
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == 'POST':
-        product.name, product.price, product.description, product.image, product.category, product.in_stock = \
-        request.form['name'], float(request.form['price']), request.form['description'], request.form['image'], \
-        request.form['category'], 'in_stock' in request.form
+        # Оновлюємо текстові поля
+        product.name = request.form['name']
+        product.price = float(request.form['price'])
+        product.description = request.form['description']
+        product.category = request.form['category']
+        product.in_stock = 'in_stock' in request.form
+
+        # [НОВЕ] Обробляємо зображення, тільки якщо його завантажили
+        if image_file := request.files.get('image'):
+            try:
+                public_id = slugify(request.form['name'])
+                upload_result = cloudinary.uploader.upload(
+                    image_file,
+                    folder="products",
+                    public_id=public_id,
+                    overwrite=True
+                )
+                product.image = upload_result['secure_url']
+            except Exception as e:
+                flash(f"Помилка завантаження зображення: {e}", "danger")
+                return redirect(url_for('edit_product', product_id=product.id))
+
         db.session.commit()
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
@@ -704,44 +763,6 @@ def admin_unfinished():
 # ────────────────────────────────
 #  ІНШІ МАРШРУТИ ТА API
 # ────────────────────────────────
-
-@app.route('/track-order')
-def track_order_page():
-    """Відображає сторінку з формою для відстеження замовлення."""
-    return render_template('track_order.html')
-
-
-@app.route('/api/track_order', methods=['POST'])
-def track_order():
-    """
-    [ОНОВЛЕНО] Шукає замовлення ТІЛЬКИ за номером телефону.
-    Повертає список останніх 5 замовлень.
-    """
-    data = request.get_json()
-    phone = data.get('phone')
-
-    if not phone:
-        return jsonify({'status': 'error', 'message': "Номер телефону є обов'язковим."}), 400
-
-    # Шукаємо останні 5 замовлень за цим номером телефону
-    orders = Order.query.filter_by(customer_phone=phone).order_by(Order.timestamp.desc()).limit(5).all()
-
-    if orders:
-        # Створюємо список з даними про кожне замовлення
-        orders_data = [{
-            'id': order.id,
-            'status': order.status,
-            'date': order.timestamp.strftime('%d.%m.%Y'),
-            'total': order.total_cost
-        } for order in orders]
-
-        return jsonify({
-            'status': 'success',
-            'orders': orders_data
-        })
-    else:
-        return jsonify({'status': 'error', 'message': 'Замовлень за цим номером телефону не знайдено.'}), 404
-
 @app.route("/send_message", methods=["POST"])
 def send_message():
     form = request.form
@@ -894,6 +915,7 @@ def api_get_orders():
     return jsonify({"status": "success", "orders": orders_data})
 
 
+# [НОВЕ] API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
 def find_np_cities():
     """Пошук населених пунктів."""
@@ -947,10 +969,14 @@ def get_np_warehouses():
         data = response.json()
         if data['success']:
             all_warehouses = data.get('data', [])
+
+            # [ОСТАТОЧНЕ ВИПРАВЛЕННЯ] Фільтруємо, залишаючи ТІЛЬКИ відділення.
+            # Цей метод надійніший, бо він відсікає все, що не є відділенням.
             filtered_warehouses = [
                 w['Description'] for w in all_warehouses
                 if w['Description'].startswith('Відділення')
             ]
+
             return jsonify(filtered_warehouses)
         return jsonify([])
     except requests.exceptions.RequestException as e:
