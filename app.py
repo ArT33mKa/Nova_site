@@ -688,7 +688,7 @@ def edit_product(product_id):
         return redirect(url_for('catalog'))
 
     # Показуємо тільки назву файлу в формі, а не повний URL
-    image_to_display = os.path.basename(product.image) if product.image.startswith('http') else product.image
+    image_to_display = os.path.basename(product.image) if product.image and product.image.startswith('http') else product.image
     return render_template("edit_product.html", product=product, image_to_display=image_to_display)
 
 
