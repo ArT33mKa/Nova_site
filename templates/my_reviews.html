@@ -6,7 +6,7 @@
     <h1 class="page-title">Мої відгуки та питання</h1>
 
     {% if reviews.items %}
-        {% for review in reviews.items %}
+        {% for review in reviews %}
         <div class="review-card">
             <div class="review-card-header">
                 <div>
@@ -22,7 +22,7 @@
             <div class="review-card-body">
                 <div class="review-card-product-info">
                     <a href="{{ url_for('product_detail', product_id=review.product_id) }}">
-                        <img src="{{ review.product.image|image_url }}" alt="{{ review.product.name }}">
+                        <img src="{{ review.product.image }}" alt="{{ review.product.name }}">
                     </a>
                     <div>
                         <a href="{{ url_for('product_detail', product_id=review.product_id) }}"><strong>{{ review.product.name }}</strong></a>

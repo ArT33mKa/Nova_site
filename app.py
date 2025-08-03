@@ -32,6 +32,7 @@ load_dotenv()
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+
 try:
     cloudinary.config(
         cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -42,27 +43,6 @@ try:
     print(">>> Cloudinary успішно налаштовано.")
 except Exception as e:
     print(f">>> ПОМИЛКА конфігурації Cloudinary: {e}")
-
-
-# [НОВА ФУНКЦІЯ] Централізована функція для генерації URL зображень
-@app.template_filter('image_url')
-def get_image_url(image_filename):
-    """
-    Генерує повний URL для зображення з Cloudinary.
-    Якщо ім'я файлу відсутнє, повертає URL для зображення за замовчуванням.
-    """
-    if image_filename and image_filename.strip():
-        # Створюємо public_id, видаляючи розширення файлу.
-        # Наприклад, 'tovar.jpg' -> 'products/tovar'
-        public_id = f"products/{os.path.splitext(image_filename)[0]}"
-    else:
-        # Зображення за замовчуванням
-        public_id = "products/default_tovar"
-
-    # Генеруємо безпечний URL. Cloudinary додасть потрібне розширення (.jpg, .png) автоматично.
-    url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
-    return url
-
 
 app.jinja_env.add_extension('jinja2.ext.do')
 app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")
@@ -170,8 +150,7 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
-    # [ВИПРАВЛЕНО] Зберігаємо тільки ім'я файлу (напр. 'tovar.jpg'), а не повний URL
-    image = db.Column(db.String(255), nullable=True)
+    image = db.Column(db.String(500))
     category = db.Column(db.String(100))
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
@@ -286,9 +265,8 @@ def index():
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
-    # [ВИПРАВЛЕНО] Фільтр по 'default_tovar' тепер порівнює тільки ім'я файлу
     query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
-                                 Product.image.notlike('default_tovar%'))
+                                 Product.image.notlike('%/products/default_tovar%'))
     if search_query := request.args.get('search', ''): query = query.filter(Product.name.ilike(f'%{search_query}%'))
     if category_arg := request.args.get('category'): query = query.filter(Product.category == category_arg.strip())
     if min_price := request.args.get('min_price', type=float): query = query.filter(Product.price >= min_price)
@@ -306,7 +284,7 @@ def product_detail(product_id):
     similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id,
                                             Product.in_stock == True,
                                             and_(Product.description != None, Product.description != ''),
-                                            Product.image.notlike('default_tovar%')).limit(8).all()
+                                            Product.image.notlike('%/products/default_tovar%')).limit(8).all()
     return render_template("product_detail.html", product=product, similar_products=similar_products)
 
 
@@ -319,10 +297,8 @@ def get_products_by_ids():
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid IDs provided'}), 400
     products = Product.query.filter(Product.id.in_(safe_product_ids)).all()
-    # [ВИПРАВЛЕНО] Використовуємо наш новий фільтр 'image_url' для генерації URL
-    products_data = [
-        {'id': p.id, 'name': p.name, 'price': p.price, 'image': get_image_url(p.image), 'in_stock': p.in_stock,
-         'url': url_for('product_detail', product_id=p.id)} for p in products]
+    products_data = [{'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'in_stock': p.in_stock,
+                      'url': url_for('product_detail', product_id=p.id)} for p in products]
     return jsonify(products_data)
 
 
@@ -498,8 +474,7 @@ def get_cart():
         for product_id, quantity in cart.items():
             if product := product_map.get(product_id):
                 cart_items.append(
-                    {"id": product.id, "name": product.name, "price": product.price,
-                     "image": get_image_url(product.image),
+                    {"id": product.id, "name": product.name, "price": product.price, "image": product.image,
                      "quantity": quantity, "in_stock": product.in_stock,
                      "url": url_for('product_detail', product_id=product.id)})
                 total += product.price * quantity
@@ -564,7 +539,7 @@ def checkout():
 
 
 # ────────────────────────────────
-#  ПРОФІЛЬ КОРИСТУВАЧА
+#  [НОВЕ] ПРОФІЛЬ КОРИСТУВАЧА
 # ────────────────────────────────
 @app.route('/profile/orders')
 @login_required
@@ -590,6 +565,7 @@ def my_reviews():
 @login_required
 def profile_settings():
     if request.method == 'POST':
+        # Handle personal info update
         if 'update_info' in request.form:
             current_user.first_name = request.form.get('first_name')
             current_user.last_name = request.form.get('last_name')
@@ -605,6 +581,7 @@ def profile_settings():
             db.session.commit()
             flash('Ваші дані успішно оновлено.', 'success')
 
+        # Handle password change
         elif 'change_password' in request.form:
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
@@ -664,15 +641,16 @@ def admin_reviews():
 @admin_required
 def add_product():
     if request.method == 'POST':
-        new_product = Product(
-            name=request.form['name'],
-            price=float(request.form['price']),
-            description=request.form['description'],
-            # [ВИПРАВЛЕНО] Зберігаємо тільки ім'я файлу
-            image=request.form['image'].strip() or 'default_tovar.png',
-            category=request.form['category'],
-            in_stock='in_stock' in request.form
-        )
+        image_filename = request.form['image'].strip()
+        if image_filename:
+            public_id = f"products/{os.path.splitext(image_filename)[0]}"
+            image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
+        else:
+            image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
+
+        new_product = Product(name=request.form['name'], price=float(request.form['price']),
+                              description=request.form['description'], image=image_url,  # <-- Зберігаємо URL
+                              category=request.form['category'], in_stock='in_stock' in request.form)
         db.session.add(new_product)
         db.session.commit()
         flash(f"Товар '{new_product.name}' додано!", "success")
@@ -680,17 +658,28 @@ def add_product():
     return render_template("add_product.html")
 
 
+# ВИПРАВЛЕНО: /admin/edit_product
 @app.route("/admin/edit_product/<int:product_id>", methods=['GET', 'POST'])
 @login_required
 @admin_required
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == 'POST':
+        image_filename = request.form['image'].strip()
+        if image_filename:
+            # Перевіряємо, чи це вже URL, чи просто назва файлу
+            if not image_filename.startswith('http'):
+                public_id = f"products/{os.path.splitext(image_filename)[0]}"
+                image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
+            else:
+                image_url = image_filename  # Якщо це вже URL, залишаємо як є
+        else:
+            image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
+
         product.name = request.form['name']
         product.price = float(request.form['price'])
         product.description = request.form['description']
-        # [ВИПРАВЛЕНО] Зберігаємо тільки ім'я файлу
-        product.image = request.form['image'].strip() or 'default_tovar.png'
+        product.image = image_url  # <-- Зберігаємо URL
         product.category = request.form['category']
         product.in_stock = 'in_stock' in request.form
 
@@ -698,7 +687,9 @@ def edit_product(product_id):
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
 
-    return render_template("edit_product.html", product=product)
+    # Показуємо тільки назву файлу в формі, а не повний URL
+    image_to_display = os.path.basename(product.image) if product.image.startswith('http') else product.image
+    return render_template("edit_product.html", product=product, image_to_display=image_to_display)
 
 
 @app.route("/admin/delete_review/<int:review_id>", methods=["POST"])
@@ -732,21 +723,17 @@ def admin_unfinished():
     active_filters = [k for k in request.args if k in ['no_stock', 'no_description', 'no_image']]
     if not active_filters:
         query = query.filter(
-            db.or_(Product.in_stock == False,
-                   (Product.description == None) | (Product.description == ''),
-                   Product.image.like('default_tovar%') | (Product.image == None)))
+            db.or_(Product.in_stock == False, (Product.description == None) | (Product.description == ''),
+                   Product.image.like('%/products/default_tovar%'))) # <-- ЗМІНА 1
     else:
         if 'no_stock' in active_filters: query = query.filter(Product.in_stock == False)
         if 'no_description' in active_filters: query = query.filter(
             (Product.description == None) | (Product.description == ''))
-        if 'no_image' in active_filters: query = query.filter(
-            Product.image.like('default_tovar%') | (Product.image == None))
-
+        if 'no_image' in active_filters: query = query.filter(Product.image.like('%/products/default_tovar%')) # <-- ЗМІНА 2
     counts = {'no_stock': Product.query.filter(Product.in_stock == False).count(),
               'no_description': Product.query.filter(
                   (Product.description == None) | (Product.description == '')).count(),
-              'no_image': Product.query.filter(Product.image.like('default_tovar%') | (Product.image == None)).count()}
-
+              'no_image': Product.query.filter(Product.image.like('%/products/default_tovar%')).count()} # <-- ЗМІНА 3
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
     return render_template('admin_unfinished.html', products=products, counts=counts)
 
@@ -767,7 +754,7 @@ def send_message():
 
 
 # ────────────────────────────────
-#  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - НАДІЙНА ВЕРСІЯ
+#  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - ФІНАЛЬНА ВЕРСІЯ 5.0 (СПРОЩЕНА)
 # ───────────────────────────────
 
 
@@ -788,6 +775,9 @@ def handle_bas_handshake():
     print("BAS: пройдено етап handshake.")
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
+
+# [ВАЖЛИВО] Старий маршрут /upload_image більше не потрібен, оскільки uploader.py
+# тепер завантажує фото напряму в Cloudinary. Його можна повністю видалити.
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
@@ -821,6 +811,9 @@ def bas_import():
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
+        # --- [ВИДАЛЕНО БЛОК ОПТИМІЗАЦІЇ] ---
+        # Ми більше не завантажуємо всі товари в пам'ять.
+
         updated_count, added_count = 0, 0
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю цикл обробки...")
@@ -836,8 +829,13 @@ def bas_import():
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
 
-            # [КЛЮЧОВА ЗМІНА] Отримуємо тільки ім'я файлу
-            image_filename = (product_node.findtext('Картинка') or 'default_tovar.png').strip()
+            image_filename = (product_node.findtext('Картинка') or '').strip()
+
+            if image_filename:
+                public_id = f"products/{os.path.splitext(image_filename)[0]}"
+                image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
+            else:
+                image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
 
             price = 0.0
             in_stock = False
@@ -873,19 +871,22 @@ def bas_import():
                         if stock_prop_node_alt.text.lower() == 'true':
                             in_stock = True
 
+            # --- [НОВА ЛОГІКА] ---
+            # Робимо один маленький запит до БД для КОЖНОГО товару з XML.
+            # Це набагато безпечніше для Heroku.
             product = db.session.query(Product).filter_by(name=name).first()
 
             if product:
                 product.price = price
                 product.description = description
                 product.category = category
-                product.image = image_filename  # Зберігаємо ім'я файлу
+                product.image = image_url
                 product.in_stock = in_stock
                 updated_count += 1
             else:
                 new_product = Product(
                     name=name, price=price, description=description,
-                    category=category, image=image_filename, in_stock=in_stock  # Зберігаємо ім'я файлу
+                    category=category, image=image_url, in_stock=in_stock
                 )
                 db.session.add(new_product)
                 added_count += 1
@@ -941,8 +942,7 @@ def api_get_orders():
         orders]
     return jsonify({"status": "success", "orders": orders_data})
 
-
-# API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
+# [НОВЕ] API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
 def find_np_cities():
     """Пошук населених пунктів."""
@@ -996,16 +996,19 @@ def get_np_warehouses():
         data = response.json()
         if data['success']:
             all_warehouses = data.get('data', [])
+
+            # [ОСТАТОЧНЕ ВИПРАВЛЕННЯ] Фільтруємо, залишаючи ТІЛЬКИ відділення.
+            # Цей метод надійніший, бо він відсікає все, що не є відділенням.
             filtered_warehouses = [
                 w['Description'] for w in all_warehouses
                 if w['Description'].startswith('Відділення')
             ]
+
             return jsonify(filtered_warehouses)
         return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
-
 
 @app.errorhandler(404)
 def page_not_found(e):
@@ -1020,10 +1023,8 @@ if __name__ == "__main__":
         db.create_all()
         if not User.query.filter_by(is_admin=True).first():
             print(">>> Створення адміністратора...")
-            admin = User(username='admin', first_name='Admin', last_name='User', email='artemcool200911@gmail.com',
-                         is_admin=True)
+            admin = User(username='admin', first_name='Admin', last_name='User', email='artemcool200911@gmail.com', is_admin=True)
             admin.set_password('admin123')
-            db.session.add(admin);
-            db.session.commit()
+            db.session.add(admin); db.session.commit()
             print(">>> Адміністратора створено. Логін: admin, Пароль: admin123")
     app.run(debug=True, port=5000)
