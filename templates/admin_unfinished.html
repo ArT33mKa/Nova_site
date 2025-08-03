@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block title %}Незавершені товари{% endblock %}
 
@@ -10,7 +9,6 @@
 </header>
 <div class="container" style="padding-top: 40px; padding-bottom: 60px;">
 
-    <!-- Блок зі статистикою -->
     <div style="display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap;">
         <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; flex-grow: 1;">
             <h3 style="margin: 0 0 10px 0;">Немає в наявності</h3>
@@ -26,7 +24,6 @@
         </div>
     </div>
 
-    <!-- Фільтри -->
     <form method="GET" class="checkout-form" style="display: flex; gap: 20px; align-items: center; margin-bottom: 30px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
         <h4 style="margin: 0;">Фільтрувати за:</h4>
         <label class="checkbox-item"><input type="checkbox" name="no_stock" value="true" {% if request.args.get('no_stock') %}checked{% endif %}> Немає в наявності</label>
@@ -36,7 +33,6 @@
         <a href="{{ url_for('admin_unfinished') }}" class="btn btn-outline btn-sm">Скинути</a>
     </form>
 
-    <!-- Таблиця з товарами -->
     {% if products.items %}
     <p>Знайдено товарів: <strong>{{ products.total }}</strong></p>
     <table class="admin-table">
@@ -72,7 +68,8 @@
                     {% endif %}
                 </td>
                 <td>
-                    {% if 'default_tovar' not in product.image %}
+                    <!-- [ВИПРАВЛЕНО] Перевірка на стандартне зображення -->
+                    {% if product.image and not product.image.startswith('default_tovar') %}
                         <span style="color: var(--success-color);">Є</span>
                     {% else %}
                          <span style="color: var(--danger-color);">Відсутнє</span>
@@ -85,7 +82,6 @@
             {% endfor %}
         </tbody>
     </table>
-    <!-- [ВИПРАВЛЕНО] Пагінація для незавершених товарів -->
     <div class="pagination">
         <div class="pagination-controls">
             {% set query_params = request.args.to_dict() %}

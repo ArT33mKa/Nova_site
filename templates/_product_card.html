@@ -1,49 +1,94 @@
-<div class="product-card" data-id="{{ product.id }}">
+{% extends "base.html" %}
+{% block title %}{{ product.name }}{% endblock %}
 
-    <!-- Блок для зображення. Він буде базою для позиціонування іконок. -->
-    <div class="product-image">
-        <a href="{{ url_for('product_detail', product_id=product.id) }}" class="product-image-link">
-            <img src="{{ product.image }}" alt="{{ product.name }}">
-        </a>
-
-        <!-- Статус наявності (зверху зліва) -->
-        {% if product.in_stock %}
-            <div class="stock-status in-stock">Є в наявності</div>
-        {% else %}
-            <div class="stock-status out-of-stock">Немає в наявності</div>
-        {% endif %}
-
-        <!-- Кнопка "Обране" (зверху справа) -->
-        <button class="favorite-btn" title="Додати в обране">
-            <i class="far fa-star"></i>
-            <i class="fas fa-star"></i>
-        </button>
-
-        <!-- Адмін-кнопки (знизу справа на фото) -->
-        {% if current_user.is_authenticated and current_user.is_admin %}
-        <div class="admin-product-actions">
-            <a href="{{ url_for('edit_product', product_id=product.id) }}" class="admin-action-btn edit-btn" title="Редагувати">
-                <i class="fas fa-pencil-alt"></i>
-            </a>
-            <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST" onsubmit="return confirm('Ви впевнені, що хочете видалити цей товар?');">
-                <button type="submit" class="admin-action-btn delete-btn" title="Видалити">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-            </form>
+{% block content %}
+<header class="page-header">
+    <div class="container">
+        <div class="breadcrumbs">
+            <a href="{{ url_for('index') }}">Головна</a> /
+            <a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a> /
+            <span>{{ product.name }}</span>
         </div>
-        {% endif %}
+    </div>
+</header>
+
+<div class="container" style="padding-top: 40px; padding-bottom: 60px;">
+    <div class="product-detail-grid" data-id="{{ product.id }}">
+        <div class="product-image-main">
+            <!-- [КЛЮЧОВА ЗМІНА] Використовуємо фільтр для генерації URL -->
+            <img src="{{ product.image|image_url }}" alt="{{ product.name }}">
+        </div>
+
+        <div class="product-info-main">
+            <h1 class="product-title">{{ product.name }}</h1>
+            <a href="{{ url_for('product_reviews', product_id=product.id) }}" class="reviews-summary-link">
+                <span class="rating">
+                    {% set r = product.rating|round|int %}
+                    {% for i in range(r) %}★{% endfor %}
+                    {% for i in range(5 - r) %}<span>★</span>{% endfor %}
+                </span>
+                <span class="reviews-count-text">{{ product.reviews_count }} відгуків</span>
+            </a>
+
+            <div class="product-price-detail">{{ "%.2f"|format(product.price) }} ₴</div>
+
+            <div class="product-meta">
+                <dl>
+                    <div class="meta-item">
+                        <dt>Наявність:</dt>
+                        <dd>
+                            {% if product.in_stock %}
+                                <span class="stock-status in-stock" style="position: static; color: var(--success-color); background: none; font-size: 1rem; padding: 0;">
+                                    <i class="fas fa-check-circle"></i> Є в наявності
+                                </span>
+                            {% else %}
+                                <span class="stock-status out-of-stock" style="position: static; color: var(--danger-color); background: none; font-size: 1rem; padding: 0;">
+                                    <i class="fas fa-times-circle"></i> Немає в наявності
+                                </span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                     <div class="meta-item">
+                        <dt>Категорія:</dt>
+                        <dd><a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a></dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div class="product-actions">
+                <button class="btn btn-primary btn-lg add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
+                    <i class="fas fa-shopping-cart"></i> В кошик
+                </button>
+                <button class="btn btn-lg buy-now-btn" data-id="{{ product.id }}" style="background-color: var(--accent-color); color: white;" {% if not product.in_stock %}disabled{% endif %}>
+                    Купити зараз
+                </button>
+            </div>
+
+            <div class="product-description" style="margin-top: 40px;">
+                <h3>Опис товару</h3>
+                <div id="description-wrapper" class="description-text-wrapper">
+                    {{ product.description | safe }}
+                </div>
+                <button id="toggle-description-btn" class="btn-link" style="display: none; margin-top: 10px;">Читати далі</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Блок з текстовою інформацією та кнопками -->
-    <div class="product-info">
-        <h3 class="product-name">
-            <a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a>
-        </h3>
-        <p class="price">{{ "%.2f"|format(product.price) }} ₴</p>
-        <div class="product-card-actions">
-            <button class="btn add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
-                Додати в кошик
-            </button>
+    <div class="similar-products-section" style="margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--light-gray);">
+        <h2 class="section-title" style="text-align: left; padding-bottom: 20px;">Схожі товари</h2>
+        <div class="carousel-container">
+            <div class="products-carousel">
+                <div class="products-grid-carousel">
+                    {% for p in similar_products %}
+                        {% with product=p %}{% include '_product_card.html' %}{% endwith %}
+                    {% else %}
+                        <p>Схожих товарів не знайдено.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            <button class="carousel-btn carousel-prev-btn">‹</button>
+            <button class="carousel-btn carousel-next-btn">›</button>
         </div>
     </div>
 </div>
+{% endblock %}
