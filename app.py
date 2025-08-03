@@ -32,6 +32,18 @@ load_dotenv()
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+
+try:
+    cloudinary.config(
+        cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+        api_key=os.getenv("CLOUDINARY_API_KEY"),
+        api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+        secure=True
+    )
+    print(">>> Cloudinary успішно налаштовано.")
+except Exception as e:
+    print(f">>> ПОМИЛКА конфігурації Cloudinary: {e}")
+
 app.jinja_env.add_extension('jinja2.ext.do')
 app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")
 
@@ -798,10 +810,13 @@ def bas_import():
 
             image_filename = (product_node.findtext('Картинка') or '').strip()
             # [ВАЖЛИВО] Замініть 'your_cloud_name' на вашу реальну назву хмари
-            image_url = 'https://res.cloudinary.com/your_cloud_name/image/upload/v1/products/default_tovar.jpg'
             if image_filename:
+                # public_id відповідає тому, що генерує uploader.py
                 public_id = f"products/{os.path.splitext(image_filename)[0]}"
-                image_url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
+                image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
+            else:
+                # URL для зображення за замовчуванням
+                image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
 
             price = 0.0
             in_stock = False  # За замовчуванням товару немає в наявності
