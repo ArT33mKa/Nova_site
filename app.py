@@ -811,13 +811,8 @@ def bas_import():
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
 
-        # --- [ГОЛОВНА ОПТИМІЗАЦІЯ] ---
-        # 1. Завантажуємо всі існуючі товари ОДНИМ запитом.
-        #    Створюємо словник: { 'Назва товару': об'єкт_Product }
-        print("Оптимізація: завантаження існуючих товарів в пам'ять...")
-        existing_products = {p.name: p for p in Product.query.all()}
-        print(f"Завантажено {len(existing_products)} товарів для порівняння.")
-        # --------------------------------
+        # --- [ВИДАЛЕНО БЛОК ОПТИМІЗАЦІЇ] ---
+        # Ми більше не завантажуємо всі товари в пам'ять.
 
         updated_count, added_count = 0, 0
         products_from_xml = catalog_node.findall('.//Товар')
@@ -835,65 +830,51 @@ def bas_import():
             category = groups.get(group_id, "Загальна")
 
             image_filename = (product_node.findtext('Картинка') or '').strip()
-            # [ВАЖЛИВО] Замініть 'your_cloud_name' на вашу реальну назву хмари
+
             if image_filename:
-                # public_id відповідає тому, що генерує uploader.py
                 public_id = f"products/{os.path.splitext(image_filename)[0]}"
                 image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
             else:
-                # URL для зображення за замовчуванням
                 image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
 
             price = 0.0
-            in_stock = False  # За замовчуванням товару немає в наявності
+            in_stock = False
 
-            # Шукаємо відповідний вузол <Предложение> для поточного товару
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
 
             if offer_node is not None:
-                # 1. Визначаємо ціну з пропозиції
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
                     price_text = price_node.text.replace(',', '.')
                     try:
                         price = float(re.match(r"[\d.]+", price_text).group(0))
                     except (ValueError, AttributeError):
-                        price = 0.0  # Якщо не вдалося розпарсити, ціна буде 0
+                        price = 0.0
 
-                # 2. Визначаємо наявність з пропозиції (найбільш поширений варіант)
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
-                        # Перетворюємо кількість на число і перевіряємо, чи вона більша за нуль
                         stock_quantity = int(float(quantity_node.text.strip()))
                         if stock_quantity > 0:
                             in_stock = True
                     except (ValueError, TypeError):
-                        # Якщо в тезі не число, ігноруємо його
                         pass
 
-            # 3. Як ЗАПАСНИЙ варіант, шукаємо спеціальний реквізит "Наличие"
-            #    Це спрацює, якщо логіка вище не знайшла тег <Количество>
             if not in_stock:
-                # Шукаємо реквізит у вузлі самого товару
                 stock_prop_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
                 if stock_prop_node is not None and stock_prop_node.text is not None:
-                    # Перевіряємо, чи значення реквізиту є "true", "да", або "є"
                     if stock_prop_node.text.strip().lower() in ['true', 'да', 'є', 'yes']:
                         in_stock = True
                 else:
-                    # Якщо і там не знайшли, спробуємо знайти властивість "Наличие"
-                    # Цей пошук менш точний, але може допомогти
                     stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
                     if stock_prop_node_alt is not None and stock_prop_node_alt.text:
                         if stock_prop_node_alt.text.lower() == 'true':
                             in_stock = True
 
-            # --- [ГОЛОВНА ОПТИМІЗАЦІЯ] ---
-            # 2. Перевіряємо існування товару в нашому словнику (це миттєво),
-            #    а не робимо запит до БД.
-            product = existing_products.get(name)
-            # --------------------------------
+            # --- [НОВА ЛОГІКА] ---
+            # Робимо один маленький запит до БД для КОЖНОГО товару з XML.
+            # Це набагато безпечніше для Heroku.
+            product = db.session.query(Product).filter_by(name=name).first()
 
             if product:
                 product.price = price
@@ -910,7 +891,6 @@ def bas_import():
                 db.session.add(new_product)
                 added_count += 1
 
-        # Зберігаємо всі зміни в БД одним великим коммітом
         print("Завершення циклу. Зберігаю зміни в базі даних...")
         db.session.commit()
         print("Зміни успішно збережено.")
