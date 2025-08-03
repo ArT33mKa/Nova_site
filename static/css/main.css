@@ -539,23 +539,24 @@ img {
 .product-card {
     background-color: white;
     border-radius: var(--border-radius);
-    overflow: hidden;
     box-shadow: var(--box-shadow);
     transition: var(--transition);
-    position: relative;
-    display: flex;
-    flex-direction: column;
+    display: flex; /* Це важливо для Flexbox */
+    flex-direction: column; /* Елементи йдуть один під одним */
+    overflow: hidden; /* Ховаємо все, що може вилізти */
 }
 .product-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
+
+/* Блок з фотографією */
 .product-image {
-    position: relative;
+    position: relative; /* Робить цей блок "базою" для позиціонування */
     height: 180px;
     background-color: #f5f5f5;
 }
-.product-image a {
+.product-image-link {
     display: block;
     height: 100%;
 }
@@ -564,39 +565,67 @@ img {
     height: 100%;
     object-fit: contain;
     padding: 10px;
-    transition: var(--transition);
+    transition: transform 0.3s ease;
 }
 .product-card:hover .product-image img {
     transform: scale(1.05);
 }
 
+/* Кнопка "Обране" (зірочка) */
+.favorite-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
+    /* Решта стилів залишаються з попередніх правок */
+}
+/* Щоб показувати тільки одну з двох іконок зірки */
+.favorite-btn .fa-star { display: none; }
+.favorite-btn .far-star { display: inline-block; }
+.favorite-btn.active .fa-star { display: inline-block; }
+.favorite-btn.active .far-star { display: none; }
+
+
+/* Кнопки адміністратора */
+.admin-product-actions {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 3;
+    display: flex;
+    gap: 8px;
+}
+
+/* Інформаційний блок */
 .product-info {
     padding: 15px;
-    flex-grow: 1;
+    flex-grow: 1; /* Блок розтягується, щоб заповнити місце */
     display: flex;
     flex-direction: column;
+    text-align: center; /* Центруємо весь текст */
 }
-.product-info h3 {
+.product-name {
     font-size: 1rem;
-    margin-bottom: 10px;
-    flex-grow: 1;
+    margin-bottom: 15px;
+    flex-grow: 1; /* Назва товару займає вільне місце, відсуваючи ціну та кнопку вниз */
+    line-height: 1.4;
 }
-
-.product-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: auto;
-    gap: 10px; /* Додаємо фіксований відступ між ціною та кнопкою */
-}
-
 .price {
+    font-size: 1.2rem; /* Трохи більший розмір ціни для акценту */
     font-weight: 700;
-    color: var(--primary-color);
-    font-size: 1.1rem;
-    white-space: nowrap; /* Цей рядок - ключ до вирішення проблеми з ціною! */
-    flex-shrink: 0; /* Не дозволяє ціні стискатись */
+    color: var(--dark-color);
+    margin-bottom: 15px;
 }
+.product-card-actions {
+    margin-top: auto; /* Притискає кнопку до самого низу картки */
+}
+
+/* Стиль головної кнопки */
+.product-info .add-to-cart-btn {
+    width: 100%;
+    display: block;
+}
+
 
 .product-card .add-to-cart-btn {
     /* Робимо кнопку більш прямокутною і стильною */
