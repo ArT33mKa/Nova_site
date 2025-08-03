@@ -266,7 +266,7 @@ def index():
 def catalog():
     page = request.args.get('page', 1, type=int)
     query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
-                                 Product.image.notlike('%default_tovar.jpg%'))
+                                 Product.image.notlike('%/products/default_tovar%'))
     if search_query := request.args.get('search', ''): query = query.filter(Product.name.ilike(f'%{search_query}%'))
     if category_arg := request.args.get('category'): query = query.filter(Product.category == category_arg.strip())
     if min_price := request.args.get('min_price', type=float): query = query.filter(Product.price >= min_price)
@@ -284,7 +284,7 @@ def product_detail(product_id):
     similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id,
                                             Product.in_stock == True,
                                             and_(Product.description != None, Product.description != ''),
-                                            Product.image != 'default_tovar.jpg').limit(8).all()
+                                            Product.image.notlike('%/products/default_tovar%')).limit(8).all()
     return render_template("product_detail.html", product=product, similar_products=similar_products)
 
 
@@ -641,29 +641,55 @@ def admin_reviews():
 @admin_required
 def add_product():
     if request.method == 'POST':
+        image_filename = request.form['image'].strip()
+        if image_filename:
+            public_id = f"products/{os.path.splitext(image_filename)[0]}"
+            image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
+        else:
+            image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
+
         new_product = Product(name=request.form['name'], price=float(request.form['price']),
-                              description=request.form['description'], image=request.form['image'],
+                              description=request.form['description'], image=image_url,  # <-- Зберігаємо URL
                               category=request.form['category'], in_stock='in_stock' in request.form)
-        db.session.add(new_product);
+        db.session.add(new_product)
         db.session.commit()
         flash(f"Товар '{new_product.name}' додано!", "success")
         return redirect(url_for('catalog'))
     return render_template("add_product.html")
 
 
+# ВИПРАВЛЕНО: /admin/edit_product
 @app.route("/admin/edit_product/<int:product_id>", methods=['GET', 'POST'])
 @login_required
 @admin_required
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == 'POST':
-        product.name, product.price, product.description, product.image, product.category, product.in_stock = \
-        request.form['name'], float(request.form['price']), request.form['description'], request.form['image'], \
-        request.form['category'], 'in_stock' in request.form
+        image_filename = request.form['image'].strip()
+        if image_filename:
+            # Перевіряємо, чи це вже URL, чи просто назва файлу
+            if not image_filename.startswith('http'):
+                public_id = f"products/{os.path.splitext(image_filename)[0]}"
+                image_url = cloudinary.utils.cloudinary_url(public_id, secure=True)[0]
+            else:
+                image_url = image_filename  # Якщо це вже URL, залишаємо як є
+        else:
+            image_url = cloudinary.utils.cloudinary_url("products/default_tovar", secure=True)[0]
+
+        product.name = request.form['name']
+        product.price = float(request.form['price'])
+        product.description = request.form['description']
+        product.image = image_url  # <-- Зберігаємо URL
+        product.category = request.form['category']
+        product.in_stock = 'in_stock' in request.form
+
         db.session.commit()
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
-    return render_template("edit_product.html", product=product)
+
+    # Показуємо тільки назву файлу в формі, а не повний URL
+    image_to_display = os.path.basename(product.image) if product.image.startswith('http') else product.image
+    return render_template("edit_product.html", product=product, image_to_display=image_to_display)
 
 
 @app.route("/admin/delete_review/<int:review_id>", methods=["POST"])
@@ -698,16 +724,16 @@ def admin_unfinished():
     if not active_filters:
         query = query.filter(
             db.or_(Product.in_stock == False, (Product.description == None) | (Product.description == ''),
-                   Product.image.like('%default_tovar.jpg%')))
+                   Product.image.like('%/products/default_tovar%'))) # <-- ЗМІНА 1
     else:
         if 'no_stock' in active_filters: query = query.filter(Product.in_stock == False)
         if 'no_description' in active_filters: query = query.filter(
             (Product.description == None) | (Product.description == ''))
-        if 'no_image' in active_filters: query = query.filter(Product.image.like('%default_tovar.jpg%'))
+        if 'no_image' in active_filters: query = query.filter(Product.image.like('%/products/default_tovar%')) # <-- ЗМІНА 2
     counts = {'no_stock': Product.query.filter(Product.in_stock == False).count(),
               'no_description': Product.query.filter(
                   (Product.description == None) | (Product.description == '')).count(),
-              'no_image': Product.query.filter(Product.image.like('%default_tovar.jpg%')).count()}
+              'no_image': Product.query.filter(Product.image.like('%/products/default_tovar%')).count()} # <-- ЗМІНА 3
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
     return render_template('admin_unfinished.html', products=products, counts=counts)
 
