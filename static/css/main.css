@@ -587,43 +587,44 @@ img {
     justify-content: space-between;
     align-items: center;
     margin-top: auto;
+    gap: 10px; /* Додаємо фіксований відступ між ціною та кнопкою */
 }
+
 .price {
     font-weight: 700;
     color: var(--primary-color);
     font-size: 1.1rem;
+    white-space: nowrap; /* Цей рядок - ключ до вирішення проблеми з ціною! */
+    flex-shrink: 0; /* Не дозволяє ціні стискатись */
 }
 
-.favorite-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 36px;
-    height: 36px;
-    background-color: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(2px);
-    border-radius: 50%;
-    border: 1px solid var(--light-gray);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    z-index: 2;
+.product-card .add-to-cart-btn {
+    /* Робимо кнопку більш прямокутною і стильною */
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    white-space: nowrap; /* Це робить кнопку прямокутною, не даючи тексту переноситись */
+    border: 2px solid var(--light-gray);
+    background-color: var(--light-color);
+    color: var(--dark-color);
+    font-weight: 600;
 }
-.favorite-btn i {
-    font-size: 1.1rem;
+
+.product-card .add-to-cart-btn:hover {
+    /* Ефект при наведенні */
+    border-color: var(--primary-color);
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.product-card .add-to-cart-btn:disabled {
+    /* Стиль для неактивної кнопки */
+    background-color: var(--light-gray);
+    border-color: var(--light-gray);
     color: var(--gray-color);
-    transition: all 0.3s ease;
-}
-.favorite-btn:hover i {
-    color: #ffc107;
-}
-.favorite-btn.active i {
-    color: #ffc107;
-    transform: scale(1.1);
+    cursor: not-allowed;
 }
 
+/* Існуючий стиль для кнопки "в кошику" залишається гарним, просто перевірте, що він є */
 .add-to-cart-btn.in-cart {
     background-color: var(--success-color);
     border-color: var(--success-color);
@@ -632,6 +633,23 @@ img {
 .add-to-cart-btn.in-cart:hover {
     background-color: #218838;
     border-color: #1e7e34;
+}
+
+.add-to-cart-btn i {
+    margin-right: 6px;
+}
+.add-to-cart-btn span {
+    display: inline-block; /* Покращує вирівнювання */
+}
+
+/* На маленьких екранах приховаємо текст "Купити", залишивши іконку */
+@media (max-width: 1100px) and (min-width: 901px) {
+    .add-to-cart-btn span {
+         display: none;
+    }
+    .add-to-cart-btn i {
+         margin-right: 0;
+    }
 }
 
 /* --- Modals --- */

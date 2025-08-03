@@ -41,7 +41,7 @@
         <div class="product-footer">
             <span class="price">{{ "%.2f"|format(product.price) }} ₴</span>
             <button class="btn btn-sm add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
-                Додати в кошик
+                <i class="fas fa-shopping-cart"></i> <span>Купити</span>
             </button>
         </div>
     </div>
