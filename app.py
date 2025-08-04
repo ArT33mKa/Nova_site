@@ -44,25 +44,6 @@ except Exception as e:
     print(f">>> ПОМИЛКА конфігурації Cloudinary: {e}")
 
 
-# [НОВА ФУНКЦІЯ] Централізована функція для генерації URL зображень
-@app.template_filter('image_url')
-def get_image_url(image_filename):
-    """
-    Генерує повний URL для зображення з Cloudinary.
-    Якщо ім'я файлу відсутнє, повертає URL для зображення за замовчуванням.
-    """
-    if image_filename and image_filename.strip():
-        # Створюємо public_id, видаляючи розширення файлу.
-        # Наприклад, 'tovar.jpg' -> 'products/tovar'
-        public_id = f"products/{os.path.splitext(image_filename)[0]}"
-    else:
-        # Зображення за замовчуванням
-        public_id = "products/default_tovar"
-
-    # Генеруємо безпечний URL. Cloudinary додасть потрібне розширення (.jpg, .png) автоматично.
-    url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
-    return url
-
 
 app.jinja_env.add_extension('jinja2.ext.do')
 app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")
@@ -319,10 +300,12 @@ def get_products_by_ids():
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid IDs provided'}), 400
     products = Product.query.filter(Product.id.in_(safe_product_ids)).all()
-    # [ВИПРАВЛЕНО] Використовуємо наш новий фільтр 'image_url' для генерації URL
+
+    # [ВИПРАВЛЕННЯ] Просто беремо готовий URL з бази
     products_data = [
-        {'id': p.id, 'name': p.name, 'price': p.price, 'image': get_image_url(p.image), 'in_stock': p.in_stock,
+        {'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'in_stock': p.in_stock,
          'url': url_for('product_detail', product_id=p.id)} for p in products]
+
     return jsonify(products_data)
 
 
@@ -497,11 +480,16 @@ def get_cart():
         product_map = {str(p.id): p for p in products}
         for product_id, quantity in cart.items():
             if product := product_map.get(product_id):
-                cart_items.append(
-                    {"id": product.id, "name": product.name, "price": product.price,
-                     "image": get_image_url(product.image),
-                     "quantity": quantity, "in_stock": product.in_stock,
-                     "url": url_for('product_detail', product_id=product.id)})
+                cart_items.append({
+                    "id": product.id,
+                    "name": product.name,
+                    "price": product.price,
+                    # [ВИПРАВЛЕННЯ] Просто беремо готовий URL з бази
+                    "image": product.image,
+                    "quantity": quantity,
+                    "in_stock": product.in_stock,
+                    "url": url_for('product_detail', product_id=product.id)
+                })
                 total += product.price * quantity
     return jsonify({"items": cart_items, "total": total})
 
