@@ -1016,29 +1016,27 @@ def page_not_found(e):
 @app.template_filter('image_url')
 def get_image_url(image_filename):
     """
-    Автоматично генерує повний URL для зображення з Cloudinary.
-    Якщо ім'я файлу відсутнє або пусте, повертає URL для зображення за замовчуванням.
+    Автоматично генерує URL для зображення, враховуючи структуру ID
+    'products/products/НАЗВА_ФАЙЛУ'.
     """
     try:
         # --- НАЛАШТУВАННЯ ---
-        # Вкажіть тут ПРАВИЛЬНИЙ Public ID для зображення "за замовчуванням".
-        # Перевірте його в Media Library на Cloudinary. Ймовірно, без подвоєння "products/".
-        DEFAULT_IMAGE_PUBLIC_ID = "products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"
+        # Public ID для зображення "за замовчуванням".
+        # Він вже має бути в правильному форматі.
+        DEFAULT_IMAGE_PUBLIC_ID = "products/products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"
 
         if image_filename and image_filename.strip() and 'default_tovar' not in image_filename:
             # 1. Для реальних товарів:
-            #    Беремо ім'я файлу з бази (напр. 'хеш.png'), відрізаємо розширення
-            #    і додаємо префікс папки 'products/'.
+            #    Беремо ім'я файлу з бази (напр. 'хеш.png'), відрізаємо розширення.
             filename_without_extension = os.path.splitext(image_filename)[0]
-            public_id = f"products/{filename_without_extension}"
+            # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Створюємо Public ID у потрібному вам форматі.
+            public_id = f"products/products/{filename_without_extension}"
         else:
-            # 2. Для товарів без картинки або для default_tovar:
+            # 2. Для товарів без картинки:
             #    Використовуємо заздалегідь визначений Public ID.
             public_id = DEFAULT_IMAGE_PUBLIC_ID
 
-        # 3. Генеруємо URL за допомогою Cloudinary SDK.
-        #    fetch_format="auto" - автоматично вибере найкращий формат (webp, avif).
-        #    quality="auto" - автоматично підбере якість.
+        # 3. Генеруємо URL.
         url, _ = cloudinary.utils.cloudinary_url(
             public_id,
             secure=True,
@@ -1048,22 +1046,25 @@ def get_image_url(image_filename):
         return url
 
     except Exception as e:
-        # 4. Якщо сталася будь-яка помилка:
-        #    - Виводимо її в лог, щоб ви могли побачити її на Heroku.
-        #    - Повертаємо посилання на локальний файл-заглушку, щоб сайт не "ламався".
-        print(f"!!! ПОМИЛКА генерації Cloudinary URL для '{image_filename}': {e}")
-        # Переконайтесь, що у вас є файл 'placeholder.png' в папці static/img/
+        # 4. Якщо сталася помилка - показуємо її в логах і віддаємо заглушку.
+        print(f"!!! ПОМИЛКА генерації Cloudinary URL для '{image_filename}' (очікуваний ID: '{public_id}'): {e}")
         return url_for('static', filename='img/placeholder.png', _external=True)
 
-# Ви можете залишити тестовий маршрут для перевірки, але він більше не є обов'язковим.
-# Якщо залишаєте, переконайтесь, що public_id в ньому такий самий, як DEFAULT_IMAGE_PUBLIC_ID.
+# Тестовий маршрут також потрібно оновити, щоб він відповідав реальності.
 @app.route('/test_cloudinary')
 def test_cloudinary():
-    # Тестуємо з тим самим ID, що і в функції
-    public_id = "products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d" # <--- ВИПРАВТЕ, ЯКЩО ПОТРІБНО
+    public_id = "products/products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"
     try:
         url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True, fetch_format="auto", quality="auto")
-        return f'<img src="{url}" alt="Тестове зображення">'
+        html = f"""
+            <h1>Тест Cloudinary з подвійним шляхом</h1>
+            <p>Тестуємо Public ID: <b>{public_id}</b></p>
+            <p>Згенерований URL:</p>
+            <a href="{url}">{url}</a>
+            <p>Якщо картинка нижче відображається, все правильно!</p>
+            <img src="{url}" alt="Тестове зображення">
+        """
+        return html
     except Exception as e:
         return f"Помилка: {e}"
 
