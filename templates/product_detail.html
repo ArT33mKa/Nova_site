@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block title %}{{ product.name }}{% endblock %}
 
@@ -19,7 +18,8 @@
 
         <!-- Ліва колонка з зображенням товару -->
         <div class="product-image-main">
-            <img src="{{ product.image }}" alt="{{ product.name }}">
+            <!-- [ВИПРАВЛЕНО] Використовуємо фільтр для генерації URL -->
+            <img src="{{ product.image | image_url }}" alt="{{ product.name }}">
         </div>
 
         <!-- Права колонка з інформацією про товар -->

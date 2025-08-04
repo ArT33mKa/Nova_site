@@ -3,7 +3,8 @@
     <!-- Блок для зображення. Він буде базою для позиціонування іконок. -->
     <div class="product-image">
         <a href="{{ url_for('product_detail', product_id=product.id) }}" class="product-image-link">
-            <img src="{{ product.image }}" alt="{{ product.name }}">
+            <!-- [ВИПРАВЛЕНО] Використовуємо фільтр для генерації URL -->
+            <img src="{{ product.image | image_url }}" alt="{{ product.name }}">
         </a>
 
         <!-- Статус наявності (зверху зліва) -->

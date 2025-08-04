@@ -1,4 +1,4 @@
-<!-- templates/edit_product.html (ОНОВЛЕНА ВЕРСІЯ) -->
+<!-- templates/edit_product.html (ОНОВЛЕНО) -->
 {% extends "base.html" %}
 {% block title %}Редагувати товар{% endblock %}
 
@@ -19,9 +19,9 @@
             <textarea id="description" name="description" class="form-control" rows="5" required>{{ product.description }}</textarea>
         </div>
         <div class="form-group">
-            <label for="image">Назва файлу зображення (або повний URL)</label>
-            <!-- [ПОКРАЩЕННЯ] Використовуємо image_to_display замість product.image для зручності -->
-            <input type="text" id="image" name="image" class="form-control" value="{{ image_to_display }}" required>
+            <label for="image">Назва файлу зображення</label>
+            <!-- [ВИПРАВЛЕНО] Використовуємо image_to_display замість product.image -->
+            <input type="text" id="image" name="image" class="form-control" value="{{ image_to_display }}" placeholder="Напр., 'tovar123.jpg'">
         </div>
         <div class="form-group">
             <label for="category">Категорія</label>

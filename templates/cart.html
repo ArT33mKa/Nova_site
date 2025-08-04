@@ -25,8 +25,7 @@
             <div class="cart-item-row" data-id="{{ item.product.id }}">
                 <div class="cart-item-image">
                     <a href="{{ url_for('product_detail', product_id=item.product.id) }}">
-                        <!-- [ГОЛОВНЕ ВИПРАВЛЕННЯ] Використовуємо повний URL з бази даних -->
-                        <img src="{{ item.product.image }}" alt="{{ item.product.name }}">
+                        <img src="{{ url_for('static', filename='img/products/' + item.product.image) }}" alt="{{ item.product.name }}">
                     </a>
                 </div>
                 <div class="cart-item-details">
@@ -34,6 +33,7 @@
                     <div class="text-muted">{{ "%.2f"|format(item.product.price) }} ₴ / шт.</div>
                 </div>
                 <div class="cart-item-quantity-controls">
+                    <!-- [ВИПРАВЛЕНО] Додано data-id для коректної роботи JS -->
                     <button class="qty-btn minus" data-id="{{ item.product.id }}">-</button>
                     <span class="quantity-display">{{ item.quantity }}</span>
                     <button class="qty-btn plus" data-id="{{ item.product.id }}">+</button>
