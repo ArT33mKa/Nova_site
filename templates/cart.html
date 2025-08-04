@@ -24,8 +24,8 @@
             {% for item in cart_items %}
             <div class="cart-item-row" data-id="{{ item.product.id }}">
                 <div class="cart-item-image">
-                    <img src="{{ product.image }}" alt="{{ product.name }}">
-                        <img src="{{ url_for('static', filename='img/products/' + item.product.image) }}" alt="{{ item.product.name }}">
+                    <a href="{{ url_for('product_detail', product_id=item.product.id) }}">
+                        <img src="{{ product.image }}" alt="{{ product.name }}">
                     </a>
                 </div>
                 <div class="cart-item-details">
