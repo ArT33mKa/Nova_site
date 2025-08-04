@@ -19,7 +19,7 @@
                 {% for item in order.items %}
                 <div class="order-item-in-profile">
                     <!-- [ВИПРАВЛЕНО] Використовуємо фільтр для генерації URL -->
-                    <img src="{{ item.product.image | image_url }}" alt="{{ item.product.name }}">
+                    <img src="{{ product.image }}" alt="{{ product.name }}">
                     <div style="flex-grow: 1;">
                         <a href="{{ url_for('product_detail', product_id=item.product_id) }}">{{ item.product.name }}</a>
                         <div style="color: var(--gray-color); font-size: 0.9rem;">{{ item.quantity }} шт. × {{ "%.2f"|format(item.price) }} ₴</div>

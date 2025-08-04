@@ -789,6 +789,37 @@ def handle_bas_handshake():
     print("BAS: пройдено етап handshake.")
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
+def _get_cloudinary_url(image_filename):
+    """
+    Внутрішня функція для генерації повного URL зображення з Cloudinary.
+    Використовується тільки всередині app.py під час імпорту.
+    """
+    # ID для зображення за замовчуванням (заглушки)
+    DEFAULT_IMAGE_PUBLIC_ID = "products/products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"
+
+    public_id = ""
+    try:
+        if image_filename and image_filename.strip():
+            # Логіка для реальних товарів
+            filename_without_extension = os.path.splitext(image_filename)[0]
+            public_id = f"products/products/{filename_without_extension}"
+        else:
+            # Логіка для товарів без картинки
+            public_id = DEFAULT_IMAGE_PUBLIC_ID
+
+        # Генеруємо URL
+        url, _ = cloudinary.utils.cloudinary_url(
+            public_id,
+            secure=True,
+            fetch_format="auto",
+            quality="auto"
+        )
+        return url
+    except Exception as e:
+        # Якщо сталася помилка, виводимо її в лог
+        print(f"!!! ПОМИЛКА генерації Cloudinary URL для ID '{public_id}': {e}")
+        # Повертаємо None, щоб в базу не записалося нічого або помилкове значення
+        return None
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
@@ -826,6 +857,9 @@ def bas_import():
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю цикл обробки...")
 
+        # Отримуємо URL-заглушку один раз, щоб не генерувати її в циклі
+        default_image_url = _get_cloudinary_url(None)
+
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
@@ -837,14 +871,22 @@ def bas_import():
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
 
-            # [КЛЮЧОВА ЗМІНА] Отримуємо тільки ім'я файлу
-            image_filename = (product_node.findtext('Картинка') or 'default_tovar.png').strip()
+            # Отримуємо ім'я файлу з XML
+            image_filename_from_xml = (product_node.findtext('Картинка') or '').strip()
+
+            # =================================================
+            # ГОЛОВНА ЗМІНА: Генеруємо повний URL тут і зараз
+            # =================================================
+            # Викликаємо нашу нову внутрішню функцію
+            final_image_url = _get_cloudinary_url(image_filename_from_xml)
+
+            # Якщо з якоїсь причини URL не згенерувався, використовуємо заглушку
+            if not final_image_url:
+                final_image_url = default_image_url
 
             price = 0.0
             in_stock = False
-
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
-
             if offer_node is not None:
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
@@ -874,19 +916,26 @@ def bas_import():
                         if stock_prop_node_alt.text.lower() == 'true':
                             in_stock = True
 
+            # Шукаємо існуючий товар за назвою
             product = db.session.query(Product).filter_by(name=name).first()
 
             if product:
+                # Оновлюємо існуючий товар
                 product.price = price
                 product.description = description
                 product.category = category
-                product.image = image_filename  # Зберігаємо ім'я файлу
+                # Записуємо в базу вже готовий URL!
+                product.image = final_image_url
                 product.in_stock = in_stock
                 updated_count += 1
             else:
+                # Створюємо новий товар
                 new_product = Product(
                     name=name, price=price, description=description,
-                    category=category, image=image_filename, in_stock=in_stock  # Зберігаємо ім'я файлу
+                    category=category,
+                    # Записуємо в базу вже готовий URL!
+                    image=final_image_url,
+                    in_stock=in_stock
                 )
                 db.session.add(new_product)
                 added_count += 1
@@ -1011,62 +1060,6 @@ def get_np_warehouses():
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
-
-
-@app.template_filter('image_url')
-def get_image_url(image_filename):
-    """
-    Автоматично генерує URL для зображення, враховуючи структуру ID
-    'products/products/НАЗВА_ФАЙЛУ'.
-    """
-    try:
-        # --- НАЛАШТУВАННЯ ---
-        # Public ID для зображення "за замовчуванням".
-        # Він вже має бути в правильному форматі.
-        DEFAULT_IMAGE_PUBLIC_ID = "products/products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"
-
-        if image_filename and image_filename.strip() and 'default_tovar' not in image_filename:
-            # 1. Для реальних товарів:
-            #    Беремо ім'я файлу з бази (напр. 'хеш.png'), відрізаємо розширення.
-            filename_without_extension = os.path.splitext(image_filename)[0]
-            # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Створюємо Public ID у потрібному вам форматі.
-            public_id = f"products/products/{filename_without_extension}"
-        else:
-            # 2. Для товарів без картинки:
-            #    Використовуємо заздалегідь визначений Public ID.
-            public_id = DEFAULT_IMAGE_PUBLIC_ID
-
-        # 3. Генеруємо URL.
-        url, _ = cloudinary.utils.cloudinary_url(
-            public_id,
-            secure=True,
-            fetch_format="auto",
-            quality="auto"
-        )
-        return url
-
-    except Exception as e:
-        # 4. Якщо сталася помилка - показуємо її в логах і віддаємо заглушку.
-        print(f"!!! ПОМИЛКА генерації Cloudinary URL для '{image_filename}' (очікуваний ID: '{public_id}'): {e}")
-        return url_for('static', filename='img/placeholder.png', _external=True)
-
-# Тестовий маршрут також потрібно оновити, щоб він відповідав реальності.
-@app.route('/test_cloudinary')
-def test_cloudinary():
-    public_id = "products/products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"
-    try:
-        url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True, fetch_format="auto", quality="auto")
-        html = f"""
-            <h1>Тест Cloudinary з подвійним шляхом</h1>
-            <p>Тестуємо Public ID: <b>{public_id}</b></p>
-            <p>Згенерований URL:</p>
-            <a href="{url}">{url}</a>
-            <p>Якщо картинка нижче відображається, все правильно!</p>
-            <img src="{url}" alt="Тестове зображення">
-        """
-        return html
-    except Exception as e:
-        return f"Помилка: {e}"
 
 
 # ────────────────────────────────
