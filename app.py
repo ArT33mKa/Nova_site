@@ -1013,15 +1013,46 @@ def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
 
 
+@app.template_filter('image_url')
+def get_image_url(image_filename):
+    """
+    Генерує повний URL для зображення з Cloudinary.
+    Якщо ім'я файлу відсутнє, повертає URL для зображення за замовчуванням.
+    """
+    # [ВИПРАВЛЕННЯ] Вказуємо ТОЧНИЙ Public ID для зображення за замовчуванням
+    # Замініть 'products/ВАШ_ID_КАРТИНКИ_ЗА_ЗАМОВЧУВАННЯМ' на реальний ID з Cloudinary
+    DEFAULT_IMAGE_PUBLIC_ID = "products/products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"  # <--- ЗАМІНІТЬ ЦЕ НА РЕАЛЬНИЙ ID!
+
+    if image_filename and image_filename.strip():
+        # Ця логіка правильна для ваших файлів з назвами-хешами, ЯКЩО в базі вони з розширенням
+        public_id = f"products/{os.path.splitext(image_filename)[0]}"
+    else:
+        # Використовуємо правильний Public ID для картинки за замовчуванням
+        public_id = DEFAULT_IMAGE_PUBLIC_ID
+
+    # Генеруємо безпечний URL. Cloudinary додасть потрібне розширення (.jpg, .png) автоматично.
+    try:
+        url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
+        return url
+    except Exception as e:
+        print(f"!!! Cloudinary URL generation error for public_id '{public_id}': {e}")
+        # Якщо сталася помилка, повертаємо URL до абсолютно надійного запасного варіанту
+        # (наприклад, до локального файлу або відомого зовнішнього)
+        return url_for('static', filename='img/placeholder.png')
+
+
+# ... (ваш код) ...
+
+# Оновлюємо тестовий маршрут
 @app.route('/test_cloudinary')
 def test_cloudinary():
     try:
-        # Спробуємо згенерувати URL для зображення, яке точно існує
-        # Переконайтесь, що у вас на Cloudinary в папці 'products' є файл 'default_tovar'
-        public_id = "products/default_tovar"
-        url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
+        # [ВИПРАВЛЕННЯ] Вказуємо ТОЧНИЙ Public ID для зображення за замовчуванням
+        # Замініть 'products/ВАШ_ID_КАРТИНКИ_ЗА_ЗАМОВЧУВАННЯМ' на реальний ID з Cloudinary
+        public_id = "products/products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"  # <--- ЗАМІНІТЬ ЦЕ НА РЕАЛЬНИЙ ID!
 
-        # Перевіряємо, чи є конфігурація
+        url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True, fetch_format="auto", quality="auto")
+
         cloud_name = cloudinary.config().cloud_name
         if not cloud_name:
             return "Cloudinary не налаштовано! Перевірте змінні оточення."
@@ -1029,31 +1060,7 @@ def test_cloudinary():
         html = f"""
             <h1>Тест Cloudinary</h1>
             <p>Cloud Name: <b>{cloud_name}</b></p>
-            <p>Згенерований URL для 'products/default_tovar':</p>
-            <a href="{url}">{url}</a>
-            <p>Якщо ви бачите посилання і картинку нижче, все працює!</p>
-            <img src="{url}" alt="Тестове зображення" style="border: 2px solid green; max-width: 300px;">
-        """
-        return html
-
-    except Exception as e:
-        return f"<h1>Сталася помилка при тестуванні Cloudinary</h1><p>{e}</p>"@app.route('/test_cloudinary')
-def test_cloudinary():
-    try:
-        # Спробуємо згенерувати URL для зображення, яке точно існує
-        # Переконайтесь, що у вас на Cloudinary в папці 'products' є файл 'default_tovar'
-        public_id = "products/default_tovar"
-        url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
-
-        # Перевіряємо, чи є конфігурація
-        cloud_name = cloudinary.config().cloud_name
-        if not cloud_name:
-            return "Cloudinary не налаштовано! Перевірте змінні оточення."
-
-        html = f"""
-            <h1>Тест Cloudinary</h1>
-            <p>Cloud Name: <b>{cloud_name}</b></p>
-            <p>Згенерований URL для 'products/default_tovar':</p>
+            <p>Згенерований URL для '{public_id}':</p>
             <a href="{url}">{url}</a>
             <p>Якщо ви бачите посилання і картинку нижче, все працює!</p>
             <img src="{url}" alt="Тестове зображення" style="border: 2px solid green; max-width: 300px;">
