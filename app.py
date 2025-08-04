@@ -795,7 +795,7 @@ def _get_cloudinary_url(image_filename):
     Використовується тільки всередині app.py під час імпорту.
     """
     # ID для зображення за замовчуванням (заглушки)
-    DEFAULT_IMAGE_PUBLIC_ID = "products/products/feefdc3b-5452-11f0-b4cd-5057a8e14d4d"
+    DEFAULT_IMAGE_PUBLIC_ID = "products/products/default_tovar.jpg"
 
     public_id = ""
     try:
