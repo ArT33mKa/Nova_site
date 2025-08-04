@@ -1013,6 +1013,56 @@ def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
 
 
+@app.route('/test_cloudinary')
+def test_cloudinary():
+    try:
+        # Спробуємо згенерувати URL для зображення, яке точно існує
+        # Переконайтесь, що у вас на Cloudinary в папці 'products' є файл 'default_tovar'
+        public_id = "products/default_tovar"
+        url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
+
+        # Перевіряємо, чи є конфігурація
+        cloud_name = cloudinary.config().cloud_name
+        if not cloud_name:
+            return "Cloudinary не налаштовано! Перевірте змінні оточення."
+
+        html = f"""
+            <h1>Тест Cloudinary</h1>
+            <p>Cloud Name: <b>{cloud_name}</b></p>
+            <p>Згенерований URL для 'products/default_tovar':</p>
+            <a href="{url}">{url}</a>
+            <p>Якщо ви бачите посилання і картинку нижче, все працює!</p>
+            <img src="{url}" alt="Тестове зображення" style="border: 2px solid green; max-width: 300px;">
+        """
+        return html
+
+    except Exception as e:
+        return f"<h1>Сталася помилка при тестуванні Cloudinary</h1><p>{e}</p>"@app.route('/test_cloudinary')
+def test_cloudinary():
+    try:
+        # Спробуємо згенерувати URL для зображення, яке точно існує
+        # Переконайтесь, що у вас на Cloudinary в папці 'products' є файл 'default_tovar'
+        public_id = "products/default_tovar"
+        url, _ = cloudinary.utils.cloudinary_url(public_id, secure=True)
+
+        # Перевіряємо, чи є конфігурація
+        cloud_name = cloudinary.config().cloud_name
+        if not cloud_name:
+            return "Cloudinary не налаштовано! Перевірте змінні оточення."
+
+        html = f"""
+            <h1>Тест Cloudinary</h1>
+            <p>Cloud Name: <b>{cloud_name}</b></p>
+            <p>Згенерований URL для 'products/default_tovar':</p>
+            <a href="{url}">{url}</a>
+            <p>Якщо ви бачите посилання і картинку нижче, все працює!</p>
+            <img src="{url}" alt="Тестове зображення" style="border: 2px solid green; max-width: 300px;">
+        """
+        return html
+
+    except Exception as e:
+        return f"<h1>Сталася помилка при тестуванні Cloudinary</h1><p>{e}</p>"
+
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
 # ────────────────────────────────
