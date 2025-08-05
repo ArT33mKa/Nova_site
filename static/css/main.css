@@ -1,34 +1,4 @@
-/* ==============================================
-   OPTIMIZED main.css
-   ==============================================
-   TABLE OF CONTENTS
-   ----------------------------------------------
-   1.  VARIABLES & GLOBAL RESET
-   2.  GENERAL LAYOUT & HELPERS (Container, Titles)
-   3.  BUTTONS & FORMS
-   4.  HEADER
-   5.  FOOTER
-   6.  COMPONENTS
-       - Product Card
-       - Modals (Auth, Favorites)
-       - Sidebars (Cart, Cabinet)
-       - Hero Slider
-       - Carousel
-       - Tabs
-       - Tables
-       - Badges
-       - Alerts & Toasts
-   7.  PAGE-SPECIFIC STYLES
-       - Home Page (Categories, About, Contacts)
-       - Catalog Page
-       - Product Detail Page
-       - Reviews & Questions Page
-       - Checkout Page
-       - Profile & Admin Pages
-   8.  OVERLAYS & BACKDROPS
-   9.  RESPONSIVE STYLES
-   ============================================== */
-
+/* static/css/main.css */
 
 /* ==============================================
    1. VARIABLES & GLOBAL RESET
@@ -220,19 +190,32 @@ img {
     border: 1px solid #dadce0;
     display: flex;
     align-items: center;
-    justify-content: center;
+    /* justify-content: center;  <-- ВИДАЛІТЬ АБО ЗАКОМЕНТУЙТЕ ЦЕЙ РЯДОК */
+    justify-content: flex-start; /* <-- ДОДАЙТЕ ЦЕЙ РЯДОК */
     gap: 12px;
     font-weight: 500;
-    padding: 10px 20px;
+    padding: 10px 20px; /* Відступи по боках створюють простір зліва */
     transition: background-color 0.3s, border-color 0.3s;
+    white-space: nowrap;
 }
+
 .btn-google:hover {
     background-color: #f8f9fa;
     border-color: #c6c9ce;
 }
+
+/* Переконайтесь, що цей блок залишається без змін */
 .btn-google img {
+    display: inline-block;
     height: 18px;
     width: 18px;
+    flex-shrink: 0;
+}
+
+/* [ДОДАНО] Прибираємо стандартну чорну рамку фокусування для кнопки Google і додаємо свою */
+.btn-google:focus, a.btn-google:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.4); /* Використовуємо тінь фокусу, як на інших елементах */
 }
 
 .btn-sm {
@@ -296,7 +279,6 @@ img {
     min-height: 120px;
     resize: vertical;
 }
-
 
 /* ==============================================
    4. HEADER
@@ -747,6 +729,10 @@ img {
     cursor: pointer;
     font-weight: 500;
     color: var(--gray-color);
+    /* [ВИПРАВЛЕНО] Повністю скидаємо стилі рамки та фону, щоб прибрати дефолтний вигляд кнопки */
+    border: none;
+    background: none;
+    /* [ВИПРАВЛЕНО] Повертаємо тільки потрібну нам нижню рамку */
     border-bottom: 2px solid transparent;
 }
 .auth-tab.active {
@@ -782,6 +768,12 @@ img {
     margin-top: 1rem;
     text-align: center;
 }
+
+/* [ДОДАНО] Спеціальне правило для кнопок в модальному вікні авторизації, щоб гарантовано прибрати небажану рамку */
+.auth-form .btn-primary {
+    border-color: var(--primary-color);
+}
+
 
 /* --- Sidebars (Cart, Cabinet) --- */
 
@@ -1839,4 +1831,39 @@ img {
     .modal-content { width: 95%; }
     .cart-sidebar { max-width: 90%; }
     .carousel-container .product-card { flex-basis: 60%; }
+}
+
+.social-login-header {
+    text-align: center;
+    color: var(--gray-color);
+    margin: 1.5rem 0 1rem 0;
+    font-size: 0.9rem;
+}
+
+.social-login-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.social-login-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    transition: var(--transition);
+}
+
+.social-login-btn:hover {
+    background-color: #f8f9fa;
+    border-color: #ccc;
+}
+
+.social-login-btn img {
+    height: 24px;
+    width: 24px;
+    display: inline-block !important; /* Важливо, щоб перевизначити глобальний стиль */
 }

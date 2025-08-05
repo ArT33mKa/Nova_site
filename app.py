@@ -218,14 +218,14 @@ google_blueprint = make_google_blueprint(scope=["openid", "https://www.googleapi
 app.register_blueprint(google_blueprint, url_prefix="/login")
 
 shop_info = {"name": "НОВА ХВИЛЯ",
-             "categories": [{'name': 'ПОЛИВОЧНА СИСТЕМА', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
-                            {'name': 'НАСОСИ', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
-                            {'name': 'БОЙЛЕРА', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
-                            {'name': 'ЗМІШУВАЧІ', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
-                            {'name': "ВИТЯЖКИ", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
-                            {'name': "КОЛОНКИ", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
-                            {'name': "СУШКА ДЛЯ РУШНИКІВ", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
-                            {'name': "ЗАПЧАСТИНИ ДО ГАЗ ОБЛАДНАННЯ", 'image': 'gas_parts.jpg',
+             "categories": [{'name': 'Поливочна система', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
+                            {'name': 'Насоси', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
+                            {'name': 'Бойлера', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
+                            {'name': 'Змішувачі', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
+                            {'name': "Витяжки", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
+                            {'name': "Колонки", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
+                            {'name': "Сушка для рушників", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
+                            {'name': "Запчастини до газ обладнання", 'image': 'gas_parts.jpg',
                              'icon': 'gas_parts.jpg'}], "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
              "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
              "hours": {"Пн - Пт:": "8:00 - 17:00", "Субота:": "8:00 - 15:00", "Неділя:": "8:00 - 15:00"}}
@@ -277,8 +277,11 @@ def catalog():
     if request.args.get('in_stock'): query = query.filter(Product.in_stock == True)
     if request.args.get('min_rating'): query = query.filter(Product.rating >= 4.0)
     products = query.paginate(page=page, per_page=25, error_out=False)
-    categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0]]
+    # Зміна №2: Додано умову `and c[0].lower() != 'загальна'` для виключення категорії "Загальна"
+    categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0] and c[0].lower() != 'загальна']
     return render_template('catalog.html', products=products, categories=categories)
+
+
 
 
 @app.route("/product/<int:product_id>")

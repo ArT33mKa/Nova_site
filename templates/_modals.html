@@ -1,4 +1,4 @@
-<!-- templates/_modals.html -->
+<!-- templates/_modals.html (ПОВНІСТЮ ОНОВЛЕНА ВЕРСІЯ) -->
 <div id="auth-modal" class="modal">
     <div class="modal-content">
         <button class="close-modal">×</button>
@@ -7,6 +7,7 @@
             <button class="auth-tab" data-tab="register">Реєстрація</button>
         </div>
 
+        <!-- ВКЛАДКА "ВХІД" -->
         <div id="login" class="tab-content active">
             <form id="loginForm" class="auth-form">
                 <div class="form-group"><input type="email" name="email" placeholder="Email" required></div>
@@ -14,10 +15,16 @@
                 <div id="loginError" class="error-message" style="display: none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">Увійти</button>
             </form>
-            <div class="auth-divider"><span>або</span></div>
-            <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block"><img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"> Увійти через Google</a>
+            <!-- [ЗМІНЕНО] Новий блок для входу через соцмережі -->
+            <div class="social-login-header">Або увійдіть за допомогою:</div>
+            <div class="social-login-container">
+                <a href="{{ url_for('google.login') }}" class="social-login-btn google">
+                    <img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google">
+                </a>
+            </div>
         </div>
 
+        <!-- ВКЛАДКА "РЕЄСТРАЦІЯ" -->
         <div id="register" class="tab-content">
             <form id="registerForm" class="auth-form">
                 <div class="form-group-inline" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
@@ -30,13 +37,18 @@
                 <div id="registerError" class="error-message" style="display: none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">Зареєструватися</button>
             </form>
-            <div class="auth-divider"><span>або</span></div>
-            <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block"><img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"> Зареєструватися через Google</a>
+            <!-- [ЗМІНЕНО] Новий блок для реєстрації через соцмережі -->
+            <div class="social-login-header">Або зареєструйтесь за допомогою:</div>
+            <div class="social-login-container">
+                <a href="{{ url_for('google.login') }}" class="social-login-btn google">
+                    <img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google">
+                </a>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- [ОНОВЛЕНО] МОДАЛЬНЕ ВІКНО ОСОБИСТОГО КАБІНЕТУ -->
+<!-- Модальне вікно особистого кабінету (без змін) -->
 <div id="cabinet-modal" class="cabinet-sidebar">
     <div class="cabinet-header">
         {% if current_user.is_authenticated %}
@@ -54,8 +66,6 @@
                         <span>Українська</span>
                         <i class="fas fa-chevron-down"></i>
                     </a>
-                    <!-- Примітка: Функціонал зміни мови потребує значної бекенд логіки.
-                         Це візуальний елемент для майбутньої реалізації. -->
                 </li>
                 <li>
                     <a href="{{ url_for('my_orders') }}" class="cabinet-nav-item">
@@ -63,7 +73,6 @@
                         <span>Мої замовлення</span>
                     </a>
                 </li>
-                <!-- [ВИДАЛЕНО] Зайва кнопка відстеження -->
                 <li>
                     <a href="#" id="cabinet-open-favorites" class="cabinet-nav-item">
                         <i class="fas fa-heart"></i>
@@ -100,7 +109,7 @@
 </div>
 
 
-<!-- БОКОВА ПАНЕЛЬ КОШИКА -->
+<!-- Бокова панель кошика (без змін) -->
 <div id="cart-modal" class="cart-sidebar">
     <div class="cart-header">
         <h3>Ваш кошик</h3>
@@ -116,7 +125,7 @@
     </div>
 </div>
 
-<!-- МОДАЛЬНЕ ВІКНО ОБРАНОГО -->
+<!-- Модальне вікно обраного (без змін) -->
 <div id="favorites-modal" class="modal">
     <div class="modal-content" id="favorites-modal-content">
         <button class="close-modal">×</button>
