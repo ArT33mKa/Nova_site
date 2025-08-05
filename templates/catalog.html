@@ -26,7 +26,7 @@
                             <label class="checkbox-item">
                                 <input type="radio" name="category" value=""
                                        {% if not request.args.get('category') %}checked{% endif %}
-                                       onchange="this.form.submit()">
+                                       onchange="this.form.search.value=''; this.form.submit();">
                                 <strong>Усі категорії</strong>
                             </label>
 
@@ -35,7 +35,7 @@
                             <label class="checkbox-item">
                                 <input type="radio" name="category" value="{{ cat }}"
                                        {% if request.args.get('category') == cat %}checked{% endif %}
-                                       onchange="this.form.submit()">
+                                       onchange="this.form.search.value=''; this.form.submit();">
                                 <!-- [ЗМІНЕНО] Додано .title() для правильного регістру -->
                                 {{ cat.title() }}
                             </label>
