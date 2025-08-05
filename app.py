@@ -271,7 +271,7 @@ def catalog():
     query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
                                  Product.image.notlike('default_tovar%'))
     if search_query := request.args.get('search', ''): query = query.filter(Product.name.ilike(f'%{search_query}%'))
-    if category_arg := request.args.get('category'): query = query.filter(Product.category == category_arg.strip())
+    if category_arg := request.args.get('category'): query = query.filter(func.lower(Product.category) == func.lower(category_arg.strip()))
     if min_price := request.args.get('min_price', type=float): query = query.filter(Product.price >= min_price)
     if max_price := request.args.get('max_price', type=float): query = query.filter(Product.price <= max_price)
     if request.args.get('in_stock'): query = query.filter(Product.in_stock == True)
