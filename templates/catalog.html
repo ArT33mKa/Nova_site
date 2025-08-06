@@ -21,39 +21,50 @@
                 <div class="filter-group">
                     <h4 class="filter-title">Категорії</h4>
                     <div class="category-filter-list">
+                        <!-- [ВИПРАВЛЕНО] Спрощена логіка для 'checked', щоб коректно відображати вибір -->
+                        <label class="checkbox-item">
+                            <input type="radio" name="category" value=""
+                                   {% if not request.args.get('category') %}checked{% endif %}
+                                   onchange="this.form.submit();">
+                            <strong>Усі категорії</strong>
+                        </label>
 
-                            <!-- Опція "Усі категорії" -->
-                            <label class="checkbox-item">
-                                <input type="radio" name="category" value=""
-                                       {% if not request.args.get('category') %}checked{% endif %}
-                                       onchange="this.form.search.value=''; this.form.submit();">
-                                <strong>Усі категорії</strong>
-                            </label>
-
-                            <!-- Цикл для виводу конкретних категорій -->
-                            {% for cat in categories %}
-                            <label class="checkbox-item">
-                                <input type="radio" name="category" value="{{ cat }}"
-                                       {% if request.args.get('category') == cat %}checked{% endif %}
-                                       onchange="this.form.search.value=''; this.form.submit();">
-                                <!-- [ЗМІНЕНО] Додано .title() для правильного регістру -->
-                                {{ cat.title() }}
-                            </label>
-                            {% endfor %}
-                        </div>
-
+                        {% for cat in categories %}
+                        <label class="checkbox-item">
+                            <!-- [ВИПРАВЛЕНО] Спрощена логіка для 'checked', щоб коректно відображати вибір -->
+                            <input type="radio" name="category" value="{{ cat }}"
+                                   {% if request.args.get('category') == cat %}checked{% endif %}
+                                   onchange="this.form.submit();">
+                            {{ cat.title() }}
+                        </label>
+                        {% endfor %}
                     </div>
-                    {% endif %}
+                </div>
+                {% endif %}
 
                 <div class="filter-group">
                     <h4 class="filter-title">Ціна, ₴</h4>
-<!-- Переконайтесь, що у вас цей блок -->
                     <div class="price-inputs">
                         <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
                         <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
                         <button type="submit" class="price-ok-btn">Ок</button>
                     </div>
                 </div>
+
+                <!-- [НОВИЙ БЛОК] Додаткові фільтри -->
+                <div class="filter-group">
+                    <h4 class="filter-title">Інші критерії</h4>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="in_stock" value="true" {% if request.args.get('in_stock') %}checked{% endif %}>
+                        В наявності
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="min_rating" value="4.0" {% if request.args.get('min_rating') %}checked{% endif %}>
+                        Високий рейтинг (4+)
+                    </label>
+                </div>
+                <!-- Кінець нового блоку -->
+
 
                 <button type="submit" class="btn btn-primary btn-block">Застосувати</button>
                 <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути все</a>
@@ -62,7 +73,15 @@
 
         <!-- Основний контент з товарами -->
         <div class="products-container">
-            <h1 class="page-title">{{ request.args.get('category', 'Каталог товарів') }}</h1>
+            <!-- [ЗМІНЕНО] Заголовок тепер показує "Результати пошуку", якщо є пошуковий запит -->
+            <h1 class="page-title">
+                {% if request.args.get('search') %}
+                    Результати пошуку: "{{ request.args.get('search') }}"
+                {% else %}
+                    {{ request.args.get('category', 'Каталог товарів') | title }}
+                {% endif %}
+            </h1>
+
             {% if products.items %}
                 <div class="products-grid">
                     {% for product in products.items %}

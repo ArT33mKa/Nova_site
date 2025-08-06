@@ -43,8 +43,6 @@ try:
 except Exception as e:
     print(f">>> ПОМИЛКА конфігурації Cloudinary: {e}")
 
-
-
 app.jinja_env.add_extension('jinja2.ext.do')
 app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")
 
@@ -267,21 +265,36 @@ def index():
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
-    # [ВИПРАВЛЕНО] Фільтр по 'default_tovar' тепер порівнює тільки ім'я файлу
-    query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
-                                 Product.image.notlike('default_tovar%'))
-    if search_query := request.args.get('search', ''): query = query.filter(Product.name.ilike(f'%{search_query}%'))
-    if category_arg := request.args.get('category'): query = query.filter(func.lower(Product.category) == func.lower(category_arg.strip()))
-    if min_price := request.args.get('min_price', type=float): query = query.filter(Product.price >= min_price)
-    if max_price := request.args.get('max_price', type=float): query = query.filter(Product.price <= max_price)
-    if request.args.get('in_stock'): query = query.filter(Product.in_stock == True)
-    if request.args.get('min_rating'): query = query.filter(Product.rating >= 4.0)
+    # [ВИПРАВЛЕНО] Початкова вибірка тепер включає всі товари,
+    # щоб категорії не виглядали порожніми через жорсткі фільтри.
+    # Користувач може сам відфільтрувати товари за допомогою опцій.
+    query = Product.query
+
+    search_query = request.args.get('search', '')
+    if search_query:
+        query = query.filter(Product.name.ilike(f'%{search_query}%'))
+
+    # [ВИПРАВЛЕНО] Фільтр по категорії тепер коректно працює разом з пошуком.
+    category_arg = request.args.get('category')
+    if category_arg:
+        query = query.filter(func.lower(Product.category) == func.lower(category_arg.strip()))
+
+    if min_price := request.args.get('min_price', type=float):
+        query = query.filter(Product.price >= min_price)
+    if max_price := request.args.get('max_price', type=float):
+        query = query.filter(Product.price <= max_price)
+    if request.args.get('in_stock'):
+        query = query.filter(Product.in_stock == True)
+    if request.args.get('min_rating'):
+        min_rating_val = request.args.get('min_rating', type=float)
+        if min_rating_val:
+            query = query.filter(Product.rating >= min_rating_val)
+
     products = query.paginate(page=page, per_page=25, error_out=False)
-    # Зміна №2: Додано умову `and c[0].lower() != 'загальна'` для виключення категорії "Загальна"
-    categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if c[0] and c[0].lower() != 'загальна']
-    return render_template('catalog.html', products=products, categories=categories)
+    categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if
+                  c[0] and c[0].lower() != 'загальна']
 
-
+    return render_template('catalog.html', products=products, categories=categories, search_query=search_query)
 
 
 @app.route("/product/<int:product_id>")
@@ -693,6 +706,7 @@ def edit_product(product_id):
     image_to_display = product.image if product.image and 'default_tovar' not in product.image else ''
     return render_template("edit_product.html", product=product, image_to_display=image_to_display)
 
+
 @app.route("/admin/delete_review/<int:review_id>", methods=["POST"])
 @login_required
 @admin_required
@@ -780,6 +794,7 @@ def handle_bas_handshake():
     print("BAS: пройдено етап handshake.")
     return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
 
+
 def _get_cloudinary_url(image_filename):
     """
     Внутрішня функція для генерації повного URL зображення з Cloudinary.
@@ -811,6 +826,7 @@ def _get_cloudinary_url(image_filename):
         print(f"!!! ПОМИЛКА генерації Cloudinary URL для ID '{public_id}': {e}")
         # Повертаємо None, щоб в базу не записалося нічого або помилкове значення
         return None
+
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
