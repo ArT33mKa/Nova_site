@@ -4,6 +4,7 @@ import locale
 import smtplib
 import requests  # для Telegram та Нової Пошти
 import cloudinary.utils
+
 from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
@@ -293,25 +294,41 @@ def catalog():
     products = query.paginate(page=page, per_page=10, error_out=False)
     # [НОВЕ] Логіка для групування категорій
     # 1. Визначаємо основні групи, за якими будемо групувати
-    main_groups = [
-        'Насоси', 'Бойлера', 'Змішувачі', 'Витяжки', 'Колонки',
-        'Запчастини', 'Поливочна система', 'Сушка для рушників', 'Комплектуючі', 'Котли'
-    ]
-
-    # 2. Отримуємо всі унікальні назви категорій з бази даних
     raw_categories_query = db.session.query(Product.category).distinct().filter(
         Product.category.isnot(None),
         Product.category != ''
     ).all()
-    raw_categories = [c[0] for c in raw_categories_query if c[0].lower() != 'загальна']
+    raw_categories = [c[0] for c in raw_categories_query if c[0] and c[0].lower() != 'загальна']
 
-    # 3. Створюємо фінальний список, групуючи категорії
+    # 2. Визначаємо "стоп-слова", які не повинні стати групами
+    stop_words = ['до', 'для', 'на', 'із', 'та']
+
+    # 3. Розбиваємо назви на слова і рахуємо їх частоту
+    all_words = []
+    for cat_name in raw_categories:
+        # Приводимо до нижнього регістру і розділяємо слова
+        words = re.findall(r'\b[а-яА-ЯіІїЇєЄa-zA-Z]+\b', cat_name.lower())
+        # Фільтруємо стоп-слова та занадто короткі слова (менше 3 букв)
+        cleaned_words = [word.capitalize() for word in words if word not in stop_words and len(word) > 2]
+        all_words.extend(cleaned_words)
+
+    word_counts = Counter(all_words)
+
+    # 4. Визначаємо головні групи. Це слова, які зустрічаються більше одного разу.
+    # Також додаємо слова, які є повноцінною категорією (наприклад, "Бойлера")
+    main_groups = {word for word, count in word_counts.items() if count > 1}
+    for cat in raw_categories:
+        if cat.capitalize() in main_groups:
+            main_groups.add(cat.capitalize())
+
+    # 5. Створюємо фінальний список, групуючи категорії за знайденими групами
     grouped_categories = set()
     other_categories = []
 
     for cat_name in raw_categories:
         found_group = False
-        for group in main_groups:
+        # Сортуємо групи за довжиною, щоб спочатку перевірялись більш конкретні (напр. "Насоси Погружні")
+        for group in sorted(list(main_groups), key=len, reverse=True):
             if group.lower() in cat_name.lower():
                 grouped_categories.add(group)
                 found_group = True
@@ -319,11 +336,10 @@ def catalog():
         if not found_group:
             other_categories.append(cat_name)
 
-    # 4. Об'єднуємо згруповані категорії та решту, сортуємо
+    # 6. Об'єднуємо згруповані категорії та решту, сортуємо
     final_categories = sorted(list(grouped_categories)) + sorted(other_categories)
     # Переприсвоюємо змінну, яку очікує шаблон
     categories = final_categories
-    # [ЗМІНЕНО] Передаємо пошуковий запит назад в шаблон для відображення
     return render_template('catalog.html', products=products, categories=categories, search_query=search_query)
 
 @app.route('/api/catalog/load_more')
