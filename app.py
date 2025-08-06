@@ -263,9 +263,69 @@ def index():
     return render_template("index.html", products=products, hero_slides=hero_slides)
 
 
+def get_category_hierarchy():
+    """
+    Автоматично створює ієрархічну структуру категорій на основі назв.
+    """
+    # 1. Отримуємо всі унікальні категорії з бази
+    raw_categories_query = db.session.query(Product.category).distinct().filter(
+        Product.category.isnot(None), Product.category != '', Product.category.ilike('% %')
+    ).all()
+    raw_categories = [c[0] for c in raw_categories_query if c[0] and c[0].lower() != 'загальна']
+
+    # 2. Знаходимо потенційні батьківські категорії (спільні слова)
+    stop_words = ['до', 'для', 'на', 'із', 'та', 'з']
+    all_words = []
+    for cat_name in raw_categories:
+        words = re.findall(r'\b[а-яА-ЯіІїЇєЄa-zA-Z]+\b', cat_name.lower())
+        cleaned_words = [word.capitalize() for word in words if word not in stop_words and len(word) > 3]
+        all_words.extend(cleaned_words)
+
+    word_counts = Counter(all_words)
+    # Батьки - це слова, що зустрічаються у назвах 2 або більше разів
+    parent_candidates = {word for word, count in word_counts.items() if count > 1}
+
+    # 3. Будуємо фінальну ієрархію
+    hierarchy = {parent: [] for parent in sorted(list(parent_candidates))}
+    all_children = set()
+
+    # Розподіляємо категорії по батьківських групах
+    for cat in raw_categories:
+        for parent in parent_candidates:
+            if parent.lower() in cat.lower() and parent.lower() != cat.lower():
+                hierarchy[parent].append(cat)
+                all_children.add(cat)
+                break
+
+    # 4. Додаємо категорії, які не потрапили в жодну групу, як самостійні
+    single_categories_query = db.session.query(Product.category).distinct().filter(
+        Product.category.isnot(None), Product.category != ''
+    ).all()
+
+    for cat_tuple in single_categories_query:
+        cat = cat_tuple[0]
+        if cat and cat not in all_children and cat not in hierarchy:
+            # Перевіряємо, чи не є ця категорія частиною вже існуючої
+            is_part_of_other = False
+            for parent in hierarchy:
+                if cat.lower() in parent.lower():
+                    is_part_of_other = True
+                    break
+            if not is_part_of_other:
+                hierarchy[cat] = []
+
+    # 5. Видаляємо батьківські категорії, у яких не виявилося дітей
+    final_hierarchy = {parent: sorted(children) for parent, children in hierarchy.items() if
+                       children or parent not in parent_candidates}
+
+    # Сортуємо головні категорії за алфавітом
+    return dict(sorted(final_hierarchy.items()))
+
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
+
+    CATEGORY_STRUCTURE = get_category_hierarchy()
 
     # Базовий запит до всіх видимих товарів
     base_query = Product.query.filter(
