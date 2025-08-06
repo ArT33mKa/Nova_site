@@ -2014,3 +2014,70 @@ details > summary.filter-title::after { /* Застосовуємо тільки
 .filter-title.always-open::after {
     display: none;
 }
+
+details > summary.filter-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 15px 10px;
+    margin: 0 -10px; /* Візуально розширюємо фон */
+    background-color: #f0f3f5;
+    border-radius: 6px;
+    position: relative;
+}
+
+details > summary.filter-title::after {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+details[open] > summary.filter-title {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    background-color: #e9eef1;
+}
+
+/* Стилі для радіокнопок (кружечків) */
+.radio-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+    cursor: pointer;
+    justify-content: space-between;
+}
+
+.radio-item span:first-of-type {
+    margin-right: auto;
+}
+
+.radio-item input[type="radio"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #ccc;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    position: relative;
+    display: grid;
+    place-content: center;
+}
+
+.radio-item input[type="radio"]::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    transform: scale(0);
+    transition: transform 0.2s ease-in-out;
+}
+
+.radio-item input[type="radio"]:checked {
+    border-color: var(--primary-color);
+}
+.radio-item input[type="radio"]:checked::before {
+    transform: scale(1);
+}

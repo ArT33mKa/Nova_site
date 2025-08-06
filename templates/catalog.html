@@ -48,24 +48,23 @@
                 {% endif %}
 
                 <!-- Фільтр Виробники (Акордеон) -->
-                {% if brand_counts %}
+                {% if category_counts %}
                 <details class="filter-group" open>
-                    <summary class="filter-title">Виробник</summary>
+                    <summary class="filter-title">Категорії</summary>
                     <div class="filter-options-list">
-                        {% for brand, count in brand_counts.items() %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in selected_brands %}checked{% endif %} onchange="this.form.submit()">
-                            <span>{{ brand }}</span>
+                        <!-- Опція "Всі категорії" -->
+                        <label class="radio-item">
+                            <input type="radio" name="category" value="" {% if not selected_category %}checked{% endif %} onchange="this.form.submit()">
+                            <span><strong>Всі категорії</strong></span>
+                        </label>
+
+                        {% for category, count in category_counts.items() %}
+                        <label class="radio-item">
+                            <input type="radio" name="category" value="{{ category }}" {% if category == selected_category %}checked{% endif %} onchange="this.form.submit()">
+                            <span>{{ category.title() }}</span>
                             <span class="filter-count">{{ count }}</span>
                         </label>
                         {% endfor %}
-                        {% if other_brands_count > 0 %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="other" {% if 'other' in selected_brands %}checked{% endif %} onchange="this.form.submit()">
-                            <span>Інші виробники</span>
-                            <span class="filter-count">{{ other_brands_count }}</span>
-                        </label>
-                        {% endif %}
                     </div>
                 </details>
                 {% endif %}

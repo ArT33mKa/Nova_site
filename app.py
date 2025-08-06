@@ -266,76 +266,92 @@ def index():
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
-    query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
-                                 Product.image.notlike('default_tovar%'))
 
+    # Базовий запит до всіх видимих товарів
+    base_query = Product.query.filter(
+        Product.in_stock == True,
+        and_(Product.description != None, Product.description != ''),
+        Product.image.notlike('default_tovar%')
+    )
+
+    # Отримуємо параметри з URL
     search_query = request.args.get('search', '')
-    if search_query:
-        query = query.filter(Product.name.ilike(f'%{search_query}%'))
-
-    # [НОВЕ] Обробка множинних фільтрів по категорії та бренду
-    selected_categories = request.args.getlist('category')
-    if selected_categories:
-        # Створюємо умови OR для кожної обраної категорії
-        category_conditions = [Product.category.ilike(f'%{cat}%') for cat in selected_categories]
-        query = query.filter(db.or_(*category_conditions))
-
+    selected_category = request.args.get('category', '')
     selected_brands = request.args.getlist('brand')
+    min_price = request.args.get('min_price', type=float)
+    max_price = request.args.get('max_price', type=float)
+
+    # Фільтруємо основний запит (для відображення товарів)
+    filtered_query = base_query
+    if search_query:
+        filtered_query = filtered_query.filter(Product.name.ilike(f'%{search_query}%'))
+    if selected_category:
+        filtered_query = filtered_query.filter(Product.category.ilike(f'%{selected_category}%'))
     if selected_brands:
-        # Обробка для "Інших" виробників
         if "other" in selected_brands:
-            # Знаходимо бренди, які мають 3 або менше товарів
             subquery = db.session.query(Product.brand, func.count(Product.id).label('count')).group_by(
                 Product.brand).subquery()
-            other_brands_list = [r.brand for r in
-                                 db.session.query(subquery.c.brand).filter(subquery.c.count <= 3).all()]
-
-            # Додаємо умову для пошуку в списку "інших" брендів
+            other_brands_list = [r.brand for r in db.session.query(subquery.c.brand).filter(subquery.c.count <= 3).all()
+                                 if r.brand]
             brand_conditions = [Product.brand.in_(other_brands_list)]
-            # Якщо були обрані й інші бренди, додаємо їх теж
             regular_brands = [b for b in selected_brands if b != "other"]
             if regular_brands:
                 brand_conditions.append(Product.brand.in_(regular_brands))
-
-            query = query.filter(db.or_(*brand_conditions))
+            filtered_query = filtered_query.filter(db.or_(*brand_conditions))
         else:
-            query = query.filter(Product.brand.in_(selected_brands))
+            filtered_query = filtered_query.filter(Product.brand.in_(selected_brands))
+    if min_price:
+        filtered_query = filtered_query.filter(Product.price >= min_price)
+    if max_price:
+        filtered_query = filtered_query.filter(Product.price <= max_price)
 
-    if min_price := request.args.get('min_price', type=float):
-        query = query.filter(Product.price >= min_price)
-    if max_price := request.args.get('max_price', type=float):
-        query = query.filter(Product.price <= max_price)
+    # [НОВА ЛОГІКА] Динамічне формування лічильників для фільтрів
 
-    # [НОВЕ] Функція для отримання та групування фільтрів з лічильниками
-    def get_filter_items(model_column, threshold=3):
-        # Запит, який рахує кількість товарів для кожного унікального значення в колонці
-        counts = db.session.query(model_column, func.count(Product.id).label('count')) \
-            .filter(model_column.isnot(None), model_column != '') \
-            .group_by(model_column).all()
+    # 1. Лічильники для категорій
+    category_query = base_query
+    if selected_brands:  # Якщо обрані бренди, рахуємо категорії тільки для них
+        if "other" in selected_brands:
+            subquery_brands = db.session.query(Product.brand, func.count(Product.id).label('count')).group_by(
+                Product.brand).subquery()
+            other_brands_list_cat = [r.brand for r in db.session.query(subquery_brands.c.brand).filter(
+                subquery_brands.c.count <= 3).all() if r.brand]
+            brand_conditions_cat = [Product.brand.in_(other_brands_list_cat)]
+            regular_brands_cat = [b for b in selected_brands if b != "other"]
+            if regular_brands_cat:
+                brand_conditions_cat.append(Product.brand.in_(regular_brands_cat))
+            category_query = category_query.filter(db.or_(*brand_conditions_cat))
+        else:
+            category_query = category_query.filter(Product.brand.in_(selected_brands))
 
-        # Розділяємо на основні елементи (> threshold) та "інші" (<= threshold)
-        main_items = {item: count for item, count in counts if count > threshold}
-        other_items_count = sum(count for item, count in counts if count <= threshold)
+    category_counts_raw = db.session.query(Product.category, func.count(Product.id)) \
+        .select_from(category_query.subquery()) \
+        .group_by(Product.category).all()
+    category_counts = dict(sorted(category_counts_raw, key=lambda item: item[1], reverse=True))
 
-        # Сортуємо основні елементи за кількістю товарів (від більшого до меншого)
-        sorted_main = dict(sorted(main_items.items(), key=lambda item: item[1], reverse=True))
+    # 2. Лічильники для брендів
+    brand_query = base_query
+    if selected_category:  # Якщо обрана категорія, рахуємо бренди тільки для неї
+        brand_query = brand_query.filter(Product.category.ilike(f'%{selected_category}%'))
 
-        return sorted_main, other_items_count
+    brand_counts_raw = db.session.query(Product.brand, func.count(Product.id)) \
+        .select_from(brand_query.subquery()) \
+        .filter(Product.brand.isnot(None), Product.brand != '') \
+        .group_by(Product.brand).all()
 
-    # Отримуємо дані для фільтрів
-    category_counts, other_categories_count = get_filter_items(Product.category)
-    brand_counts, other_brands_count = get_filter_items(Product.brand)
+    # Групуємо бренди на "основні" та "інші"
+    brand_counts_main = {brand: count for brand, count in brand_counts_raw if count > 3}
+    other_brands_count = sum(count for brand, count in brand_counts_raw if count <= 3)
+    brand_counts = dict(sorted(brand_counts_main.items(), key=lambda item: item[1], reverse=True))
 
-    # Пагінація залишається для початкового завантаження
-    products = query.order_by(Product.id.desc()).paginate(page=page, per_page=10, error_out=False)
+    # Пагінація для товарів
+    products = filtered_query.order_by(Product.id.desc()).paginate(page=page, per_page=10, error_out=False)
 
     return render_template('catalog.html',
                            products=products,
                            category_counts=category_counts,
-                           other_categories_count=other_categories_count,
                            brand_counts=brand_counts,
                            other_brands_count=other_brands_count,
-                           selected_categories=selected_categories,
+                           selected_category=selected_category,
                            selected_brands=selected_brands,
                            search_query=search_query)
 
