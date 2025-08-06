@@ -31,22 +31,6 @@
                     </div>
                 </div>
 
-                <!-- Фільтр Категорії (Акордеон) -->
-                {% if category_counts %}
-                <details class="filter-group" open>
-                    <summary class="filter-title">Категорії</summary>
-                    <div class="filter-options-list">
-                        {% for category, count in category_counts.items() %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="category" value="{{ category }}" {% if category in selected_categories %}checked{% endif %} onchange="this.form.submit()">
-                            <span>{{ category.title() }}</span>
-                            <span class="filter-count">{{ count }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                {% endif %}
-
                 <!-- Фільтр Виробники (Акордеон) -->
                 {% if category_counts %}
                 <details class="filter-group" open>
