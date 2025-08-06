@@ -21,19 +21,19 @@
                 <div class="filter-group">
                     <h4 class="filter-title">Категорії</h4>
                     <div class="category-filter-list">
-                        <!-- [ВИПРАВЛЕНО] Спрощена логіка для 'checked', щоб коректно відображати вибір -->
+                        <!-- [ЗМІНЕНО] Логіка 'checked' тепер враховує наявність пошукового запиту -->
                         <label class="checkbox-item">
                             <input type="radio" name="category" value=""
-                                   {% if not request.args.get('category') %}checked{% endif %}
+                                   {% if request.args.get('search') or not request.args.get('category') %}checked{% endif %}
                                    onchange="this.form.submit();">
                             <strong>Усі категорії</strong>
                         </label>
 
                         {% for cat in categories %}
                         <label class="checkbox-item">
-                            <!-- [ВИПРАВЛЕНО] Спрощена логіка для 'checked', щоб коректно відображати вибір -->
+                            <!-- [ЗМІНЕНО] Логіка 'checked' тепер враховує наявність пошукового запиту -->
                             <input type="radio" name="category" value="{{ cat }}"
-                                   {% if request.args.get('category') == cat %}checked{% endif %}
+                                   {% if not request.args.get('search') and request.args.get('category') == cat %}checked{% endif %}
                                    onchange="this.form.submit();">
                             {{ cat.title() }}
                         </label>

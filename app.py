@@ -265,19 +265,17 @@ def index():
 @app.route('/catalog')
 def catalog():
     page = request.args.get('page', 1, type=int)
-    # [ВИПРАВЛЕНО] Початкова вибірка тепер включає всі товари,
-    # щоб категорії не виглядали порожніми через жорсткі фільтри.
-    # Користувач може сам відфільтрувати товари за допомогою опцій.
-    query = Product.query
+    query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
+                                 Product.image.notlike('default_tovar%'))
 
     search_query = request.args.get('search', '')
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    # [ВИПРАВЛЕНО] Фільтр по категорії тепер коректно працює разом з пошуком.
+    # [ЗМІНЕНО] Фільтр по категорії застосовується тільки якщо НЕМАЄ пошукового запиту
     category_arg = request.args.get('category')
-    if category_arg:
-        query = query.filter(func.lower(Product.category) == func.lower(category_arg.strip()))
+    if category_arg and not search_query:
+        query = query.filter(Product.category.ilike(f'%{category_arg.strip()}%'))
 
     if min_price := request.args.get('min_price', type=float):
         query = query.filter(Product.price >= min_price)
@@ -286,6 +284,7 @@ def catalog():
     if request.args.get('in_stock'):
         query = query.filter(Product.in_stock == True)
     if request.args.get('min_rating'):
+        # [ЗМІНЕНО] Тепер використовуємо float, оскільки значення передається як "4.0"
         min_rating_val = request.args.get('min_rating', type=float)
         if min_rating_val:
             query = query.filter(Product.rating >= min_rating_val)
@@ -294,6 +293,7 @@ def catalog():
     categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if
                   c[0] and c[0].lower() != 'загальна']
 
+    # [ЗМІНЕНО] Передаємо пошуковий запит назад в шаблон для відображення
     return render_template('catalog.html', products=products, categories=categories, search_query=search_query)
 
 
