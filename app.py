@@ -1043,7 +1043,7 @@ def bas_import():
                 # 2. Якщо не знайшли, шукаємо відомі бренди в тексті
                 if not brand:
                     # Сортуємо бренди за довжиною, щоб "Насоси плюс обладнання" знайшлося раніше, ніж "Насоси"
-                    for known_brand in sorted(known_browsers, key=len, reverse=True):
+                    for known_brand in sorted(known_brands, key=len, reverse=True):
                         if re.search(r'\b' + re.escape(known_brand) + r'\b', description, re.IGNORECASE):
                             brand = known_brand
                             break
