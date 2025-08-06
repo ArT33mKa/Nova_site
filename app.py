@@ -291,9 +291,38 @@ def catalog():
             query = query.filter(Product.rating >= min_rating_val)
 
     products = query.paginate(page=page, per_page=10, error_out=False)
-    categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if
-                  c[0] and c[0].lower() != 'загальна']
+    # [НОВЕ] Логіка для групування категорій
+    # 1. Визначаємо основні групи, за якими будемо групувати
+    main_groups = [
+        'Насоси', 'Бойлера', 'Змішувачі', 'Витяжки', 'Колонки',
+        'Запчастини', 'Поливочна система', 'Сушка для рушників', 'Комплектуючі', 'Котли'
+    ]
 
+    # 2. Отримуємо всі унікальні назви категорій з бази даних
+    raw_categories_query = db.session.query(Product.category).distinct().filter(
+        Product.category.isnot(None),
+        Product.category != ''
+    ).all()
+    raw_categories = [c[0] for c in raw_categories_query if c[0].lower() != 'загальна']
+
+    # 3. Створюємо фінальний список, групуючи категорії
+    grouped_categories = set()
+    other_categories = []
+
+    for cat_name in raw_categories:
+        found_group = False
+        for group in main_groups:
+            if group.lower() in cat_name.lower():
+                grouped_categories.add(group)
+                found_group = True
+                break
+        if not found_group:
+            other_categories.append(cat_name)
+
+    # 4. Об'єднуємо згруповані категорії та решту, сортуємо
+    final_categories = sorted(list(grouped_categories)) + sorted(other_categories)
+    # Переприсвоюємо змінну, яку очікує шаблон
+    categories = final_categories
     # [ЗМІНЕНО] Передаємо пошуковий запит назад в шаблон для відображення
     return render_template('catalog.html', products=products, categories=categories, search_query=search_query)
 

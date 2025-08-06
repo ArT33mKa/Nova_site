@@ -1875,3 +1875,53 @@ img {
     width: 24px;
     display: inline-block !important; /* Важливо, щоб перевизначити глобальний стиль */
 }
+
+.sticky-sidebar {
+    position: -webkit-sticky; /* Для Safari */
+    position: sticky;
+    top: 100px; /* Відстань від верху екрана (висота хедера + 20px) */
+    align-self: start; /* Важливо, щоб елемент "прилипав" до початку контейнера */
+    max-height: calc(100vh - 120px); /* Максимальна висота, щоб вміщувались елементи */
+    overflow-y: auto; /* Додаємо прокрутку, якщо фільтрів забагато */
+}
+
+/* Ховаємо некрасивий скролбар, залишаючи можливість скролити */
+.sticky-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+.sticky-sidebar::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 3px;
+}
+
+
+/* 2. Розтягуємо контейнер для кнопки "Показати ще" */
+.load-more-container {
+    /* Це правило застосовується до всього блоку, де лежить кнопка */
+    grid-column: 1 / -1; /* Головний фікс: розтягуємо на всі колонки grid-контейнера */
+    width: 100%;
+    text-align: center;
+    margin-top: 40px;
+    padding: 20px 0;
+}
+
+/* 3. Стилізуємо саму кнопку, щоб вона теж була широкою */
+#load-more-btn {
+    width: 100%; /* Кнопка займає всю ширину свого контейнера */
+    max-width: 400px; /* Але не стає надто широкою на великих екранах */
+    padding: 15px 30px;
+    font-size: 1.1rem;
+}
+
+/* [ДОДАТКОВО] Виправляємо поведінку на мобільних пристроях */
+@media (max-width: 900px) {
+    .sticky-sidebar {
+        position: static; /* Відключаємо "липкість" на мобільних, бо там інший макет */
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    .load-more-container {
+        grid-column: auto; /* Скидаємо розтягування на мобільних */
+    }
+}
