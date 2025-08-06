@@ -8,7 +8,7 @@
     </div>
 
     <div class="catalog-content">
-        <!-- БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ (НОВА ВЕРСІЯ) -->
+        <!-- БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ (ВИПРАВЛЕНА ВЕРСІЯ) -->
         <aside class="filters-sidebar sticky-sidebar">
             <div class="filters-header">
                 <h3 class="filter-section-title">Фільтри</h3>
@@ -21,18 +21,29 @@
                     <input type="text" name="search" class="form-control" placeholder="Пошук за назвою..." value="{{ search_query }}">
                 </div>
 
+                <!-- Фільтр по ціні (винесено окремо) -->
+                <div class="filter-group">
+                    <h4 class="filter-title always-open">Ціна, ₴</h4>
+                    <div class="price-inputs">
+                        <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
+                        <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
+                        <button type="submit" class="price-ok-btn">Ок</button>
+                    </div>
+                </div>
+
                 <!-- Фільтр Категорії (Акордеон) -->
                 {% if category_counts %}
                 <details class="filter-group" open>
                     <summary class="filter-title">Категорії</summary>
-                        <div class="filter-group">
-                            <h4 class="filter-title always-open">Ціна, ₴</h4>
-                            <div class="price-inputs">
-                                <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
-                                <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
-                                <button type="submit" class="price-ok-btn">Ок</button>
-                            </div>
-                        </div>
+                    <div class="filter-options-list">
+                        {% for category, count in category_counts.items() %}
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="category" value="{{ category }}" {% if category in selected_categories %}checked{% endif %} onchange="this.form.submit()">
+                            <span>{{ category.title() }}</span>
+                            <span class="filter-count">{{ count }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
                 </details>
                 {% endif %}
 
