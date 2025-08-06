@@ -35,15 +35,14 @@
                 {% if category_counts %}
                 <details class="filter-group" open>
                     <summary class="filter-title">Категорії</summary>
-                    <div class="filter-options-list">
-                        {% for category, count in category_counts.items() %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="category" value="{{ category }}" {% if category in selected_categories %}checked{% endif %} onchange="this.form.submit()">
-                            <span>{{ category }}</span>
-                            <span class="filter-count">{{ count }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
+                        <div class="filter-group">
+                            <h4 class="filter-title always-open">Ціна, ₴</h4>
+                            <div class="price-inputs">
+                                <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
+                                <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
+                                <button type="submit" class="price-ok-btn">Ок</button>
+                            </div>
+                        </div>
                 </details>
                 {% endif %}
 
