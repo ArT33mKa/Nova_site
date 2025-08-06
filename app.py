@@ -18,7 +18,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_dance.consumer.storage.sqla import SQLAlchemyStorage
 from flask_dance.contrib.google import make_google_blueprint, google
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, make_response, render_template, request, redirect, url_for, session, jsonify, flash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import xml.etree.ElementTree as ET
 from werkzeug.exceptions import Unauthorized
@@ -218,8 +218,8 @@ app.register_blueprint(google_blueprint, url_prefix="/login")
 shop_info = {"name": "НОВА ХВИЛЯ",
              "categories": [{'name': 'Поливочна система', 'image': 'irrigation.jpg', 'icon': 'irrigation.jpg'},
                             {'name': 'Насоси', 'image': 'pumps.jpg', 'icon': 'pumps.jpg'},
-                            {'name': 'Бойлера', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
-                            {'name': 'Змішувачі', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
+                            {'name': 'Бойлер', 'image': 'boilers.jpg', 'icon': 'boilers.jpg'},
+                            {'name': 'Змішувач', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
                             {'name': "Витяжки", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
                             {'name': "Колонки", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
                             {'name': "Сушка для рушників", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
@@ -275,6 +275,7 @@ def catalog():
     # [ЗМІНЕНО] Фільтр по категорії застосовується тільки якщо НЕМАЄ пошукового запиту
     category_arg = request.args.get('category')
     if category_arg and not search_query:
+        # ВИПРАВЛЕННЯ: шукаємо не точну відповідність, а входження (напр. "Насоси" знайде "Відцентрові Насоси")
         query = query.filter(Product.category.ilike(f'%{category_arg.strip()}%'))
 
     if min_price := request.args.get('min_price', type=float):
@@ -289,13 +290,53 @@ def catalog():
         if min_rating_val:
             query = query.filter(Product.rating >= min_rating_val)
 
-    products = query.paginate(page=page, per_page=25, error_out=False)
+    products = query.paginate(page=page, per_page=10, error_out=False)
     categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if
                   c[0] and c[0].lower() != 'загальна']
 
     # [ЗМІНЕНО] Передаємо пошуковий запит назад в шаблон для відображення
     return render_template('catalog.html', products=products, categories=categories, search_query=search_query)
 
+@app.route('/api/catalog/load_more')
+def load_more_products():
+    page = request.args.get('page', 2, type=int)
+    per_page = 10
+
+    query = Product.query.filter(Product.in_stock == True, and_(Product.description != None, Product.description != ''),
+                                 Product.image.notlike('default_tovar%'))
+
+    search_query = request.args.get('search', '')
+    if search_query:
+        query = query.filter(Product.name.ilike(f'%{search_query}%'))
+    else:
+        category_arg = request.args.get('category')
+        if category_arg:
+            query = query.filter(Product.category.ilike(f'%{category_arg.strip()}%'))
+
+    if min_price := request.args.get('min_price', type=float):
+        query = query.filter(Product.price >= min_price)
+    if max_price := request.args.get('max_price', type=float):
+        query = query.filter(Product.price <= max_price)
+    if request.args.get('in_stock'):
+        query = query.filter(Product.in_stock == True)
+    if min_rating_val := request.args.get('min_rating', type=float):
+        if min_rating_val:
+            query = query.filter(Product.rating >= min_rating_val)
+
+    products_page = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    if not products_page.items:
+        response = make_response("")
+        response.headers['X-More-Available'] = 'false'
+        return response
+
+    html_string = ""
+    for product in products_page.items:
+        html_string += render_template('_product_card.html', product=product)
+
+    response = make_response(html_string)
+    response.headers['X-More-Available'] = 'true' if products_page.has_next else 'false'
+    return response
 
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):

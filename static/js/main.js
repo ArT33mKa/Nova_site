@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
-
+    initLoadMore();
     updateCartView();
     updateFavoritesUI();
 
@@ -626,4 +626,49 @@ function initSimilarProductsCarousel() {
         updateButtons();
     });
     updateButtons();
+}
+
+function initLoadMore() {
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    const productsGrid = document.querySelector('.products-grid');
+    const loadingSpinner = document.getElementById('loading-spinner');
+
+    if (!loadMoreBtn || !productsGrid) {
+        return;
+    }
+
+    let currentPage = 1;
+
+    loadMoreBtn.addEventListener('click', () => {
+        currentPage++;
+        loadMoreBtn.style.display = 'none';
+        if (loadingSpinner) loadingSpinner.style.display = 'block';
+
+        const params = new URLSearchParams(window.location.search);
+        params.set('page', currentPage);
+
+        fetch(`/api/catalog/load_more?${params.toString()}`)
+            .then(response => {
+                const moreAvailable = response.headers.get('X-More-Available') === 'true';
+                return response.text().then(html => ({ html, moreAvailable }));
+            })
+            .then(({ html, moreAvailable }) => {
+                if (html.trim() !== "") {
+                    productsGrid.insertAdjacentHTML('beforeend', html);
+                }
+
+                if (moreAvailable) {
+                    loadMoreBtn.style.display = 'inline-block';
+                } else {
+                    loadMoreBtn.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading more products:', error);
+                loadMoreBtn.style.display = 'inline-block';
+            })
+            .finally(() => {
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
+            });
+    });
 }

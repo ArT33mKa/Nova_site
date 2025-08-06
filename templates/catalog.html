@@ -89,17 +89,15 @@
                     {% endfor %}
                 </div>
 
-                <!-- Пагінація -->
-                <div class="pagination">
-                    <div class="pagination-controls">
-                        {% set query_params = request.args.to_dict() %}{% do query_params.pop('page', None) %}
-                        {% if products.has_prev %}<a href="{{ url_for('catalog', page=products.prev_num, **query_params) }}" class="page-link">«</a>{% endif %}
-                        {% for page_num in products.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                            {% if page_num %}<a href="{{ url_for('catalog', page=page_num, **query_params) }}" class="page-link {{ 'active' if products.page == page_num else '' }}">{{ page_num }}</a>{% else %}<span class="page-dots">...</span>{% endif %}
-                        {% endfor %}
-                        {% if products.has_next %}<a href="{{ url_for('catalog', page=products.next_num, **query_params) }}" class="page-link">»</a>{% endif %}
-                    </div>
+                <div class="load-more-container" style="text-align: center; margin-top: 40px;">
+                    {% if products.has_next %}
+                        <button id="load-more-btn" class="btn btn-primary btn-lg">Показати ще</button>
+                        <div id="loading-spinner" style="display: none; margin-top: 20px;">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color);"></i>
+                        </div>
+                    {% endif %}
                 </div>
+
             {% else %}
                 <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
                     <h3>Товарів за вашими критеріями не знайдено.</h3>
