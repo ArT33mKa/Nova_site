@@ -1011,6 +1011,8 @@ def bas_import():
             # [НОВЕ] "Розумне" визначення бренду з опису
             brand = None
             if description:
+                clean_description = description.replace('<br>', '\n').replace('<BR>', '\n')
+
                 # Список можливих ключових слів для пошуку бренду
                 brand_keywords = ['виробник:', 'бренд:', 'виробництво:', 'торгова марка:']
                 # Список відомих брендів (можна доповнювати)
@@ -1019,34 +1021,38 @@ def bas_import():
                     'Immergas', 'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis',
                     'Pedrollo', 'Pentax', 'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut',
                     'Aquatica', 'Thermo Alliance', 'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor',
-                    'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення'
+                    'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення', 'Gerts'
                 ]
 
                 # 1. Спроба знайти бренд за ключовими словами
                 for keyword in brand_keywords:
-                    if keyword in description.lower():
+                    if keyword in clean_description.lower():
                         # Знаходимо позицію після ключового слова
-                        start_index = description.lower().find(keyword) + len(keyword)
-                        # Беремо наступні ~30 символів
-                        line_after_keyword = description[start_index:].strip()
-                        # Знаходимо кінець рядка або наступний розділовий знак
-                        end_of_brand = re.search(r'[\n;.]', line_after_keyword)
-                        if end_of_brand:
-                            brand_candidate = line_after_keyword[:end_of_brand.start()].strip()
-                        else:
-                            brand_candidate = line_after_keyword.split()[0]  # Беремо перше слово
+                        start_index = clean_description.lower().find(keyword) + len(keyword)
+                        # Беремо рядок після ключового слова
+                        line_after_keyword = clean_description[start_index:].strip()
+                        # Розділяємо по переносу рядка і беремо першу частину
+                        brand_candidate = line_after_keyword.split('\n')[0].strip()
 
                         if brand_candidate:
-                            brand = brand_candidate.title()
+                            brand = brand_candidate
                             break
 
                 # 2. Якщо не знайшли, шукаємо відомі бренди в тексті
                 if not brand:
                     # Сортуємо бренди за довжиною, щоб "Насоси плюс обладнання" знайшлося раніше, ніж "Насоси"
                     for known_brand in sorted(known_brands, key=len, reverse=True):
-                        if re.search(r'\b' + re.escape(known_brand) + r'\b', description, re.IGNORECASE):
+                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description, re.IGNORECASE):
                             brand = known_brand
                             break
+
+            # 3. [ВАЖЛИВО] Очищення та обмеження довжини знайденого бренду
+            if brand:
+                # Прибираємо зайві символи і залишаємо тільки текст
+                brand = re.sub(r'<[^>]+>', '', brand).strip()
+                # Обрізаємо до 100 символів, щоб гарантовано уникнути помилки
+                brand = brand[:100]
+
             if product:
                 # Оновлюємо існуючий товар
                 product.price = price
