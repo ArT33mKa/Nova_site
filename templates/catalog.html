@@ -31,7 +31,7 @@
                     </div>
                 </div>
 
-                <!-- Фільтр Виробники (Акордеон) -->
+                <!-- Фільтр Категорії (Радіокнопки) -->
                 {% if category_counts %}
                 <details class="filter-group" open>
                     <summary class="filter-title">Категорії</summary>
@@ -49,6 +49,29 @@
                             <span class="filter-count">{{ count }}</span>
                         </label>
                         {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+
+                <!-- Фільтр Виробники (Акордеон) - ВІДНОВЛЕНИЙ БЛОК -->
+                {% if brand_counts or other_brands_count > 0 %}
+                <details class="filter-group" open>
+                    <summary class="filter-title">Виробник</summary>
+                    <div class="filter-options-list">
+                        {% for brand, count in brand_counts.items() %}
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in selected_brands %}checked{% endif %} onchange="this.form.submit()">
+                            <span>{{ brand }}</span>
+                            <span class="filter-count">{{ count }}</span>
+                        </label>
+                        {% endfor %}
+                        {% if other_brands_count > 0 %}
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="other" {% if 'other' in selected_brands %}checked{% endif %} onchange="this.form.submit()">
+                            <span>Інші виробники</span>
+                            <span class="filter-count">{{ other_brands_count }}</span>
+                        </label>
+                        {% endif %}
                     </div>
                 </details>
                 {% endif %}
