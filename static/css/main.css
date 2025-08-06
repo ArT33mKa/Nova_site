@@ -1925,3 +1925,86 @@ img {
         grid-column: auto; /* Скидаємо розтягування на мобільних */
     }
 }
+
+.filters-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.filters-header .filter-section-title {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border: none;
+    text-align: left;
+}
+.filters-header .filter-section-title::after {
+    display: none;
+}
+
+.filter-group {
+    border-bottom: 1px solid var(--light-gray);
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+}
+.filter-group:last-of-type {
+    border-bottom: none;
+    margin-bottom: 25px;
+}
+
+details.filter-group {
+    padding-bottom: 0;
+}
+
+details > summary {
+    list-style: none; /* Прибирає стандартний маркер */
+    cursor: pointer;
+    padding: 10px 0;
+}
+summary::-webkit-details-marker {
+    display: none; /* Прибирає маркер в Chrome */
+}
+
+.filter-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Стрілочка для акордеону */
+.filter-title::after {
+    content: '▲';
+    font-size: 0.8rem;
+    transition: transform 0.2s ease-in-out;
+    transform: rotate(180deg);
+}
+
+details[open] > summary .filter-title::after {
+    transform: rotate(0deg);
+}
+
+.filter-options-list {
+    padding: 10px 0 20px 5px;
+}
+
+.checkbox-item {
+    justify-content: space-between; /* Розносить елементи по боках */
+    gap: 10px;
+}
+
+.checkbox-item span:first-of-type {
+    margin-right: auto; /* Текст займає весь доступний простір */
+    word-break: break-word;
+}
+
+.filter-count {
+    font-size: 0.85rem;
+    color: var(--gray-color);
+    background-color: var(--light-gray);
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}

@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
     initLoadMore();
+    initFilterAccordion();
     updateCartView();
     updateFavoritesUI();
 
@@ -670,5 +671,20 @@ function initLoadMore() {
             .finally(() => {
                 if (loadingSpinner) loadingSpinner.style.display = 'none';
             });
+    });
+}
+
+function initFilterAccordion() {
+    const toggleBtn = document.getElementById('toggle-filters-btn');
+    const filters = document.querySelectorAll('details.filter-group');
+
+    if (!toggleBtn || filters.length === 0) return;
+
+    toggleBtn.addEventListener('click', () => {
+        const isHiding = toggleBtn.textContent === 'Сховати все';
+        filters.forEach(filter => {
+            filter.open = !isHiding;
+        });
+        toggleBtn.textContent = isHiding ? 'Показати все' : 'Сховати все';
     });
 }

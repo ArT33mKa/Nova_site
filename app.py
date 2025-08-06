@@ -152,6 +152,7 @@ class Product(db.Model):
     # [ВИПРАВЛЕНО] Зберігаємо тільки ім'я файлу (напр. 'tovar.jpg'), а не повний URL
     image = db.Column(db.String(255), nullable=True)
     category = db.Column(db.String(100))
+    brand = db.Column(db.String(100), index=True, nullable=True)
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
     reviews_count = db.Column(db.Integer, default=0)
@@ -272,30 +273,71 @@ def catalog():
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    # [ЗМІНЕНО] Фільтр по категорії застосовується тільки якщо НЕМАЄ пошукового запиту
-    category_arg = request.args.get('category')
-    if category_arg and not search_query:
-        # ВИПРАВЛЕННЯ: шукаємо не точну відповідність, а входження (напр. "Насоси" знайде "Відцентрові Насоси")
-        query = query.filter(Product.category.ilike(f'%{category_arg.strip()}%'))
+    # [НОВЕ] Обробка множинних фільтрів по категорії та бренду
+    selected_categories = request.args.getlist('category')
+    if selected_categories:
+        # Створюємо умови OR для кожної обраної категорії
+        category_conditions = [Product.category.ilike(f'%{cat}%') for cat in selected_categories]
+        query = query.filter(db.or_(*category_conditions))
+
+    selected_brands = request.args.getlist('brand')
+    if selected_brands:
+        # Обробка для "Інших" виробників
+        if "other" in selected_brands:
+            # Знаходимо бренди, які мають 3 або менше товарів
+            subquery = db.session.query(Product.brand, func.count(Product.id).label('count')).group_by(
+                Product.brand).subquery()
+            other_brands_list = [r.brand for r in
+                                 db.session.query(subquery.c.brand).filter(subquery.c.count <= 3).all()]
+
+            # Додаємо умову для пошуку в списку "інших" брендів
+            brand_conditions = [Product.brand.in_(other_brands_list)]
+            # Якщо були обрані й інші бренди, додаємо їх теж
+            regular_brands = [b for b in selected_brands if b != "other"]
+            if regular_brands:
+                brand_conditions.append(Product.brand.in_(regular_brands))
+
+            query = query.filter(db.or_(*brand_conditions))
+        else:
+            query = query.filter(Product.brand.in_(selected_brands))
 
     if min_price := request.args.get('min_price', type=float):
         query = query.filter(Product.price >= min_price)
     if max_price := request.args.get('max_price', type=float):
         query = query.filter(Product.price <= max_price)
-    if request.args.get('in_stock'):
-        query = query.filter(Product.in_stock == True)
-    if request.args.get('min_rating'):
-        # [ЗМІНЕНО] Тепер використовуємо float, оскільки значення передається як "4.0"
-        min_rating_val = request.args.get('min_rating', type=float)
-        if min_rating_val:
-            query = query.filter(Product.rating >= min_rating_val)
 
-    products = query.paginate(page=page, per_page=10, error_out=False)
-    categories = [c[0] for c in db.session.query(Product.category).distinct().order_by(Product.category).all() if
-                  c[0] and c[0].lower() != 'загальна']
+    # [НОВЕ] Функція для отримання та групування фільтрів з лічильниками
+    def get_filter_items(model_column, threshold=3):
+        # Запит, який рахує кількість товарів для кожного унікального значення в колонці
+        counts = db.session.query(model_column, func.count(Product.id).label('count')) \
+            .filter(model_column.isnot(None), model_column != '') \
+            .group_by(model_column).all()
 
-    # [ЗМІНЕНО] Передаємо пошуковий запит назад в шаблон для відображення
-    return render_template('catalog.html', products=products, categories=categories, search_query=search_query)
+        # Розділяємо на основні елементи (> threshold) та "інші" (<= threshold)
+        main_items = {item: count for item, count in counts if count > threshold}
+        other_items_count = sum(count for item, count in counts if count <= threshold)
+
+        # Сортуємо основні елементи за кількістю товарів (від більшого до меншого)
+        sorted_main = dict(sorted(main_items.items(), key=lambda item: item[1], reverse=True))
+
+        return sorted_main, other_items_count
+
+    # Отримуємо дані для фільтрів
+    category_counts, other_categories_count = get_filter_items(Product.category)
+    brand_counts, other_brands_count = get_filter_items(Product.brand)
+
+    # Пагінація залишається для початкового завантаження
+    products = query.order_by(Product.id.desc()).paginate(page=page, per_page=10, error_out=False)
+
+    return render_template('catalog.html',
+                           products=products,
+                           category_counts=category_counts,
+                           other_categories_count=other_categories_count,
+                           brand_counts=brand_counts,
+                           other_brands_count=other_brands_count,
+                           selected_categories=selected_categories,
+                           selected_brands=selected_brands,
+                           search_query=search_query)
 
 @app.route('/api/catalog/load_more')
 def load_more_products():
@@ -966,12 +1008,14 @@ def bas_import():
 
             # Шукаємо існуючий товар за назвою
             product = db.session.query(Product).filter_by(name=name).first()
-
+            brand_node = product_node.find(".//ЗначениеРеквизита[Наименование='Производитель']/Значение")
+            brand = brand_node.text.strip() if brand_node is not None and brand_node.text else None
             if product:
                 # Оновлюємо існуючий товар
                 product.price = price
                 product.description = description
                 product.category = category
+                product.brand = brand  # <-- ДОДАНО
                 # Записуємо в базу вже готовий URL!
                 product.image = final_image_url
                 product.in_stock = in_stock
@@ -981,6 +1025,7 @@ def bas_import():
                 new_product = Product(
                     name=name, price=price, description=description,
                     category=category,
+                    brand=brand,  # <-- ДОДАНО
                     # Записуємо в базу вже готовий URL!
                     image=final_image_url,
                     in_stock=in_stock
