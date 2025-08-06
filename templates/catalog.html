@@ -1,95 +1,97 @@
 {% extends "base.html" %}
-{% block title %}Каталог товарів{% endblock %}
+{% block title %}{{ current_category or 'Каталог товарів' }}{% endblock %}
 
 {% block content %}
 <div class="container catalog-page">
     <div class="breadcrumbs">
-        <a href="{{ url_for('index') }}">Головна</a> / <span>Каталог</span>
+        <a href="{{ url_for('index') }}">Головна</a> /
+        <a href="{{ url_for('catalog') }}">Каталог</a>
+        {% if current_category %}/ <span>{{ current_category }}</span>{% endif %}
     </div>
 
     <div class="catalog-content">
-        <!-- БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ (ВИПРАВЛЕНА ВЕРСІЯ) -->
+        <!-- БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ (ЛОГІКА PROM.UA, ВЕРСІЯ 2.0) -->
         <aside class="filters-sidebar sticky-sidebar">
-            <div class="filters-header">
-                <h3 class="filter-section-title">Фільтри</h3>
-                <button id="toggle-filters-btn" class="btn-link">Сховати все</button>
-            </div>
+            <h3 class="filter-section-title">Фільтри</h3>
+            <form id="filters-form" method="GET">
 
-            <form id="filters-form" method="GET" action="{{ url_for('catalog') }}">
-                <!-- Пошук -->
+                <!-- Список Категорій/Підкатегорій -->
                 <div class="filter-group">
-                    <input type="text" name="search" class="form-control" placeholder="Пошук за назвою..." value="{{ search_query }}">
+                    {% if current_category %}
+                        <h4 class="filter-title always-open">{{ current_category }}</h4>
+                        {% if subcategories %}
+                        <ul class="subcategory-list">
+                            {% for subcat in subcategories %}
+                            <li><a href="{{ url_for('catalog', category_slug=subcat.lower().replace(' ', '-')) }}">{{ subcat }}</a></li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    {% else %}
+                         <h4 class="filter-title always-open">Категорії</h4>
+                         <div class="filter-options-list" data-show-limit="5">
+                            {% for cat_name, count in main_categories.items() %}
+                            <a href="{{ url_for('catalog', category_slug=cat_name.lower().replace(' ', '-')) }}" class="filter-category-link">
+                                <span>{{ cat_name }}</span>
+                                <span class="filter-count">{{ count }}</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
 
-                <!-- Фільтр по ціні (винесено окремо) -->
+                <!-- Фільтр по ціні -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
                     <div class="price-inputs">
                         <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
                         <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
-                        <button type="submit" class="price-ok-btn">Ок</button>
                     </div>
                 </div>
 
-                <!-- Фільтр Категорії (Радіокнопки) -->
-                {% if category_counts %}
-                <details class="filter-group" open>
-                    <summary class="filter-title">Категорії</summary>
-                    <div class="filter-options-list">
-                        <!-- Опція "Всі категорії" -->
-                        <label class="radio-item">
-                            <input type="radio" name="category" value="" {% if not selected_category %}checked{% endif %} onchange="this.form.submit()">
-                            <span><strong>Всі категорії</strong></span>
-                        </label>
-
-                        {% for category, count in category_counts.items() %}
-                        <label class="radio-item">
-                            <input type="radio" name="category" value="{{ category }}" {% if category == selected_category %}checked{% endif %} onchange="this.form.submit()">
-                            <span>{{ category.title() }}</span>
-                            <span class="filter-count">{{ count }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                {% endif %}
-
-                <!-- Фільтр Виробники (Акордеон) - ВІДНОВЛЕНИЙ БЛОК -->
-                {% if brand_counts or other_brands_count > 0 %}
-                <details class="filter-group" open>
-                    <summary class="filter-title">Виробник</summary>
-                    <div class="filter-options-list">
-                        {% for brand, count in brand_counts.items() %}
+                <!-- Фільтр Виробники -->
+                {% if brand_counts %}
+                <div class="filter-group">
+                    <h4 class="filter-title always-open">Виробник</h4>
+                    <div class="filter-options-list" data-show-limit="5">
+                        {% for brand, count in brand_counts %}
                         <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in selected_brands %}checked{% endif %} onchange="this.form.submit()">
+                            <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in selected_brands %}checked{% endif %}>
                             <span>{{ brand }}</span>
                             <span class="filter-count">{{ count }}</span>
                         </label>
                         {% endfor %}
-                        {% if other_brands_count > 0 %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="other" {% if 'other' in selected_brands %}checked{% endif %} onchange="this.form.submit()">
-                            <span>Інші виробники</span>
-                            <span class="filter-count">{{ other_brands_count }}</span>
-                        </label>
-                        {% endif %}
                     </div>
-                </details>
+                </div>
                 {% endif %}
 
-                <button type="submit" class="btn btn-primary btn-block">Застосувати</button>
-                <a href="{{ url_for('catalog') }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути все</a>
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Застосувати</button>
+                <a href="{{ url_for('catalog', category_slug=current_category.lower().replace(' ', '-') if current_category else None) }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути</a>
             </form>
         </aside>
 
         <!-- Основний контент з товарами -->
         <div class="products-container">
-            <h1 class="page-title">
-                {% if search_query %}
-                    Результати пошуку: "{{ search_query }}"
-                {% else %}
-                    Каталог товарів
+            <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
+
+            <!-- Панель обраних фільтрів -->
+            {% if selected_brands or request.args.get('min_price') or request.args.get('max_price') %}
+            <div class="selected-filters-bar">
+                <span>Обрані фільтри:</span>
+                {% for brand in selected_brands %}
+                    {% set new_params = current_filters.copy() %}
+                    {% do new_params.getlist('brand').remove(brand) %}
+                    <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">{{ brand }} ×</a>
+                {% endfor %}
+                {% if request.args.get('min_price') %}
+                     {% set new_params = current_filters.copy() %}{% do new_params.pop('min_price') %}
+                    <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">Від {{ request.args.get('min_price') }} ₴ ×</a>
                 {% endif %}
-            </h1>
+                 {% if request.args.get('max_price') %}
+                     {% set new_params = current_filters.copy() %}{% do new_params.pop('max_price') %}
+                    <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">До {{ request.args.get('max_price') }} ₴ ×</a>
+                {% endif %}
+            </div>
+            {% endif %}
 
             {% if products.items %}
                 <div class="products-grid">
@@ -97,16 +99,7 @@
                         {% include '_product_card.html' %}
                     {% endfor %}
                 </div>
-
                 <!-- Кнопка "Завантажити ще" -->
-                <div class="load-more-container">
-                    {% if products.has_next %}
-                        <button id="load-more-btn" class="btn btn-primary btn-lg">Показати ще</button>
-                        <div id="loading-spinner" style="display: none; margin-top: 20px;">
-                            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color);"></i>
-                        </div>
-                    {% endif %}
-                </div>
             {% else %}
                 <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
                     <h3>Товарів за вашими критеріями не знайдено.</h3>

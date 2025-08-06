@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
     initLoadMore();
-    initFilterAccordion();
+    initShowMoreFilters();
     updateCartView();
     updateFavoritesUI();
 
@@ -674,17 +674,32 @@ function initLoadMore() {
     });
 }
 
-function initFilterAccordion() {
-    const toggleBtn = document.getElementById('toggle-filters-btn');
-    const filters = document.querySelectorAll('details.filter-group');
+function initShowMoreFilters() {
+    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
+        const limit = parseInt(list.dataset.showLimit, 10);
+        const items = Array.from(list.children);
 
-    if (!toggleBtn || filters.length === 0) return;
+        if (items.length > limit) {
+            // Ховаємо всі елементи, що перевищують ліміт
+            for (let i = limit; i < items.length; i++) {
+                items[i].style.display = 'none';
+            }
 
-    toggleBtn.addEventListener('click', () => {
-        const isHiding = toggleBtn.textContent === 'Сховати все';
-        filters.forEach(filter => {
-            filter.open = !isHiding;
-        });
-        toggleBtn.textContent = isHiding ? 'Показати все' : 'Сховати все';
+            // Створюємо та додаємо кнопку
+            const remainingCount = items.length - limit;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'show-more-filters-btn';
+            button.textContent = `Ще ${remainingCount}`;
+            list.insertAdjacentElement('afterend', button);
+
+            // Додаємо обробник події для кнопки
+            button.addEventListener('click', () => {
+                for (let i = limit; i < items.length; i++) {
+                    items[i].style.display = ''; // Повертаємо стандартне відображення
+                }
+                button.remove(); // Видаляємо кнопку після використання
+            });
+        }
     });
 }

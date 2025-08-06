@@ -2081,3 +2081,29 @@ details[open] > summary.filter-title {
 .radio-item input[type="radio"]:checked::before {
     transform: scale(1);
 }
+/* --- Стилі для логіки Prom.ua v2.0 --- */
+.filter-category-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+.filter-category-link:hover {
+    background-color: #e9eef1;
+    color: var(--primary-color);
+}
+
+/* Кнопка "Показати ще" для фільтрів */
+.show-more-filters-btn {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-weight: 500;
+    cursor: pointer;
+    padding: 10px 5px;
+}
+.show-more-filters-btn:hover {
+    text-decoration: underline;
+}
