@@ -11,46 +11,53 @@
 
     <div class="catalog-content">
         <aside class="filters-sidebar sticky-sidebar">
-            <h3 class="filter-section-title">Фільтри</h3>
             <form id="auto-filters-form" method="GET">
 
-                <!-- Список Категорій/Підкатегорій -->
+                <!-- [НОВИЙ БЛОК КАТЕГОРІЙ] - Логіка як на вашому скріншоті -->
                 <div class="filter-group">
-                    {% if current_category %}
-                        <!-- [НОВИЙ, ПОКРАЩЕНИЙ ВИГЛЯД] Якщо ми в категорії, показуємо стилізований заголовок -->
-                        <div class="current-category-header">
-                            <a href="{{ url_for('catalog') }}" class="back-to-categories-link" title="Повернутись до всіх категорій">
-                                <i class="fas fa-arrow-left"></i>
+                    <h4 class="filter-title always-open">Категорії</h4>
+                    <div class="filter-options-list radio-style-list">
+
+                        {# Посилання "Всі категорії", яке скидає фільтр категорії #}
+                        {% set all_cat_params = current_filters.copy() %}
+                        {% do all_cat_params.pop('category_slug', None) %}
+                        <a href="{{ url_for('catalog', **all_cat_params) }}" class="radio-item {% if not current_category %}active{% endif %}">
+                            <span class="radio-circle"></span>
+                            <span>Всі категорії</span>
+                        </a>
+
+                        {# Якщо обрана якась категорія, показуємо її і її підкатегорії #}
+                        {% if current_category %}
+                            <a href="{{ url_for('catalog', category_slug=current_category.lower().replace(' ', '-'), **current_filters) }}" class="radio-item active is-parent">
+                                <span class="radio-circle"></span>
                                 <span>{{ current_category }}</span>
                             </a>
-                        </div>
-                        <!-- [ВИПРАВЛЕНО] Показуємо підкатегорії з новими коректними лічильниками -->
-                        {% if subcategories_with_counts %}
-                        <h4 class="filter-title always-open" style="margin-top: 20px;">Підкатегорії</h4>
-                        <div class="filter-options-list subcategory-list">
-                            {% for subcat, count in subcategories_with_counts.items() %}
-                                <a href="{{ url_for('catalog', category_slug=subcat.lower().replace(' ', '-')) }}" class="filter-category-link">
+                            {% if subcategories_with_counts %}
+                            <div class="subcategory-list-v2">
+                                {% for subcat, count in subcategories_with_counts.items() %}
+                                <a href="{{ url_for('catalog', category_slug=subcat.lower().replace(' ', '-')) }}" class="radio-item">
+                                    <span class="radio-circle"></span>
                                     <span>{{ subcat }}</span>
                                     <span class="filter-count">{{ count }}</span>
                                 </a>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                    {% else %}
-                         <!-- Якщо ми в головному каталозі, показуємо всі батьківські категорії -->
-                         <h4 class="filter-title always-open">Категорії</h4>
-                         <div class="filter-options-list" data-show-limit="10">
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                        {# Інакше показуємо список головних категорій #}
+                        {% else %}
                             {% for cat_name, count in main_categories.items() %}
-                            <a href="{{ url_for('catalog', category_slug=cat_name.lower().replace(' ', '-')) }}" class="filter-category-link">
+                            <a href="{{ url_for('catalog', category_slug=cat_name.lower().replace(' ', '-'), **current_filters) }}" class="radio-item">
+                                <span class="radio-circle"></span>
                                 <span>{{ cat_name }}</span>
                                 <span class="filter-count">{{ count }}</span>
                             </a>
                             {% endfor %}
-                        </div>
-                    {% endif %}
+                        {% endif %}
+                    </div>
                 </div>
 
-                <!-- Решта фільтрів -->
+                <!-- Решта фільтрів залишається без змін, але тепер вони працюють з новою логікою -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
                     <div class="price-inputs">

@@ -2341,3 +2341,70 @@ details[open] > summary.filter-title {
     margin-top: 40px;
     padding: 20px 0;
 }
+
+.radio-style-list .radio-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 5px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.radio-style-list .radio-item:hover {
+    background-color: #f0f3f5;
+}
+
+.radio-style-list .radio-item.active {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.radio-style-list .radio-item .radio-circle {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #ccc;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    position: relative;
+    display: grid;
+    place-content: center;
+}
+
+.radio-style-list .radio-item .radio-circle::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    transform: scale(0);
+    transition: transform 0.2s ease-in-out;
+}
+
+.radio-style-list .radio-item.active .radio-circle {
+    border-color: var(--primary-color);
+}
+
+.radio-style-list .radio-item.active .radio-circle::before {
+    transform: scale(1);
+}
+
+.radio-style-list .radio-item span:nth-child(2) {
+    flex-grow: 1;
+}
+
+/* Стиль для батьківської категорії, щоб візуально виділити її */
+.radio-style-list .radio-item.is-parent {
+    font-size: 1.05rem;
+}
+
+/* Контейнер для вкладених підкатегорій */
+.subcategory-list-v2 {
+    padding-left: 25px;
+    margin-left: 9px; /* Вирівнювання по центру кружечка */
+    border-left: 2px solid var(--light-gray);
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
