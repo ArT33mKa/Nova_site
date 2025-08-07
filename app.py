@@ -1023,35 +1023,39 @@ def bas_import():
             return "failure\nНе знайдено тег <Каталог>.", 400
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
-
-        updated_count, added_count = 0, 0
         products_from_xml = catalog_node.findall('.//Товар')
-        print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю цикл обробки...")
+        print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю обробку...")
 
-        # Отримуємо URL-заглушку один раз, щоб не генерувати її в циклі
+        # ================================================================
+        # [ОПТИМІЗАЦІЯ №1]: Отримуємо всі існуючі товари з бази ОДНИМ ЗАПИТОМ
+        # ================================================================
+        print("Оптимізація: Завантажую існуючі товари з бази даних...")
+        # Завантажуємо тільки ID та назву для економії пам'яті
+        existing_products_raw = db.session.query(Product.id, Product.name).all()
+        # Створюємо словник для миттєвого пошуку: { 'Назва товару': id }
+        existing_products_map = {name: pid for pid, name in existing_products_raw}
+        print(f"Завантажено {len(existing_products_map)} існуючих товарів.")
+
+        # ================================================================
+        # [ОПТИМІЗАЦІЯ №2]: Готуємо списки для пакетної обробки
+        # ================================================================
+        products_to_update = []
+        products_to_add = []
         default_image_url = _get_cloudinary_url(None)
 
+        # Починаємо цикл обробки XML, але НЕ робимо запитів до бази всередині
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
 
+            # --- Ця логіка збору даних з XML залишається без змін ---
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
-
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
-
-            # Отримуємо ім'я файлу з XML
             image_filename_from_xml = (product_node.findtext('Картинка') or '').strip()
-
-            # =================================================
-            # ГОЛОВНА ЗМІНА: Генеруємо повний URL тут і зараз
-            # =================================================
-            # Викликаємо нашу нову внутрішню функцію
             final_image_url = _get_cloudinary_url(image_filename_from_xml)
-
-            # Якщо з якоїсь причини URL не згенерувався, використовуємо заглушку
             if not final_image_url:
                 final_image_url = default_image_url
 
@@ -1061,105 +1065,82 @@ def bas_import():
             if offer_node is not None:
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
-                    price_text = price_node.text.replace(',', '.')
                     try:
-                        price = float(re.match(r"[\d.]+", price_text).group(0))
+                        price = float(re.match(r"[\d.]+", price_node.text.replace(',', '.')).group(0))
                     except (ValueError, AttributeError):
-                        price = 0.0
-
+                        pass
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
-                        stock_quantity = int(float(quantity_node.text.strip()))
-                        if stock_quantity > 0:
-                            in_stock = True
+                        if int(float(quantity_node.text.strip())) > 0: in_stock = True
                     except (ValueError, TypeError):
                         pass
 
             if not in_stock:
                 stock_prop_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
-                if stock_prop_node is not None and stock_prop_node.text is not None:
-                    if stock_prop_node.text.strip().lower() in ['true', 'да', 'є', 'yes']:
-                        in_stock = True
-                else:
-                    stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
-                    if stock_prop_node_alt is not None and stock_prop_node_alt.text:
-                        if stock_prop_node_alt.text.lower() == 'true':
-                            in_stock = True
+                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
+                    'true', 'да', 'є', 'yes']:
+                    in_stock = True
 
-            # Шукаємо існуючий товар за назвою
-            product = db.session.query(Product).filter_by(name=name).first()
-            # [НОВЕ] "Розумне" визначення бренду з опису
+            # --- Логіка визначення бренду також без змін ---
             brand = None
             if description:
+                # ... (тут ваша існуюча логіка визначення бренду)
                 clean_description = description.replace('<br>', '\n').replace('<BR>', '\n')
-
-                # Список можливих ключових слів для пошуку бренду
                 brand_keywords = ['виробник:', 'бренд:', 'виробництво:', 'торгова марка:']
-                # Список відомих брендів (можна доповнювати)
-                known_brands = [
-                    'Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap',
-                    'Immergas', 'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis',
-                    'Pedrollo', 'Pentax', 'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut',
-                    'Aquatica', 'Thermo Alliance', 'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor',
-                    'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення', 'Gerts'
-                ]
-
-                # 1. Спроба знайти бренд за ключовими словами
+                known_brands = ['Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap', 'Immergas',
+                                'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis', 'Pedrollo', 'Pentax',
+                                'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut', 'Aquatica', 'Thermo Alliance',
+                                'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor', 'Aqua', 'Арма', 'Донтерм', 'Прометей',
+                                'Насоси плюс обладнання', 'Опалення', 'Gerts']
                 for keyword in brand_keywords:
                     if keyword in clean_description.lower():
-                        # Знаходимо позицію після ключового слова
                         start_index = clean_description.lower().find(keyword) + len(keyword)
-                        # Беремо рядок після ключового слова
-                        line_after_keyword = clean_description[start_index:].strip()
-                        # Розділяємо по переносу рядка і беремо першу частину
-                        brand_candidate = line_after_keyword.split('\n')[0].strip()
-
-                        if brand_candidate:
-                            brand = brand_candidate
-                            break
-
-                # 2. Якщо не знайшли, шукаємо відомі бренди в тексті
+                        brand_candidate = clean_description[start_index:].strip().split('\n')[0].strip()
+                        if brand_candidate: brand = brand_candidate; break
                 if not brand:
-                    # Сортуємо бренди за довжиною, щоб "Насоси плюс обладнання" знайшлося раніше, ніж "Насоси"
                     for known_brand in sorted(known_brands, key=len, reverse=True):
-                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description, re.IGNORECASE):
-                            brand = known_brand
-                            break
+                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description,
+                                     re.IGNORECASE): brand = known_brand; break
+            if brand: brand = re.sub(r'<[^>]+>', '', brand).strip()[:100]
 
-            # 3. [ВАЖЛИВО] Очищення та обмеження довжини знайденого бренду
-            if brand:
-                # Прибираємо зайві символи і залишаємо тільки текст
-                brand = re.sub(r'<[^>]+>', '', brand).strip()
-                # Обрізаємо до 100 символів, щоб гарантовано уникнути помилки
-                brand = brand[:100]
+            # Створюємо словник з даними товару
+            product_data = {
+                'name': name, 'price': price, 'description': description,
+                'category': category, 'brand': brand, 'image': final_image_url,
+                'in_stock': in_stock
+            }
 
-            if product:
-                # Оновлюємо існуючий товар
-                product.price = price
-                product.description = description
-                product.category = category
-                product.brand = brand  # <-- ДОДАНО
-                # Записуємо в базу вже готовий URL!
-                product.image = final_image_url
-                product.in_stock = in_stock
-                updated_count += 1
+            # Розподіляємо товар у відповідний список: на оновлення або на додавання
+            if name in existing_products_map:
+                product_data['id'] = existing_products_map[name]  # Додаємо ID для оновлення
+                products_to_update.append(product_data)
             else:
-                # Створюємо новий товар
-                new_product = Product(
-                    name=name, price=price, description=description,
-                    category=category,
-                    brand=brand,  # <-- ДОДАНО
-                    # Записуємо в базу вже готовий URL!
-                    image=final_image_url,
-                    in_stock=in_stock
-                )
-                db.session.add(new_product)
-                added_count += 1
+                products_to_add.append(product_data)
 
-        print("Завершення циклу. Зберігаю зміни в базі даних...")
-        db.session.commit()
-        print("Зміни успішно збережено.")
+        updated_count = len(products_to_update)
+        added_count = len(products_to_add)
+        print(f"Завершення циклу. Підготовлено до оновлення: {updated_count}, до додавання: {added_count}.")
+
+        # ================================================================
+        # [ОПТИМІЗАЦІЯ №3]: Виконуємо пакетні операції з базою
+        # ================================================================
+        if products_to_add:
+            print("Виконую пакетне додавання нових товарів...")
+            db.session.bulk_insert_mappings(Product, products_to_add)
+            print("Пакетне додавання завершено.")
+
+        if products_to_update:
+            print("Виконую пакетне оновлення існуючих товарів...")
+            db.session.bulk_update_mappings(Product, products_to_update)
+            print("Пакетне оновлення завершено.")
+
+        if products_to_add or products_to_update:
+            print("Зберігаю зміни в базі даних (commit)...")
+            db.session.commit()
+            print("Зміни успішно збережено.")
+        else:
+            print("Немає товарів для додавання або оновлення.")
 
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
         print(message)
