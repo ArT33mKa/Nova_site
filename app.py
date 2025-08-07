@@ -326,10 +326,20 @@ def catalog(category_slug):
 
     current_category_name = None
     if category_slug:
+        # Шукаємо відповідну назву категорії, ігноруючи регістр
+        slug_to_find = category_slug.replace('-', ' ')
         for cat_name in CATEGORY_STRUCTURE:
-            if cat_name.lower().replace(' ', '-') == category_slug:
-                current_category_name = cat_name
-                break
+             if cat_name.lower() == slug_to_find:
+                 current_category_name = cat_name
+                 break
+        # Якщо не знайшли серед батьківських, шукаємо серед всіх можливих
+        if not current_category_name:
+            all_cats = db.session.query(Product.category).distinct().all()
+            for cat_tuple in all_cats:
+                cat_name = cat_tuple[0]
+                if cat_name and cat_name.lower().replace(' ', '-') == category_slug:
+                    current_category_name = cat_name
+                    break
 
     # ====================================================================
     # [НОВА, БІЛЬШ ТОЧНА ЛОГІКА ФІЛЬТРАЦІЇ ТА ЛІЧИЛЬНИКІВ]
@@ -351,7 +361,7 @@ def catalog(category_slug):
     if max_price:
         products_query = products_query.filter(Product.price <= max_price)
 
-    # 2. Визначаємо запит для підрахунку брендів
+    # 2. Визначаємо запит для підрахунку брендів (на основі поточних фільтрів)
     brands_count_query = base_query
     if current_category_name:
         subcategories = CATEGORY_STRUCTURE.get(current_category_name, [])
@@ -370,7 +380,7 @@ def catalog(category_slug):
         .group_by(Product.brand).all()
     brand_counts = sorted(brand_counts_raw, key=lambda x: x[0].lower())
 
-    # 3. Визначаємо запит для підрахунку категорій/підкатегорій
+    # 3. Визначаємо запит для підрахунку категорій/підкатегорій (на основі поточних фільтрів)
     categories_count_query = base_query
     if selected_brands:
         categories_count_query = categories_count_query.filter(Product.brand.in_(selected_brands))
@@ -398,7 +408,7 @@ def catalog(category_slug):
         # [ВИПРАВЛЕННЯ СОРТУВАННЯ] Тепер категорії сортуються за алфавітом
         main_categories_counts = dict(sorted(main_categories_counts.items()))
     else:
-        # [ВИПРАВЛЕННЯ ЛІЧИЛЬНИКІВ] Рахуємо підкатегорії
+        # [ВИПРАВЛЕННЯ ЛІЧИЛЬНИКІВ] Рахуємо підкатегорії для поточної активної категорії
         for subcat in CATEGORY_STRUCTURE.get(current_category_name, []):
             count = all_cats_counts.get(subcat, 0)
             if count > 0:
@@ -413,11 +423,11 @@ def catalog(category_slug):
                            main_categories=main_categories_counts,
                            current_category=current_category_name,
                            subcategories_with_counts=subcategories_counts,
-                           # [НОВЕ] Передаємо підкатегорії з лічильниками
                            brand_counts=brand_counts,
                            selected_brands=selected_brands,
                            current_filters=current_filters,
                            category_slug=category_slug)
+
 
 @app.route('/api/catalog/load_more')
 def load_more_products():

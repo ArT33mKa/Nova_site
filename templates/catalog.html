@@ -17,15 +17,16 @@
                 <!-- Список Категорій/Підкатегорій -->
                 <div class="filter-group">
                     {% if current_category %}
-                        <!-- Якщо ми в категорії -->
+                        <!-- [НОВИЙ, ПОКРАЩЕНИЙ ВИГЛЯД] Якщо ми в категорії, показуємо стилізований заголовок -->
                         <div class="current-category-header">
                             <a href="{{ url_for('catalog') }}" class="back-to-categories-link" title="Повернутись до всіх категорій">
                                 <i class="fas fa-arrow-left"></i>
                                 <span>{{ current_category }}</span>
                             </a>
                         </div>
-                        <!-- [ВИПРАВЛЕНО] Показуємо підкатегорії з новими лічильниками -->
+                        <!-- [ВИПРАВЛЕНО] Показуємо підкатегорії з новими коректними лічильниками -->
                         {% if subcategories_with_counts %}
+                        <h4 class="filter-title always-open" style="margin-top: 20px;">Підкатегорії</h4>
                         <div class="filter-options-list subcategory-list">
                             {% for subcat, count in subcategories_with_counts.items() %}
                                 <a href="{{ url_for('catalog', category_slug=subcat.lower().replace(' ', '-')) }}" class="filter-category-link">
@@ -36,7 +37,7 @@
                         </div>
                         {% endif %}
                     {% else %}
-                         <!-- Якщо ми в головному каталозі -->
+                         <!-- Якщо ми в головному каталозі, показуємо всі батьківські категорії -->
                          <h4 class="filter-title always-open">Категорії</h4>
                          <div class="filter-options-list" data-show-limit="10">
                             {% for cat_name, count in main_categories.items() %}
@@ -49,7 +50,7 @@
                     {% endif %}
                 </div>
 
-                <!-- Решта фільтрів без змін -->
+                <!-- Решта фільтрів -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
                     <div class="price-inputs">
@@ -79,15 +80,16 @@
         <div class="products-container">
             <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
 
-            <!-- [ЗАМІНІТЬ] цей блок на виправлену версію -->
+            <!-- [ВИПРАВЛЕНО] Повністю новий блок для відображення активних фільтрів -->
             {% if current_category or selected_brands or request.args.get('min_price') or request.args.get('max_price') %}
             <div class="selected-filters-bar">
                 <span>Обрані фільтри:</span>
 
                 {# Тег для обраної категорії #}
                 {% if current_category %}
-                     {# [ВИПРАВЛЕНО] Посилання для скидання категорії тепер веде на головний каталог, зберігаючи інші фільтри #}
+                     {# [ВИПРАВЛЕНО] Посилання для скидання категорії тепер веде на головний каталог, ЗБЕРІГАЮЧИ інші фільтри #}
                      {% set cat_reset_params = current_filters.copy() %}
+                     {% do cat_reset_params.pop('category_slug', None) %} {# Видаляємо саме slug, а не посилання #}
                      <a href="{{ url_for('catalog', **cat_reset_params) }}" class="filter-tag category-tag">{{ current_category }} ×</a>
                 {% endif %}
 
@@ -95,7 +97,7 @@
                 {% for brand in selected_brands %}
                     {% set new_params = current_filters.copy() %}
                     {% set brands_to_keep = selected_brands|reject('equalto', brand)|list %}
-                    {% do new_params.pop('brand', None) %}
+                    {% do new_params.poplist('brand') %}
                     {% if brands_to_keep %}
                         {% do new_params.setlist('brand', brands_to_keep) %}
                     {% endif %}
@@ -112,7 +114,7 @@
                     <a href="{{ url_for('catalog', category_slug=category_slug, **new_params) }}" class="filter-tag">До {{ request.args.get('max_price') }} ₴ ×</a>
                 {% endif %}
 
-                {# Посилання "Скинути все" тепер веде на головний каталог #}
+                {# Посилання "Скинути все" тепер веде на головний каталог без параметрів #}
                 <a href="{{ url_for('catalog') }}" class="filter-tag-reset">Скинути все</a>
             </div>
             {% endif %}
@@ -123,9 +125,11 @@
                         {% include '_product_card.html' %}
                     {% endfor %}
                 </div>
-                <!-- [НОВЕ] Пагінація/Кнопка "Завантажити ще", якщо вона у вас є -->
-                {% if products.has_next %}
-                    {# Тут може бути ваша пагінація або кнопка "Завантажити ще" #}
+                 {% if products.has_next %}
+                    <div class="load-more-container">
+                        <button id="load-more-btn" class="btn btn-outline btn-lg">Завантажити ще</button>
+                        <div id="loading-spinner" style="display: none;">Завантаження...</div>
+                    </div>
                 {% endif %}
             {% else %}
                 <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
