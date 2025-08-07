@@ -2162,3 +2162,51 @@ details[open] > summary.filter-title {
     background-color: var(--primary-color);
     color: white;
 }
+.current-category-header {
+    margin-bottom: 20px;
+}
+
+.back-to-categories-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 15px;
+    background-color: #e9eef1;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.back-to-categories-link:hover {
+    background-color: #dfe6eb;
+    border-color: #cdd5dc;
+}
+
+.back-to-categories-link i {
+    transition: transform 0.2s;
+}
+
+.back-to-categories-link:hover i {
+    transform: translateX(-3px);
+}
+
+.subcategory-list {
+    padding-left: 10px;
+    border-left: 2px solid var(--light-gray);
+}
+.subcategory-list .filter-category-link {
+    font-weight: 500;
+}
+
+/* [ДОДАЙТЕ] Стиль для тегу категорії */
+.filter-tag.category-tag {
+    background-color: #2c3e50; /* Темніший колір для виділення */
+    font-weight: 500;
+}
+
+.filter-tag.category-tag:hover {
+    background-color: #34495e;
+}

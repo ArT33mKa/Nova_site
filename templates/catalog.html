@@ -12,21 +12,30 @@
     <div class="catalog-content">
         <aside class="filters-sidebar sticky-sidebar">
             <h3 class="filter-section-title">Фільтри</h3>
-            <!-- [ЗМІНЕНО] ID форми для JavaScript -->
             <form id="auto-filters-form" method="GET">
 
-                <!-- Список Категорій/Підкатегорій (залишається без змін) -->
+                <!-- [НОВА ЛОГІКА] Список Категорій/Підкатегорій -->
                 <div class="filter-group">
                     {% if current_category %}
-                        <h4 class="filter-title always-open">{{ current_category }}</h4>
+                        <!-- Якщо ми в категорії, показуємо її назву та посилання "назад" -->
+                        <div class="current-category-header">
+                            <a href="{{ url_for('catalog') }}" class="back-to-categories-link" title="Повернутись до всіх категорій">
+                                <i class="fas fa-arrow-left"></i>
+                                <span>{{ current_category }}</span>
+                            </a>
+                        </div>
+                        <!-- Показуємо підкатегорії, якщо вони є -->
                         {% if subcategories %}
-                        <ul class="subcategory-list">
+                        <div class="filter-options-list subcategory-list">
                             {% for subcat in subcategories %}
-                            <li><a href="{{ url_for('catalog', category_slug=subcat.lower().replace(' ', '-')) }}">{{ subcat }}</a></li>
+                                <a href="{{ url_for('catalog', category_slug=subcat.lower().replace(' ', '-')) }}" class="filter-category-link">
+                                    <span>{{ subcat }}</span>
+                                </a>
                             {% endfor %}
-                        </ul>
+                        </div>
                         {% endif %}
                     {% else %}
+                         <!-- Якщо ми в головному каталозі, показуємо список основних категорій -->
                          <h4 class="filter-title always-open">Категорії</h4>
                          <div class="filter-options-list" data-show-limit="7">
                             {% for cat_name, count in main_categories.items() %}
@@ -63,8 +72,6 @@
                     </div>
                 </div>
                 {% endif %}
-
-                <!-- [ВИДАЛЕНО] Кнопки "Застосувати" та "Скинути" -->
             </form>
         </aside>
 
@@ -73,24 +80,27 @@
             <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
 
             <!-- [ЗАМІНІТЬ] цей блок на виправлену версію -->
-            {% if selected_brands or request.args.get('min_price') or request.args.get('max_price') %}
+            {% if current_category or selected_brands or request.args.get('min_price') or request.args.get('max_price') %}
             <div class="selected-filters-bar">
                 <span>Обрані фільтри:</span>
-                {# [ВИПРАВЛЕНО] Логіка для видалення фільтрів по бренду #}
+
+                {# [НОВЕ] Тег для обраної категорії #}
+                {% if current_category %}
+                     <a href="{{ url_for(request.endpoint, **current_filters) }}" class="filter-tag category-tag">{{ current_category }} ×</a>
+                {% endif %}
+
+                {# Теги для видалення фільтрів по бренду #}
                 {% for brand in selected_brands %}
                     {% set new_params = current_filters.copy() %}
-                    {# Створюємо новий список брендів без поточного #}
                     {% set brands_to_keep = selected_brands|reject('equalto', brand)|list %}
-                    {# Видаляємо старий ключ 'brand', якщо він є #}
                     {% do new_params.pop('brand', None) %}
-                    {# Додаємо новий список брендів #}
                     {% if brands_to_keep %}
                         {% do new_params.setlist('brand', brands_to_keep) %}
                     {% endif %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">{{ brand }} ×</a>
                 {% endfor %}
 
-                {# [ВИПРАВЛЕНО] Логіка для видалення фільтра по ціні #}
+                {# Теги для видалення фільтра по ціні #}
                 {% if request.args.get('min_price') %}
                     {% set new_params = current_filters.copy() %}{% do new_params.pop('min_price') %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">Від {{ request.args.get('min_price') }} ₴ ×</a>
@@ -99,7 +109,9 @@
                     {% set new_params = current_filters.copy() %}{% do new_params.pop('max_price') %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">До {{ request.args.get('max_price') }} ₴ ×</a>
                 {% endif %}
-                 <a href="{{ url_for('catalog', category_slug=category_slug) }}" class="filter-tag-reset">Скинути все</a>
+
+                {# [НОВА ЛОГІКА] Посилання "Скинути все" тепер веде на головний каталог #}
+                <a href="{{ url_for('catalog') }}" class="filter-tag-reset">Скинути все</a>
             </div>
             {% endif %}
 
