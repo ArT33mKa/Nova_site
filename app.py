@@ -1081,28 +1081,37 @@ def bas_import():
                 if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
                     'true', 'да', 'є', 'yes']:
                     in_stock = True
+                else:
+                    stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
+                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.lower() == 'true':
+                        in_stock = True
 
             # --- Логіка визначення бренду також без змін ---
             brand = None
             if description:
-                # ... (тут ваша існуюча логіка визначення бренду)
                 clean_description = description.replace('<br>', '\n').replace('<BR>', '\n')
                 brand_keywords = ['виробник:', 'бренд:', 'виробництво:', 'торгова марка:']
-                known_brands = ['Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap', 'Immergas',
-                                'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis', 'Pedrollo', 'Pentax',
-                                'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut', 'Aquatica', 'Thermo Alliance',
-                                'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor', 'Aqua', 'Арма', 'Донтерм', 'Прометей',
-                                'Насоси плюс обладнання', 'Опалення', 'Gerts']
+                known_brands = [
+                    'Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap',
+                    'Immergas', 'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis',
+                    'Pedrollo', 'Pentax', 'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut',
+                    'Aquatica', 'Thermo Alliance', 'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor',
+                    'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення', 'Gerts'
+                ]
                 for keyword in brand_keywords:
                     if keyword in clean_description.lower():
                         start_index = clean_description.lower().find(keyword) + len(keyword)
                         brand_candidate = clean_description[start_index:].strip().split('\n')[0].strip()
-                        if brand_candidate: brand = brand_candidate; break
+                        if brand_candidate:
+                            brand = brand_candidate
+                            break
                 if not brand:
                     for known_brand in sorted(known_brands, key=len, reverse=True):
-                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description,
-                                     re.IGNORECASE): brand = known_brand; break
-            if brand: brand = re.sub(r'<[^>]+>', '', brand).strip()[:100]
+                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description, re.IGNORECASE):
+                            brand = known_brand
+                            break
+            if brand:
+                brand = re.sub(r'<[^>]+>', '', brand).strip()[:100]
 
             # Створюємо словник з даними товару
             product_data = {
@@ -1135,6 +1144,7 @@ def bas_import():
             db.session.bulk_update_mappings(Product, products_to_update)
             print("Пакетне оновлення завершено.")
 
+        # Робимо commit тільки якщо були якісь зміни
         if products_to_add or products_to_update:
             print("Зберігаю зміни в базі даних (commit)...")
             db.session.commit()
@@ -1152,6 +1162,9 @@ def bas_import():
         error_details = traceback.format_exc()
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
+
+
+# ... (ваш код після функції)
 
 
 def require_bot_api_key(f):
