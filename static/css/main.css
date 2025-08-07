@@ -1877,23 +1877,17 @@ img {
 }
 
 .sticky-sidebar {
-    position: -webkit-sticky; /* Для Safari */
+    position: -webkit-sticky;
     position: sticky;
-    top: 100px; /* Відстань від верху екрана (висота хедера + 20px) */
-    align-self: start; /* Важливо, щоб елемент "прилипав" до початку контейнера */
-    max-height: calc(100vh - 120px); /* Максимальна висота, щоб вміщувались елементи */
-    overflow-y: auto; /* Додаємо прокрутку, якщо фільтрів забагато */
+    top: 100px; /* Відстань від верху = висота хедера + відступ */
+    align-self: start;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto; /* Скрол, якщо фільтрів забагато */
 }
 
 /* Ховаємо некрасивий скролбар, залишаючи можливість скролити */
-.sticky-sidebar::-webkit-scrollbar {
-    width: 6px;
-}
-.sticky-sidebar::-webkit-scrollbar-thumb {
-    background-color: #ccc;
-    border-radius: 3px;
-}
-
+.sticky-sidebar::-webkit-scrollbar { width: 6px; }
+.sticky-sidebar::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 3px; }
 
 /* 2. Розтягуємо контейнер для кнопки "Показати ще" */
 .load-more-container {
@@ -1950,7 +1944,7 @@ img {
 }
 .filter-group:last-of-type {
     border-bottom: none;
-    margin-bottom: 25px;
+    margin-bottom: 0;
 }
 
 details.filter-group {
@@ -1990,16 +1984,26 @@ details > summary.filter-title::after { /* Застосовуємо тільки
 }
 
 .filter-options-list {
-    padding: 10px 0 20px 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Відступ між елементами списку */
 }
 
-.checkbox-item {
-    justify-content: space-between; /* Розносить елементи по боках */
-    gap: 10px;
+.checkbox-item, .filter-category-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+    cursor: pointer;
 }
-
+.checkbox-item:hover, .filter-category-link:hover {
+    background-color: #e9eef1;
+    color: var(--primary-color);
+}
 .checkbox-item span:first-of-type {
-    margin-right: auto; /* Текст займає весь доступний простір */
+    margin-right: auto;
     word-break: break-word;
 }
 
@@ -2011,6 +2015,7 @@ details > summary.filter-title::after { /* Застосовуємо тільки
     border-radius: 4px;
     flex-shrink: 0;
 }
+
 .filter-title.always-open::after {
     display: none;
 }
@@ -2103,7 +2108,38 @@ details[open] > summary.filter-title {
     font-weight: 500;
     cursor: pointer;
     padding: 10px 5px;
+    margin-top: 10px;
+    display: block;
 }
 .show-more-filters-btn:hover {
     text-decoration: underline;
+}
+
+.selected-filters-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+    margin-bottom: 25px;
+    background-color: var(--light-color);
+    border: 1px solid var(--light-gray);
+    border-radius: var(--border-radius);
+}
+.selected-filters-bar span {
+    font-weight: 500;
+}
+.filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--primary-color);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+.filter-tag:hover {
+    background-color: var(--secondary-color);
 }

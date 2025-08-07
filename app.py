@@ -310,44 +310,54 @@ def catalog(category_slug):
     page = request.args.get('page', 1, type=int)
     CATEGORY_STRUCTURE = get_category_hierarchy()
 
+    # [ПОЯСНЕННЯ] Базовий запит, який відфільтровує товари, що не мають опису чи фото
     base_query = Product.query.filter(
         Product.in_stock == True,
         and_(Product.description != None, Product.description != ''),
         Product.image.notlike('default_tovar%')
     )
 
+    # [НОВЕ] Збираємо поточні фільтри з URL для подальшого використання
     current_filters = {k: v for k, v in request.args.items() if k != 'page'}
     selected_brands = request.args.getlist('brand')
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
 
+    # [НОВЕ] Визначаємо поточну категорію за її slug
     current_category = None
     if category_slug:
+        # Шукаємо відповідну назву категорії в нашій структурі
         for cat_name in CATEGORY_STRUCTURE:
             if cat_name.lower().replace(' ', '-') == category_slug:
                 current_category = cat_name
                 break
 
-    # ФОРМУВАННЯ ЗАПИТІВ ДЛЯ ФІЛЬТРІВ ТА ЛІЧИЛЬНИКІВ
-    products_query = base_query
-    brands_count_query = base_query
-    categories_count_query = base_query
+    # ====================================================================
+    # [НОВЕ] ПРОСУНУТА ЛОГІКА ФІЛЬТРАЦІЇ ТА ЛІЧИЛЬНИКІВ (як на Prom.ua)
+    # ====================================================================
 
-    # Фільтр по категорії
+    # Створюємо три "гілки" запитів:
+    products_query = base_query  # Для відображення товарів на сторінці
+    brands_count_query = base_query  # Для підрахунку кількості товарів у кожному бренді
+    categories_count_query = base_query  # Для підрахунку кількості товарів у кожній категорії
+
+    # 1. Фільтр по КАТЕГОРІЇ (впливає на товари та бренди)
     if current_category:
         subcategories = CATEGORY_STRUCTURE.get(current_category, [])
         search_categories = [current_category] + subcategories
         category_conditions = [Product.category.ilike(f'%{cat}%') for cat in search_categories]
+
         products_query = products_query.filter(db_or(*category_conditions))
         brands_count_query = brands_count_query.filter(db_or(*category_conditions))
 
-    # Фільтр по брендах (впливає на товари та лічильники категорій)
+    # 2. Фільтр по БРЕНДАХ (впливає на товари та лічильники категорій)
     if selected_brands:
         products_query = products_query.filter(Product.brand.in_(selected_brands))
+        # Якщо категорію не обрано, то фільтр по бренду впливає на лічильники категорій
         if not current_category:
             categories_count_query = categories_count_query.filter(Product.brand.in_(selected_brands))
 
-    # Фільтр по ціні (впливає на все)
+    # 3. Фільтр по ЦІНІ (впливає на ВСЕ)
     if min_price:
         products_query = products_query.filter(Product.price >= min_price)
         brands_count_query = brands_count_query.filter(Product.price >= min_price)
@@ -357,27 +367,38 @@ def catalog(category_slug):
         brands_count_query = brands_count_query.filter(Product.price <= max_price)
         categories_count_query = categories_count_query.filter(Product.price <= max_price)
 
-    # ОТРИМАННЯ ДАНИХ
+    # ====================================================================
+    # [НОВЕ] ОТРИМАННЯ ДАНИХ ПІСЛЯ ФІЛЬТРАЦІЇ
+    # ====================================================================
+
+    # Рахуємо бренди: виконуємо запит brands_count_query
     brand_counts = db.session.query(Product.brand, func.count(Product.id)) \
         .select_from(brands_count_query.subquery()) \
         .filter(Product.brand.isnot(None), Product.brand != '') \
         .group_by(Product.brand).order_by(func.count(Product.id).desc()).all()
 
+    # Рахуємо категорії (тільки якщо ми не в конкретній категорії)
     main_categories_counts = {}
     if not current_category:
+        # Спочатку отримуємо "сирі" дані по всіх категоріях
         all_cats_counts_raw = db.session.query(Product.category, func.count(Product.id)) \
             .select_from(categories_count_query.subquery()) \
             .group_by(Product.category).all()
         all_cats_counts = dict(all_cats_counts_raw)
 
+        # Тепер групуємо лічильники по батьківських категоріях
         for parent, children in CATEGORY_STRUCTURE.items():
             count = all_cats_counts.get(parent, 0)
             for child in children:
                 count += all_cats_counts.get(child, 0)
+            # Додаємо до списку, тільки якщо там є товари
             if count > 0:
                 main_categories_counts[parent] = count
 
+    # Отримуємо фінальний список товарів для поточної сторінки
     products = products_query.order_by(Product.id.desc()).paginate(page=page, per_page=10, error_out=False)
+
+    # Сортуємо категорії за популярністю (кількістю товарів)
     main_categories = dict(sorted(main_categories_counts.items(), key=lambda item: item[1], reverse=True))
 
     return render_template('catalog.html',
@@ -387,7 +408,8 @@ def catalog(category_slug):
                            subcategories=CATEGORY_STRUCTURE.get(current_category, []) if current_category else [],
                            brand_counts=brand_counts,
                            selected_brands=selected_brands,
-                           current_filters=current_filters)
+                           current_filters=current_filters,
+                           category_slug=category_slug)  # [НОВЕ] Передаємо slug для посилань
 
 
 # ... (Решта файлу app.py залишається без змін) ...

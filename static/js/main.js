@@ -703,3 +703,33 @@ function initShowMoreFilters() {
         }
     });
 }
+
+function initShowMoreFilters() {
+    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
+        const limit = parseInt(list.dataset.showLimit, 10);
+        const items = Array.from(list.children);
+
+        if (items.length > limit) {
+            // Ховаємо всі елементи, що перевищують ліміт
+            for (let i = limit; i < items.length; i++) {
+                items[i].style.display = 'none';
+            }
+
+            // Створюємо та додаємо кнопку
+            const remainingCount = items.length - limit;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'show-more-filters-btn';
+            button.textContent = `Показати ще ${remainingCount}`;
+            list.insertAdjacentElement('afterend', button);
+
+            // Додаємо обробник події для кнопки
+            button.addEventListener('click', () => {
+                for (let i = limit; i < items.length; i++) {
+                    items[i].style.display = ''; // Повертаємо стандартне відображення
+                }
+                button.remove(); // Видаляємо кнопку після використання
+            });
+        }
+    });
+}

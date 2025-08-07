@@ -10,14 +10,15 @@
     </div>
 
     <div class="catalog-content">
-        <!-- БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ (ЛОГІКА PROM.UA, ВЕРСІЯ 2.0) -->
+        <!-- [НОВА ВЕРСІЯ] БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ -->
         <aside class="filters-sidebar sticky-sidebar">
             <h3 class="filter-section-title">Фільтри</h3>
             <form id="filters-form" method="GET">
 
-                <!-- Список Категорій/Підкатегорій -->
+                <!-- Блок Категорій/Підкатегорій -->
                 <div class="filter-group">
                     {% if current_category %}
+                        <!-- Якщо ми в категорії, показуємо її назву та підкатегорії -->
                         <h4 class="filter-title always-open">{{ current_category }}</h4>
                         {% if subcategories %}
                         <ul class="subcategory-list">
@@ -27,6 +28,7 @@
                         </ul>
                         {% endif %}
                     {% else %}
+                         <!-- Якщо ми в головному каталозі, показуємо список основних категорій -->
                          <h4 class="filter-title always-open">Категорії</h4>
                          <div class="filter-options-list" data-show-limit="5">
                             {% for cat_name, count in main_categories.items() %}
@@ -48,7 +50,7 @@
                     </div>
                 </div>
 
-                <!-- Фільтр Виробники -->
+                <!-- Фільтр по виробниках (брендах) -->
                 {% if brand_counts %}
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Виробник</h4>
@@ -65,7 +67,7 @@
                 {% endif %}
 
                 <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Застосувати</button>
-                <a href="{{ url_for('catalog', category_slug=current_category.lower().replace(' ', '-') if current_category else None) }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути</a>
+                <a href="{{ url_for('catalog', category_slug=category_slug) }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути</a>
             </form>
         </aside>
 
@@ -73,19 +75,22 @@
         <div class="products-container">
             <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
 
-            <!-- Панель обраних фільтрів -->
+            <!-- [НОВЕ] Панель обраних фільтрів (як на Prom.ua) -->
             {% if selected_brands or request.args.get('min_price') or request.args.get('max_price') %}
             <div class="selected-filters-bar">
                 <span>Обрані фільтри:</span>
+                {# Теги для видалення фільтрів по бренду #}
                 {% for brand in selected_brands %}
                     {% set new_params = current_filters.copy() %}
                     {% do new_params.getlist('brand').remove(brand) %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">{{ brand }} ×</a>
                 {% endfor %}
+                {# Тег для видалення фільтра по мінімальній ціні #}
                 {% if request.args.get('min_price') %}
                      {% set new_params = current_filters.copy() %}{% do new_params.pop('min_price') %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">Від {{ request.args.get('min_price') }} ₴ ×</a>
                 {% endif %}
+                {# Тег для видалення фільтра по максимальній ціні #}
                  {% if request.args.get('max_price') %}
                      {% set new_params = current_filters.copy() %}{% do new_params.pop('max_price') %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">До {{ request.args.get('max_price') }} ₴ ×</a>
@@ -99,7 +104,10 @@
                         {% include '_product_card.html' %}
                     {% endfor %}
                 </div>
-                <!-- Кнопка "Завантажити ще" -->
+                <!-- [НОВЕ] Пагінація/Кнопка "Завантажити ще", якщо вона у вас є -->
+                {% if products.has_next %}
+                    {# Тут може бути ваша пагінація або кнопка "Завантажити ще" #}
+                {% endif %}
             {% else %}
                 <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
                     <h3>Товарів за вашими критеріями не знайдено.</h3>
