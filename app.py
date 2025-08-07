@@ -217,7 +217,7 @@ shop_info = {"name": "НОВА ХВИЛЯ",
                             {'name': 'Змішувач', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
                             {'name': "Витяжки", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
                             {'name': "Колонки", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
-                            {'name': "Сушка для рушників", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
+                            {'name': "Су��ка для рушників", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
                             {'name': "Запчастини до газ обладнання", 'image': 'gas_parts.jpg',
                              'icon': 'gas_parts.jpg'}], "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
              "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
@@ -322,6 +322,9 @@ def catalog(category_slug):
     page = request.args.get('page', 1, type=int)
     hierarchy = get_category_hierarchy()
 
+    # Get the main categories and their counts from the hierarchy
+    main_categories = {cat: data['count'] for cat, data in hierarchy.items()}
+
     # Отримуємо фільтри
     current_filters = request.args.copy()
     if 'page' in current_filters:
@@ -412,7 +415,8 @@ def catalog(category_slug):
         brand_counts=sorted(brand_counts),
         selected_brands=selected_brands,
         current_filters=current_filters,
-        category_slug=category_slug
+        category_slug=category_slug,
+        main_categories=main_categories  # Add this line
     )
 
 
@@ -681,7 +685,7 @@ def checkout():
         except Exception as e:
             print(f">>> ПОМИЛКА СПОВІЩЕННЯ: {e}")
         session.pop('cart', None)
-        flash('Дякуємо! Ваше замовлення прийнято.', 'success')
+        flash('Дякуємо! Ваше замовле��ня прийнято.', 'success')
         return redirect(url_for('index'))
     return render_template('checkout.html')
 
@@ -1032,12 +1036,12 @@ def bas_import():
                         pass
 
             if not in_stock:
-                stock_prop_node = product_node.find(".//ЗначениеРеквизита[Наименование='Наличие']/Значение")
+                stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
                 if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
                     'true', 'да', 'є', 'yes']:
                     in_stock = True
                 else:
-                    stock_prop_node_alt = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
+                    stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
                     if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.lower() == 'true':
                         in_stock = True
 
@@ -1067,7 +1071,7 @@ def bas_import():
                             break
             if brand:
                 # Спочатку видаляємо HTML-теги, потім замінюємо &nbsp; на звичайний пробіл,
-                # а потім прибираємо зайві пробіли на початку та в кінці.
+                # а потім приб��раємо зайві пробіли на початку та в кінці.
                 brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
                 if brand:  # Перевіряємо, чи щось залишилось після очищення
                     brand = brand[:100]  # Обрізаємо до 100 символів
