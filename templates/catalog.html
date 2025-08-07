@@ -11,16 +11,19 @@
 
     <div class="catalog-content">
         <aside class="filters-sidebar sticky-sidebar">
-            <form id="auto-filters-form" method="GET">
+            <form id="filters-form" method="GET" action="{{ url_for('catalog', category_slug=category_slug) }}">
+                <!-- Приховані поля для існуючих фільтрів по брендах -->
+                {% for brand in selected_brands %}
+                <input type="hidden" name="brand" value="{{ brand }}">
+                {% endfor %}
 
-                <!-- [НОВИЙ БЛОК КАТЕГОРІЙ] - Логіка як на вашому скріншоті -->
+                <!-- ФІЛЬТР КАТЕГОРІЙ (нова логіка) -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Категорії</h4>
-                    <div class="filter-options-list radio-style-list">
-
-                        {# Посилання "Всі категорії", яке скидає фільтр категорії #}
+                    <div class="radio-style-list">
+                        {# Посилання "Всі категорії", яке скидає фільтр категорії, але зберігає інші #}
                         {% set all_cat_params = current_filters.copy() %}
-                        {% do all_cat_params.pop('category_slug', None) %}
+                        {% do all_cat_params.pop('page', None) %}
                         <a href="{{ url_for('catalog', **all_cat_params) }}" class="radio-item {% if not current_category %}active{% endif %}">
                             <span class="radio-circle"></span>
                             <span>Всі категорії</span>
@@ -28,14 +31,32 @@
 
                         {# Якщо обрана якась категорія, показуємо її і її підкатегорії #}
                         {% if current_category %}
-                            <a href="{{ url_for('catalog', category_slug=current_category.lower().replace(' ', '-'), **current_filters) }}" class="radio-item active is-parent">
+                            {# Посилання назад, якщо це підкатегорія #}
+                            {% set parent_found = namespace(value=None) %}
+                            {% for parent, children in category_structure.items() %}
+                                {% if current_category in children %}
+                                    {% set parent_found.value = parent %}
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if parent_found.value %}
+                                <a href="{{ url_for('catalog', category_slug=parent_found.value.lower().replace(' ', '-'), **current_filters) }}" class="radio-item is-parent" style="color: #0066cc; font-weight: bold;">
+                                    <span style="transform: rotate(180deg);">➔</span>
+                                    <span>{{ parent_found.value }}</span>
+                                </a>
+                            {% endif %}
+
+                            {# Активна категорія #}
+                            <a href="#" class="radio-item active is-parent">
                                 <span class="radio-circle"></span>
                                 <span>{{ current_category }}</span>
                             </a>
+
+                            {# Її підкатегорії, якщо є #}
                             {% if subcategories_with_counts %}
                             <div class="subcategory-list-v2">
                                 {% for subcat, count in subcategories_with_counts.items() %}
-                                <a href="{{ url_for('catalog', category_slug=subcat.lower().replace(' ', '-')) }}" class="radio-item">
+                                <a href="{{ url_for('catalog', category_slug=subcat.lower().replace(' ', '-'), **current_filters) }}" class="radio-item">
                                     <span class="radio-circle"></span>
                                     <span>{{ subcat }}</span>
                                     <span class="filter-count">{{ count }}</span>
@@ -57,22 +78,25 @@
                     </div>
                 </div>
 
-                <!-- Решта фільтрів залишається без змін, але тепер вони працюють з новою логікою -->
+                <!-- ФІЛЬТР ЦІНИ (з кнопкою "OK") -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
-                    <div class="price-inputs">
-                        <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}">
-                        <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}">
+                    <div class="price-filter-wrapper">
+                        <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}" class="price-input">
+                        <span class="price-divider">–</span>
+                        <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}" class="price-input">
+                        <button type="submit" class="price-ok-btn">OK</button>
                     </div>
                 </div>
 
+                <!-- ФІЛЬТР ВИРОБНИКІВ -->
                 {% if brand_counts %}
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Виробник</h4>
                     <div class="filter-options-list" data-show-limit="7">
                         {% for brand, count in brand_counts %}
                         <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in selected_brands %}checked{% endif %}>
+                            <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in selected_brands %}checked{% endif %} onchange="this.form.submit()">
                             <span>{{ brand }}</span>
                             <span class="filter-count">{{ count }}</span>
                         </label>
