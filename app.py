@@ -318,7 +318,9 @@ def catalog(category_slug):
     )
 
     # [НОВЕ] Збираємо поточні фільтри з URL для подальшого використання
-    current_filters = {k: v for k, v in request.args.items() if k != 'page'}
+    current_filters = request.args.copy()
+    if 'page' in current_filters:
+        current_filters.pop('page')
     selected_brands = request.args.getlist('brand')
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)

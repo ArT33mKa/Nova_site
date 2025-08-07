@@ -10,15 +10,14 @@
     </div>
 
     <div class="catalog-content">
-        <!-- [НОВА ВЕРСІЯ] БІЧНА ПАНЕЛЬ З ФІЛЬТРАМИ -->
         <aside class="filters-sidebar sticky-sidebar">
             <h3 class="filter-section-title">Фільтри</h3>
-            <form id="filters-form" method="GET">
+            <!-- [ЗМІНЕНО] ID форми для JavaScript -->
+            <form id="auto-filters-form" method="GET">
 
-                <!-- Блок Категорій/Підкатегорій -->
+                <!-- Список Категорій/Підкатегорій (залишається без змін) -->
                 <div class="filter-group">
                     {% if current_category %}
-                        <!-- Якщо ми в категорії, показуємо її назву та підкатегорії -->
                         <h4 class="filter-title always-open">{{ current_category }}</h4>
                         {% if subcategories %}
                         <ul class="subcategory-list">
@@ -28,9 +27,8 @@
                         </ul>
                         {% endif %}
                     {% else %}
-                         <!-- Якщо ми в головному каталозі, показуємо список основних категорій -->
                          <h4 class="filter-title always-open">Категорії</h4>
-                         <div class="filter-options-list" data-show-limit="5">
+                         <div class="filter-options-list" data-show-limit="7">
                             {% for cat_name, count in main_categories.items() %}
                             <a href="{{ url_for('catalog', category_slug=cat_name.lower().replace(' ', '-')) }}" class="filter-category-link">
                                 <span>{{ cat_name }}</span>
@@ -41,7 +39,7 @@
                     {% endif %}
                 </div>
 
-                <!-- Фільтр по ціні -->
+                <!-- Фільтр по ціні (залишається без змін) -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
                     <div class="price-inputs">
@@ -50,11 +48,11 @@
                     </div>
                 </div>
 
-                <!-- Фільтр по виробниках (брендах) -->
+                <!-- Фільтр Виробники (залишається без змін) -->
                 {% if brand_counts %}
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Виробник</h4>
-                    <div class="filter-options-list" data-show-limit="5">
+                    <div class="filter-options-list" data-show-limit="7">
                         {% for brand, count in brand_counts %}
                         <label class="checkbox-item">
                             <input type="checkbox" name="brand" value="{{ brand }}" {% if brand in selected_brands %}checked{% endif %}>
@@ -66,8 +64,7 @@
                 </div>
                 {% endif %}
 
-                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Застосувати</button>
-                <a href="{{ url_for('catalog', category_slug=category_slug) }}" class="btn btn-outline btn-block" style="margin-top: 10px;">Скинути</a>
+                <!-- [ВИДАЛЕНО] Кнопки "Застосувати" та "Скинути" -->
             </form>
         </aside>
 
@@ -75,26 +72,34 @@
         <div class="products-container">
             <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
 
-            <!-- [НОВЕ] Панель обраних фільтрів (як на Prom.ua) -->
+            <!-- [ЗАМІНІТЬ] цей блок на виправлену версію -->
             {% if selected_brands or request.args.get('min_price') or request.args.get('max_price') %}
             <div class="selected-filters-bar">
                 <span>Обрані фільтри:</span>
-                {# Теги для видалення фільтрів по бренду #}
+                {# [ВИПРАВЛЕНО] Логіка для видалення фільтрів по бренду #}
                 {% for brand in selected_brands %}
                     {% set new_params = current_filters.copy() %}
-                    {% do new_params.getlist('brand').remove(brand) %}
+                    {# Створюємо новий список брендів без поточного #}
+                    {% set brands_to_keep = selected_brands|reject('equalto', brand)|list %}
+                    {# Видаляємо старий ключ 'brand', якщо він є #}
+                    {% do new_params.pop('brand', None) %}
+                    {# Додаємо новий список брендів #}
+                    {% if brands_to_keep %}
+                        {% do new_params.setlist('brand', brands_to_keep) %}
+                    {% endif %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">{{ brand }} ×</a>
                 {% endfor %}
-                {# Тег для видалення фільтра по мінімальній ціні #}
+
+                {# [ВИПРАВЛЕНО] Логіка для видалення фільтра по ціні #}
                 {% if request.args.get('min_price') %}
-                     {% set new_params = current_filters.copy() %}{% do new_params.pop('min_price') %}
+                    {% set new_params = current_filters.copy() %}{% do new_params.pop('min_price') %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">Від {{ request.args.get('min_price') }} ₴ ×</a>
                 {% endif %}
-                {# Тег для видалення фільтра по максимальній ціні #}
-                 {% if request.args.get('max_price') %}
-                     {% set new_params = current_filters.copy() %}{% do new_params.pop('max_price') %}
+                {% if request.args.get('max_price') %}
+                    {% set new_params = current_filters.copy() %}{% do new_params.pop('max_price') %}
                     <a href="{{ url_for(request.endpoint, category_slug=category_slug, **new_params) }}" class="filter-tag">До {{ request.args.get('max_price') }} ₴ ×</a>
                 {% endif %}
+                 <a href="{{ url_for('catalog', category_slug=category_slug) }}" class="filter-tag-reset">Скинути все</a>
             </div>
             {% endif %}
 

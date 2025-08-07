@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initOptimizedCartLogic();
     initFavoritesLogic();
     initCabinetModal(pageOverlay, closeAllSidebars); // [ЗМІНЕНО] Передаємо залежності
-
+    initAutoApplyFilters();
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
     initLoadMore();
@@ -730,6 +730,41 @@ function initShowMoreFilters() {
                 }
                 button.remove(); // Видаляємо кнопку після використання
             });
+        }
+    });
+}
+
+function initAutoApplyFilters() {
+    const filtersForm = document.getElementById('auto-filters-form');
+    if (!filtersForm) return;
+
+    // Функція-затримувач, щоб не відправляти запит на кожне натискання клавіші
+    const debounce = (func, delay) => {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+    };
+
+    const submitForm = () => {
+        filtersForm.submit();
+    };
+
+    // Обробник для полів ціни з затримкою
+    const debouncedSubmit = debounce(submitForm, 800);
+
+    filtersForm.addEventListener('change', (e) => {
+        // Застосовуємо відразу для чекбоксів
+        if (e.target.type === 'checkbox') {
+            submitForm();
+        }
+    });
+
+    filtersForm.addEventListener('keyup', (e) => {
+        // Застосовуємо з затримкою для полів вводу (ціна)
+        if (e.target.type === 'number') {
+            debouncedSubmit();
         }
     });
 }

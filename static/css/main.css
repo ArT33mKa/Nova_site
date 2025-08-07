@@ -2143,3 +2143,22 @@ details[open] > summary.filter-title {
 .filter-tag:hover {
     background-color: var(--secondary-color);
 }
+.filter-tag-reset {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-color: transparent;
+    color: var(--primary-color);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border: 1px solid var(--primary-color);
+    margin-left: auto; /* Притискає посилання вправо */
+    transition: all 0.2s;
+}
+
+.filter-tag-reset:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
