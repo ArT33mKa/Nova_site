@@ -255,53 +255,76 @@ def index():
 
 
 def get_category_hierarchy():
-    """Автоматично створює ієрархічну структуру категорій на основі назв."""
-    # 1. Отримуємо всі унікальні категорії з бази, що мають більше одного слова
-    raw_categories_query = db.session.query(Product.category).distinct().filter(
-        Product.category.isnot(None), Product.category != '',
-        Product.category.ilike('% %'),
-                                      db.func.lower(Product.category) != 'загальна'
-    ).all()
-    raw_categories = [c[0] for c in raw_categories_query]
+    """Створює ієрархічну структуру категорій з фіксованими основними категоріями та автоматичним розподілом."""
 
-    # 2. Знаходимо потенційні батьківські категорії (спільні слова)
-    stop_words = ['до', 'для', 'на', 'із', 'та', 'з']
-    all_words = []
-    for cat_name in raw_categories:
-        words = re.findall(r'\b[а-яА-ЯіІїЇєЄa-zA-Z]+\b', cat_name.lower())
-        cleaned_words = [word.capitalize() for word in words if word not in stop_words and len(word) > 3]
-        all_words.extend(cleaned_words)
+    # Визначаємо основні категорії та їх ключові слова
+    MAIN_CATEGORIES = {
+        "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
+        "Насоси": ["насос", "помпа", "гідрофор"],
+        "Бойлери": ["бойлер", "водонагрівач"],
+        "Змішувачі": ["змішувач", "кран", "сифон"],
+        "Витяжки": ["витяжк", "вентилятор"],
+        "Газові колонки": ["колонк", "газов"],
+        "Сушка для рушників": ["сушк", "рушник"],
+        "Запчастини до газового обладнання": ["запчастин", "котел", "термопар", "газов"]
+    }
 
-    word_counts = Counter(all_words)
-    parent_candidates = {word for word, count in word_counts.items() if count > 1}
+    # Отримуємо всі активні категорії з бази даних
+    categories_query = db.session.query(Product.category) \
+        .filter(Product.category.isnot(None)) \
+        .filter(Product.category != '') \
+        .distinct() \
+        .all()
 
-    # 3. Будуємо фінальну ієрархію
-    hierarchy = {parent: [] for parent in sorted(list(parent_candidates))}
-    all_children = set()
+    active_categories = {cat[0] for cat in categories_query if cat[0]}
 
-    for cat in raw_categories:
-        for parent in parent_candidates:
-            if parent.lower() in cat.lower() and parent.lower() != cat.lower():
-                hierarchy[parent].append(cat)
-                all_children.add(cat)
+    # Створюємо структуру категорій
+    hierarchy = {main_cat: [] for main_cat in MAIN_CATEGORIES}
+
+    # Розподіляємо категорії
+    for category in active_categories:
+        category_lower = category.lower()
+        assigned = False
+
+        # Спочатку перевіряємо, чи це основна категорія
+        if category in MAIN_CATEGORIES:
+            continue
+
+        # Потім намагаємося знайти відповідну основну категорію
+        for main_cat, keywords in MAIN_CATEGORIES.items():
+            if any(keyword in category_lower for keyword in keywords):
+                hierarchy[main_cat].append(category)
+                assigned = True
                 break
 
-    # 4. Додаємо категорії, які не потрапили в жодну групу, як самостійні
-    single_categories_query = db.session.query(Product.category).distinct().filter(
-        Product.category.isnot(None), Product.category != '',
-                                      db.func.lower(Product.category) != 'загальна'
-    ).all()
+        # Якщо категорія не підпадає під жодну основну, додаємо її до найбільш підходящої
+        if not assigned:
+            # Шукаємо найдовший спільний префікс з основними категоріями
+            best_match = None
+            max_similarity = 0
 
-    for cat_tuple in single_categories_query:
-        cat = cat_tuple[0]
-        if cat and cat not in all_children and cat not in hierarchy:
-            is_part_of_other = any(cat.lower() in parent.lower() for parent in hierarchy)
-            if not is_part_of_other:
-                hierarchy[cat] = []
+            for main_cat in MAIN_CATEGORIES:
+                main_words = set(main_cat.lower().split())
+                cat_words = set(category_lower.split())
+                similarity = len(main_words.intersection(cat_words))
 
-    # 5. Видаляємо батьків, що залишились без дітей (якщо вони не є самостійною категорією)
-    final_hierarchy = {p: sorted(c) for p, c in hierarchy.items() if c or p not in parent_candidates}
-    return dict(sorted(final_hierarchy.items()))
+                if similarity > max_similarity:
+                    max_similarity = similarity
+                    best_match = main_cat
+
+            if best_match:
+                hierarchy[best_match].append(category)
+            else:
+                # Якщо не знайдено відповідності, додаємо до "Запчастини"
+                hierarchy["Запчастини до газового обладнання"].append(category)
+
+    # Видаляємо порожні категорії та сортуємо підкатегорії
+    final_hierarchy = {}
+    for main_cat, subcats in hierarchy.items():
+        if main_cat in active_categories or subcats:
+            final_hierarchy[main_cat] = sorted(set(subcats))  # Видаляємо дублікати та сортуємо
+
+    return final_hierarchy
 
 
 @app.route('/catalog/', defaults={'category_slug': None})
