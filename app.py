@@ -1231,10 +1231,9 @@ def find_np_cities():
         print(f"Помилка API Нової Пошти (міста): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
 
-
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання ВІДДІЛЕНЬ ТА ПОШТОМАТІВ для населеного пункту.""" # <-- Змінив коментар для ясності
+    """Отримання ВІДДІЛЕНЬ ТА ПОШТОМАТІВ для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
 
@@ -1248,9 +1247,8 @@ def get_np_warehouses():
         "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
         "methodProperties": {
-            "SettlementRef": city_ref,
-            # >>> ДОДАЙТЕ ЦЕЙ ПАРАМЕТР, щоб отримувати і поштомати теж
-            "TypeOfWarehouseRef": "841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28" # Ref для Поштоматів та Вантажно-пасажирських відділень
+            "SettlementRef": city_ref
+            # >>> ВИДАЛІТЬ РЯДОК З "TypeOfWarehouseRef" ЗВІДСИ
         }
     }
     try:
@@ -1258,9 +1256,8 @@ def get_np_warehouses():
         response.raise_for_status()
         data = response.json()
         if data['success']:
-            # >>> ЗАМІНІТЬ СТАРИЙ БЛОК ФІЛЬТРАЦІЇ НА ЦЕЙ
             all_warehouses = data.get('data', [])
-            # Тепер просто повертаємо всі знайдені відділення/поштомати без фільтрації
+            # Тепер ми просто повертаємо всі знайдені відділення/поштомати
             return jsonify([w['Description'] for w in all_warehouses])
         return jsonify([])
     except requests.exceptions.RequestException as e:

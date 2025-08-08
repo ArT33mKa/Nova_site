@@ -160,7 +160,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- >>> ПОВНІСТЮ ЗАМІНІТЬ БЛОК extra_js НА ЦЕЙ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // --- ІНІЦІАЛІЗАЦІЯ ВСІХ КОМПОНЕНТІВ ---
@@ -170,17 +169,27 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEnterKeyNavigation();
     setupCommentField();
 
-    // Нова, покращена маска для телефону
+    // >>> ПОКРАЩЕНА ЛОГІКА ДЛЯ МАСКИ ТЕЛЕФОНУ
     const phoneInput = document.getElementById('customer_phone');
     if (phoneInput) {
-        // Застосовуємо маску, якщо в полі вже є номер (наприклад, з профілю користувача)
+        // Якщо поле не порожнє при завантаженні (напр. дані з профілю), форматуємо його
         if (phoneInput.value) {
             phoneInput.value = formatPhoneNumber(phoneInput.value);
         }
-        phoneInput.addEventListener('input', handlePhoneInput, false);
-        phoneInput.addEventListener('focus', handlePhoneInput, false);
+
+        phoneInput.addEventListener('input', function(e) {
+            const pos = e.target.selectionStart;
+            const originalLength = e.target.value.length;
+
+            e.target.value = formatPhoneNumber(e.target.value);
+
+            const newLength = e.target.value.length;
+            e.target.selectionEnd = pos + (newLength - originalLength);
+        });
+
+        // Очищуємо поле, якщо користувач видалив усе, крім префіксу
         phoneInput.addEventListener('blur', (e) => {
-            if (e.target.value === '+380') {
+            if (e.target.value === '+380 (') {
                 e.target.value = '';
             }
         });
@@ -188,39 +197,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- ФУНКЦІЇ ---
 
+    /**
+     * Нова, надійна функція форматування номера телефону.
+     */
     function formatPhoneNumber(value) {
-        if (!value) return value;
-        const phoneNumber = value.replace(/[^\d]/g, '');
-        // Нормалізація номера
-        let normalized = '';
-        if (phoneNumber.startsWith('380') && phoneNumber.length > 3) {
-            normalized = phoneNumber.substring(3);
-        } else if (phoneNumber.startsWith('0') && phoneNumber.length > 1) {
-            normalized = phoneNumber.substring(1);
-        } else {
-            normalized = phoneNumber;
+        if (!value) return '';
+
+        // 1. Отримуємо тільки цифри
+        let digits = value.replace(/\D/g, '');
+
+        // 2. Нормалізуємо номер, видаляючи можливий префікс, щоб залишились тільки 9 цифр оператора і номера
+        if (digits.startsWith('380')) {
+            digits = digits.substring(3);
+        } else if (digits.startsWith('80')) {
+             digits = digits.substring(2);
+        } else if (digits.startsWith('0')) {
+             digits = digits.substring(1);
         }
 
-        const phoneNumberLength = normalized.length;
-        let formatted = '+380';
+        // Обрізаємо до 9 цифр (код оператора + номер)
+        digits = digits.substring(0, 9);
 
-        if (phoneNumberLength > 0) {
-            formatted += ' (' + normalized.substring(0, 2);
-        }
-        if (phoneNumberLength > 2) {
-            formatted += ') ' + normalized.substring(2, 5);
-        }
-        if (phoneNumberLength > 5) {
-            formatted += '-' + normalized.substring(5, 7);
-        }
-        if (phoneNumberLength > 7) {
-            formatted += '-' + normalized.substring(7, 9);
-        }
-        return formatted;
-    }
+        const len = digits.length;
 
-    function handlePhoneInput(e) {
-        e.target.value = formatPhoneNumber(e.target.value);
+        // 3. Форматуємо номер з пробілами і дужками
+        if (len === 0) return '+380 (';
+        if (len <= 2) return `+380 (${digits}`;
+        if (len <= 5) return `+380 (${digits.substring(0, 2)}) ${digits.substring(2)}`;
+        if (len <= 7) return `+380 (${digits.substring(0, 2)}) ${digits.substring(2, 5)}-${digits.substring(5)}`;
+        return `+380 (${digits.substring(0, 2)}) ${digits.substring(2, 5)}-${digits.substring(5, 7)}-${digits.substring(7, 9)}`;
     }
 
     function setupCommentField() {
