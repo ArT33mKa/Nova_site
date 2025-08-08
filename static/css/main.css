@@ -2451,3 +2451,53 @@ details[open] > summary.filter-title {
 .price-filter-wrapper .price-ok-btn:hover {
     background-color: var(--secondary-color);
 }
+
+/* --- Стилі для акордеону фільтрів --- */
+details.filter-group {
+    border-bottom: 1px solid var(--light-gray);
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+}
+
+details.filter-group:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+details > summary {
+    list-style: none; /* Прибирає стандартний маркер */
+    cursor: pointer;
+    padding: 10px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+summary::-webkit-details-marker {
+    display: none; /* Прибирає маркер в Chrome/Safari */
+}
+
+summary:hover {
+    color: var(--primary-color);
+}
+
+/* Кастомна стрілочка */
+summary::after {
+    content: '▼';
+    font-size: 0.8rem;
+    color: var(--gray-color);
+    transition: transform 0.2s ease-in-out;
+}
+
+details[open] > summary::after {
+    transform: rotate(180deg);
+}
+
+/* Контент всередині акордеону */
+.filter-options {
+    padding-top: 15px;
+}
