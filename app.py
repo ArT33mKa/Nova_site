@@ -219,7 +219,7 @@ shop_info = {"name": "НОВА ХВИЛЯ",
                             {'name': 'Змішувач', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
                             {'name': "Витяжки", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
                             {'name': "Колонки", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
-                            {'name': "Су��ка для рушників", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
+                            {'name': "Сука для рушників", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
                             {'name': "Запчастини до газ обладнання", 'image': 'gas_parts.jpg',
                              'icon': 'gas_parts.jpg'}], "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
              "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
@@ -1241,16 +1241,14 @@ def get_np_warehouses():
     if not city_ref:
         return jsonify([])
 
-    # Словник з Ref ID для різних типів відділень
+    # Оновлені, більш надійні Ref ID
     warehouse_type_refs = {
         "postomat": "f9316480-5f2d-425d-bc2c-ac73a02de323",
-        # Поштове (до 30 кг) + Вантажне відділення
-        "branch": "9a6886f2-89b7-41b0-9b0c-e675a080cb28,6f8c7162-4b72-4b0a-88e5-906948c6a92f"
+        "branch": "6f8c7162-4b72-4b0a-88e5-906948c6a92f,841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28"
     }
 
     method_properties = {"SettlementRef": city_ref}
 
-    # Додаємо фільтр за типом, якщо він вказаний
     if warehouse_type in warehouse_type_refs:
         method_properties["TypeOfWarehouseRef"] = warehouse_type_refs[warehouse_type]
 
@@ -1268,6 +1266,7 @@ def get_np_warehouses():
         if data['success']:
             all_warehouses = data.get('data', [])
             return jsonify([w['Description'] for w in all_warehouses])
+        # Якщо успішно, але даних нема, повертаємо порожній список
         return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
