@@ -902,7 +902,10 @@ def bas_import():
 
         catalog_node = root.find('.//Каталог')
         if catalog_node is None: return "failure\nНе знайдено тег <Каталог>.", 400
+
+        # [ЗМІНА] Ця логіка тепер не використовується для визначення категорії, але залишаємо її
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
+
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю обробку...")
 
@@ -912,14 +915,31 @@ def bas_import():
         products_to_update, products_to_add = [], []
         default_image_url = _get_cloudinary_url(None)
 
+        # [ГОЛОВНИЙ ФІКС] Створюємо словник для визначення категорій за ключовими словами в назві
+        CATEGORY_KEYWORDS = {
+            "Поливочна система": ["полив", "шланг", "конектор", "розпилювач", "зрошувач", "пістолет"],
+            "Насоси": ["насос", "помпа", "гідрофор"],
+            "Бойлери": ["бойлер", "водонагрівач"],
+            "Змішувачі": ["змішувач", "кран", "сифон"],
+            "Витяжки": ["витяжк", "вентилятор"],
+            "Газові колонки": ["колонк", "газов"],
+            "Сушка для рушників": ["сушк", "рушник"],
+        }
+
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
+
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
-            group_id_node = product_node.find('.//Групи/Ид')
-            group_id = group_id_node.text if group_id_node is not None else None
-            category = groups.get(group_id, "Загальна")
+
+            # --- [НОВА ЛОГІКА ВИЗНАЧЕННЯ КАТЕГОРІЇ] ---
+            category = "Запчастини"  # Категорія за замовчуванням
+            for main_cat, keywords in CATEGORY_KEYWORDS.items():
+                if any(keyword in name.lower() for keyword in keywords):
+                    category = main_cat
+                    break
+            # --- Кінець нової логіки ---
 
             image_tags = product_node.findall('Картинка')
             image_filename_from_xml = ''
@@ -953,9 +973,8 @@ def bas_import():
 
             if not in_stock:
                 stock_prop_node = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
-                if stock_prop_node is not None and stock_prop_node.text:
-                    if stock_prop_node.text.strip().lower() == 'true':
-                        in_stock = True
+                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() == 'true':
+                    in_stock = True
 
             brand = None
             if description:
@@ -1015,7 +1034,6 @@ def bas_import():
         error_details = traceback.format_exc()
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
-
 
 def require_bot_api_key(f):
     @wraps(f)
