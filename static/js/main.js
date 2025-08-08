@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
     initLoadMore();
-    initShowMoreFilters();
     updateCartView();
     updateFavoritesUI();
     initSearchLogic();
@@ -457,26 +456,6 @@ function initContactForm() {
     }
 }
 
-function initCatalogFilters() {
-    const showMoreBtn = document.getElementById('show-more-brands-btn');
-    if (showMoreBtn) {
-        showMoreBtn.addEventListener('click', function() {
-            const list = this.previousElementSibling;
-            const isExpanded = this.dataset.expanded === 'true';
-            if (isExpanded) {
-                list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
-                this.textContent = 'Показати більше';
-                this.dataset.expanded = 'false';
-            } else {
-                list.querySelectorAll('.brand-item.hidden').forEach(item => item.classList.remove('hidden'));
-                this.textContent = 'Приховати';
-                this.dataset.expanded = 'true';
-            }
-        });
-        const list = showMoreBtn.previousElementSibling;
-        list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
-    }
-}
 
 function initReviewsPage() {
     const openModal = modal => modal?.classList.add('active');
@@ -649,9 +628,6 @@ function initLoadMore() {
         // [НОВЕ] Збираємо всі активні фільтри з data-атрибутів кнопки
         const params = new URLSearchParams();
         params.set('page', currentPage);
-        if (loadMoreBtn.dataset.categorySlug) {
-            params.set('category_slug', loadMoreBtn.dataset.categorySlug);
-        }
         if (loadMoreBtn.dataset.search) {
             params.set('search', loadMoreBtn.dataset.search);
         }

@@ -16,51 +16,22 @@
     <div class="catalog-content">
         <!-- [ФІНАЛЬНА ВЕРСІЯ] -->
         <aside class="filters-sidebar sticky-sidebar">
-            <form id="filters-form" method="GET" action="{{ url_for('catalog', category_slug=category_slug) }}">
+           <form id="filters-form" method="GET" action="{{ url_for('catalog') }}">
+               <!-- ФІЛЬТР ЦІНИ -->
+               <div class="filter-group">
+                   <h4 class="filter-title always-open">Ціна, ₴</h4>
+                   <div class="price-inputs">
+                       <input type="number" name="min_price" placeholder="Від {{ min_price_available|int }}" value="{{ request.args.get('min_price', '') }}">
+                       <input type="number" name="max_price" placeholder="До {{ max_price_available|int }}" value="{{ request.args.get('max_price', '') }}">
+                       <button type="submit" class="price-ok-btn">OK</button>
+                   </div>
+               </div>
 
-                <!-- Розділені списки категорій -->
-                <div class="filter-group">
-                    <div class="filter-options-list">
-                        <!-- Завжди показуємо "Всі товари" -->
-                        <a href="{{ url_for('catalog') }}"
-                           class="filter-category-link {% if not category_slug %}active{% endif %}">
-                            <strong>Всі товари</strong>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Тепер виводимо ВСІ категорії в одному списку -->
-                {% if categories %}
-                <div class="filter-group">
-                    <h4 class="filter-title always-open">Категорії</h4>
-                    <div class="filter-options-list">
-                        {% for cat_name, count in categories.items() %}
-                            {% set slug = cat_name.lower().replace(' ', '-') %}
-                            <a href="{{ url_for('catalog', category_slug=slug) }}"
-                               class="filter-category-link {% if category_slug == slug %}active{% endif %}">
-                                <span>{{ cat_name }}</span>
-                                <span class="filter-count">{{ count }}</span>
-                            </a>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- ФІЛЬТР ЦІНИ -->
-                <div class="filter-group">
-                    <h4 class="filter-title always-open">Ціна, ₴</h4>
-                    <div class="price-inputs">
-                        <input type="number" name="min_price" placeholder="Від {{ min_price_available|int }}" value="{{ request.args.get('min_price', '') }}">
-                        <input type="number" name="max_price" placeholder="До {{ max_price_available|int }}" value="{{ request.args.get('max_price', '') }}">
-                        <button type="submit" class="price-ok-btn">OK</button>
-                    </div>
-                </div>
-
-                <!-- Невидиме поле для пошуку, щоб він не скидався -->
-                {% if search_query %}
-                    <input type="hidden" name="search" value="{{ search_query }}">
-                {% endif %}
-            </form>
+               <!-- Невидиме поле для пошуку, щоб він не скидався -->
+               {% if search_query %}
+                   <input type="hidden" name="search" value="{{ search_query }}">
+               {% endif %}
+           </form>
         </aside>
 
         <!-- Основний контент з товарами -->

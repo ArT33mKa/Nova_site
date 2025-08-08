@@ -252,32 +252,10 @@ def index():
     return render_template("index.html", products=products, hero_slides=hero_slides)
 
 
-# [Спрощена версія] Повертає всі категорії в одному списку
-def get_category_hierarchy():
-    """
-    Запитує всі унікальні категорії з БД і повертає їх разом з кількістю товарів.
-    """
-    product_counts_query = db.session.query(
-        Product.category, func.count(Product.id)
-    ).filter(
-        Product.category.isnot(None),
-        Product.category != '',
-        Product.in_stock == True
-    ).group_by(Product.category).all()
-
-    # Повертаємо єдиний словник з усіма категоріями
-    all_categories = {category: count for category, count in product_counts_query}
-    return dict(sorted(all_categories.items()))
-
-
 # Маршрут каталогу, адаптований до нової структури
-@app.route('/catalog/', defaults={'category_slug': None})
-@app.route('/catalog/<string:category_slug>/')
-def catalog(category_slug):
+@app.route('/catalog/')
+def catalog():
     page = request.args.get('page', 1, type=int)
-    # Зверніть увагу: get_category_hierarchy тепер повертає єдиний словник
-    all_categories = get_category_hierarchy()
-
     min_price_str = request.args.get('min_price', '')
     max_price_str = request.args.get('max_price', '')
     search_query = request.args.get('search', '').strip()
@@ -290,20 +268,8 @@ def catalog(category_slug):
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    current_category = None
-    if category_slug:
-        # Нормалізуємо slug для пошуку
-        category_name_from_slug = category_slug.replace('-', ' ')
+    # Видаляємо блок, пов'язаний з обробкою category_slug
 
-        # Шукаємо відповідну категорію серед усіх доступних
-        for cat_name in all_categories:
-            if cat_name.lower() == category_name_from_slug:
-                current_category = cat_name
-                # Фільтруємо товари за точною назвою категорії
-                query = query.filter(Product.category == current_category)
-                break
-
-    # Визначення діапазону цін (логіка залишається без змін)
     price_range_query = db.session.query(func.floor(func.min(Product.price)), func.ceil(func.max(Product.price)))
     if query.whereclause is not None:
         price_range_query = price_range_query.select_from(query.subquery())
@@ -321,16 +287,12 @@ def catalog(category_slug):
 
     current_filters = request.args.copy()
     if 'page' in current_filters: current_filters.pop('page')
-    if 'category_slug' in current_filters: current_filters.pop('category_slug', None)
 
     return render_template(
         'catalog.html',
         products=products,
-        categories=all_categories, # Передаємо єдиний список категорій
-        current_category=current_category,
-        main_category_of_current=None,
+        # Видаляємо передачу категорій у шаблон
         current_filters=current_filters,
-        category_slug=category_slug,
         min_price_available=min_price_available,
         max_price_available=max_price_available,
         search_query=search_query
@@ -853,9 +815,6 @@ def bas_import():
             group_id = group_id_node.text if group_id_node is not None else None
             final_category = groups.get(group_id, "Різне")
 
-            # Видалено логіку визначення final_category за ключовими словами
-            # ... (removed keyword logic) ...
-
             image_tags = product_node.findall('Картинка')
             image_filename_from_xml = ''
             if image_tags:
@@ -1042,36 +1001,30 @@ def page_not_found(e):
 # API для динамічного завантаження, що враховує всі фільтри
 @app.route('/api/catalog/load_more')
 def api_load_more():
-    page = request.args.get('page', 1, type=int)
-    category_slug = request.args.get('category_slug')
-    min_price = request.args.get('min_price', type=float)
-    max_price = request.args.get('max_price', type=float)
-    search_query = request.args.get('search', '').strip()
+   page = request.args.get('page', 1, type=int)
+   min_price = request.args.get('min_price', type=float)
+   max_price = request.args.get('max_price', type=float)
+   search_query = request.args.get('search', '').strip()
 
-    query = Product.query.filter(Product.in_stock == True)
+   query = Product.query.filter(Product.in_stock == True)
 
-    if search_query:
-        query = query.filter(Product.name.ilike(f'%{search_query}%'))
+   if search_query:
+       query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    if category_slug:
-        # Оскільки структура пласка, просто шукаємо категорію за її назвою (перетвореною зі slug)
-        category_name_from_slug = category_slug.replace('-', ' ')
-        # Використовуємо ilike для нечутливого до регістру порівняння, хоча category зберігається в одному регістрі
-        query = query.filter(Product.category.ilike(category_name_from_slug))
+   # Видаляємо блок, пов'язаний з обробкою category_slug
 
-    if min_price is not None:
-        query = query.filter(Product.price >= min_price)
-    if max_price is not None:
-        query = query.filter(Product.price <= max_price)
+   if min_price is not None:
+       query = query.filter(Product.price >= min_price)
+   if max_price is not None:
+       query = query.filter(Product.price <= max_price)
 
-    products_pagination = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
+   products_pagination = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
 
-    html = render_template('_products_grid_items.html', products=products_pagination.items)
+   html = render_template('_products_grid_items.html', products=products_pagination.items)
 
-    response = make_response(html)
-    response.headers['X-More-Available'] = 'true' if products_pagination.has_next else 'false'
-    return response
-
+   response = make_response(html)
+   response.headers['X-More-Available'] = 'true' if products_pagination.has_next else 'false'
+   return response
 
 if __name__ == "__main__":
     with app.app_context():
