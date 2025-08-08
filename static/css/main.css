@@ -2576,3 +2576,121 @@ details[open] > summary.filter-title {
 .subcategory-list .filter-category-link {
     font-weight: 500;
 }
+
+.search-bar-container {
+    margin-bottom: 25px;
+}
+
+.search-form {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    width: 100%;
+    border: 2px solid var(--primary-color);
+    border-radius: 50px; /* Робить його овальним */
+    overflow: hidden;
+    background-color: #fff;
+    box-shadow: 0 4px 15px rgba(0, 102, 204, 0.1);
+}
+
+#search-input {
+    flex-grow: 1;
+    border: none;
+    background: transparent;
+    padding: 15px 25px;
+    font-size: 1.1rem;
+    color: var(--dark-color);
+}
+#search-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.search-btn {
+    flex-shrink: 0;
+    padding: 0 25px;
+    background-color: var(--primary-color);
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.search-btn:hover {
+    background-color: var(--secondary-color);
+}
+
+/* --- Історія пошуку --- */
+.search-history-dropdown {
+    display: none;
+    position: absolute;
+    top: 105%;
+    left: 0;
+    right: 0;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    z-index: 100;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.search-history-dropdown ul {
+    list-style: none;
+    padding: 8px 0;
+}
+
+.search-history-dropdown li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+}
+
+.search-history-dropdown .history-term {
+    cursor: pointer;
+    flex-grow: 1;
+}
+
+.search-history-dropdown .history-term:hover {
+    color: var(--primary-color);
+}
+
+.remove-history-item {
+    background: none;
+    border: none;
+    color: var(--gray-color);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 5px;
+    transition: color 0.2s;
+}
+.remove-history-item:hover {
+    color: var(--danger-color);
+}
+
+.history-clear-item {
+    text-align: center;
+    padding-top: 10px;
+    border-top: 1px solid var(--light-gray);
+    margin-top: 5px;
+}
+
+#clear-history-btn {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+#clear-history-btn:hover {
+    text-decoration: underline;
+}

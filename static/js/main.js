@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initShowMoreFilters();
     updateCartView();
     updateFavoritesUI();
+    initSearchLogic();
 
     // [НОВЕ] Обробник кліку на саме затемнення для закриття панелей
     if (pageOverlay) {
@@ -685,6 +686,79 @@ function initLoadMore() {
             });
     });
 }
+
+function initSearchLogic() {
+    const searchForm = document.getElementById('search-form');
+    const searchInput = document.getElementById('search-input');
+    const historyDropdown = document.getElementById('search-history-dropdown');
+
+    if (!searchForm || !searchInput || !historyDropdown) return;
+
+    const getHistory = () => JSON.parse(localStorage.getItem('searchHistory')) || [];
+    const saveHistory = (history) => localStorage.setItem('searchHistory', JSON.stringify(history));
+
+    const renderHistory = () => {
+        historyDropdown.innerHTML = '';
+        const history = getHistory();
+        if (history.length > 0) {
+            const list = document.createElement('ul');
+            history.forEach(term => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="history-term">${term}</span>
+                    <button class="remove-history-item" data-term="${term}" title="Видалити">&times;</button>
+                `;
+                li.querySelector('.history-term').addEventListener('click', () => {
+                    searchInput.value = term;
+                    searchForm.submit();
+                });
+                list.appendChild(li);
+            });
+            const clearBtnItem = document.createElement('li');
+            clearBtnItem.className = 'history-clear-item';
+            clearBtnItem.innerHTML = '<button id="clear-history-btn">Очистити історію</button>';
+            list.appendChild(clearBtnItem);
+            historyDropdown.appendChild(list);
+            historyDropdown.style.display = 'block';
+        } else {
+            historyDropdown.style.display = 'none';
+        }
+    };
+
+    searchInput.addEventListener('focus', renderHistory);
+
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !historyDropdown.contains(e.target)) {
+            historyDropdown.style.display = 'none';
+        }
+    });
+
+    searchForm.addEventListener('submit', (e) => {
+        const searchTerm = searchInput.value.trim();
+        if (searchTerm) {
+            let history = getHistory();
+            history = history.filter(item => item.toLowerCase() !== searchTerm.toLowerCase());
+            history.unshift(searchTerm);
+            if (history.length > 5) history.pop();
+            saveHistory(history);
+        }
+    });
+
+    historyDropdown.addEventListener('click', (e) => {
+        if (e.target.id === 'clear-history-btn') {
+            localStorage.removeItem('searchHistory');
+            historyDropdown.style.display = 'none';
+        }
+        if (e.target.classList.contains('remove-history-item')) {
+            const termToRemove = e.target.dataset.term;
+            let history = getHistory();
+            history = history.filter(item => item !== termToRemove);
+            saveHistory(history);
+            renderHistory(); // Re-render to show changes
+        }
+    });
+}
+
 function initShowMoreFilters() {
     document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
         const limit = parseInt(list.dataset.showLimit, 10);
