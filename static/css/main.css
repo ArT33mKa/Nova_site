@@ -1908,9 +1908,6 @@ img {
     font-size: 1.1rem;
     min-width: 200px;
     margin: 0 auto;
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%);
 }
 
 #loading-spinner {
