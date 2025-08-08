@@ -30,13 +30,17 @@
     <div class="container">
         <h2 class="section-title">Категорії товарів</h2>
         <div class="products-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-            {% for category in shop.categories %}
-            <a href="{{ url_for('catalog', category_slug=category.name.lower().replace(' ', '-')) }}" class="category-card">
-                <div class="category-icon-wrapper">
-                    <img src="{{ url_for('static', filename='img/' + category.icon) }}" alt="{{ category.name }}">
-                </div>
-                <h3>{{ category.name }}</h3>
-            </a>
+            {# [ВИПРАВЛЕНО] Тепер ми використовуємо динамічний список категорій з бази даних #}
+            {% for cat_name, data in hierarchy.items() %}
+                {# Знаходимо відповідну іконку зі статичного списку shop.categories #}
+                {% set category_info = shop.categories|selectattr('name', 'equalto', cat_name)|first %}
+                <a href="{{ url_for('catalog', category_slug=cat_name.lower().replace(' ', '-')) }}" class="category-card">
+                    <div class="category-icon-wrapper">
+                        {# Використовуємо знайдену іконку, або стандартну, якщо не знайдено #}
+                        <img src="{{ url_for('static', filename='img/' + (category_info.icon if category_info else 'default_icon.png')) }}" alt="{{ cat_name }}">
+                    </div>
+                    <h3>{{ cat_name }}</h3>
+                </a>
             {% endfor %}
         </div>
     </div>
