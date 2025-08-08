@@ -29,29 +29,12 @@
                     </div>
                 </div>
 
-                <!-- Спочатку виводимо ОСНОВНІ категорії -->
-                {% if hierarchy.main %}
+                <!-- Тепер виводимо ВСІ категорії в одному списку -->
+                {% if categories %}
                 <div class="filter-group">
-                    <h4 class="filter-title always-open">Основні товари</h4>
+                    <h4 class="filter-title always-open">Категорії</h4>
                     <div class="filter-options-list">
-                        {% for cat_name, count in hierarchy.main.items() %}
-                            {% set slug = cat_name.lower().replace(' ', '-') %}
-                            <a href="{{ url_for('catalog', category_slug=slug) }}"
-                               class="filter-category-link {% if category_slug == slug %}active{% endif %}">
-                                <span>{{ cat_name }}</span>
-                                <span class="filter-count">{{ count }}</span>
-                            </a>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Потім виводимо ЗАПЧАСТИНИ -->
-                {% if hierarchy.parts %}
-                <div class="filter-group">
-                    <h4 class="filter-title always-open">Запчастини та комплектуючі</h4>
-                    <div class="filter-options-list">
-                         {% for cat_name, count in hierarchy.parts.items() %}
+                        {% for cat_name, count in categories.items() %}
                             {% set slug = cat_name.lower().replace(' ', '-') %}
                             <a href="{{ url_for('catalog', category_slug=slug) }}"
                                class="filter-category-link {% if category_slug == slug %}active{% endif %}">

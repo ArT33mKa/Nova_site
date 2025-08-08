@@ -2,7 +2,7 @@ import os
 import re
 import locale
 import smtplib
-import requests  # для Telegram та Нової Пошти
+import requests
 import cloudinary.utils
 from functools import wraps
 from datetime import datetime
@@ -252,20 +252,11 @@ def index():
     return render_template("index.html", products=products, hero_slides=hero_slides)
 
 
-# [ФІНАЛЬНА ВЕРСІЯ 5.1] Повертає категорії, розділені на основні товари та запчастини
+# [Спрощена версія] Повертає всі категорії в одному списку
 def get_category_hierarchy():
     """
-    [НОВА ВЕРСІЯ 5.1] Запитує всі унікальні категорії з БД і розділяє їх
-    на "Основні товари" та "Запчастини" для пріоритетного відображення.
+    Запитує всі унікальні категорії з БД і повертає їх разом з кількістю товарів.
     """
-    # 1. Список назв головних, пріоритетних категорій.
-    # Назви мають точно збігатися з тими, що генеруються при імпорті.
-    MAIN_GOODS_LIST = [
-        "Бойлери", "Насоси", "Змішувачі", "Витяжки",
-        "Газові колонки", "Сушки для рушників", "Шланги та підводка"
-    ]
-
-    # 2. Робимо запит до БД, щоб отримати всі унікальні категорії та їх кількість.
     product_counts_query = db.session.query(
         Product.category, func.count(Product.id)
     ).filter(
@@ -274,31 +265,18 @@ def get_category_hierarchy():
         Product.in_stock == True
     ).group_by(Product.category).all()
 
-    # 3. Розділяємо категорії на дві групи: основні та запчастини.
-    main_categories = {}
-    part_categories = {}
-
-    for category, count in product_counts_query:
-        if category in MAIN_GOODS_LIST:
-            main_categories[category] = count
-        else:
-            part_categories[category] = count
-
-    # 4. Сортуємо кожну групу за алфавітом.
-    sorted_main = dict(sorted(main_categories.items()))
-    sorted_parts = dict(sorted(part_categories.items()))
-
-    # Повертаємо структуру, яку шаблон зможе легко відобразити.
-    return {'main': sorted_main, 'parts': sorted_parts}
+    # Повертаємо єдиний словник з усіма категоріями
+    all_categories = {category: count for category, count in product_counts_query}
+    return dict(sorted(all_categories.items()))
 
 
-# [ФІНАЛЬНА ВЕРСІЯ 5.1] Маршрут каталогу, адаптований до нової структури
+# Маршрут каталогу, адаптований до нової структури
 @app.route('/catalog/', defaults={'category_slug': None})
 @app.route('/catalog/<string:category_slug>/')
 def catalog(category_slug):
     page = request.args.get('page', 1, type=int)
-    # Зверніть увагу: get_category_hierarchy тепер повертає словник з ключами 'main' і 'parts'
-    hierarchy = get_category_hierarchy()
+    # Зверніть увагу: get_category_hierarchy тепер повертає єдиний словник
+    all_categories = get_category_hierarchy()
 
     min_price_str = request.args.get('min_price', '')
     max_price_str = request.args.get('max_price', '')
@@ -317,8 +295,7 @@ def catalog(category_slug):
         # Нормалізуємо slug для пошуку
         category_name_from_slug = category_slug.replace('-', ' ')
 
-        # Шукаємо відповідну категорію серед основних або запчастин
-        all_categories = {**hierarchy['main'], **hierarchy['parts']}
+        # Шукаємо відповідну категорію серед усіх доступних
         for cat_name in all_categories:
             if cat_name.lower() == category_name_from_slug:
                 current_category = cat_name
@@ -349,7 +326,7 @@ def catalog(category_slug):
     return render_template(
         'catalog.html',
         products=products,
-        hierarchy=hierarchy,
+        categories=all_categories, # Передаємо єдиний список категорій
         current_category=current_category,
         main_category_of_current=None,
         current_filters=current_filters,
@@ -824,7 +801,7 @@ def _get_cloudinary_url(image_filename):
         return None
 
 
-# [ФІНАЛЬНА ВЕРСІЯ 5.1] Максимально детальна та гнучка категоризація
+# [Оновлений імпорт BAS] Видалено логіку авто-категоризації
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
@@ -850,6 +827,7 @@ def bas_import():
         catalog_node = root.find('.//Каталог')
         if catalog_node is None: return "failure\nНе знайдено тег <Каталог>.", 400
 
+        # Зберігаємо групи (категорії) з XML
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю обробку...")
@@ -860,60 +838,24 @@ def bas_import():
         products_to_update, products_to_add = [], []
         default_image_url = _get_cloudinary_url(None)
 
-        MAIN_GOODS_KEYWORDS = {
-            "Газові колонки": ["колонка газова", "газова колонка"],
-            "Шланги та підводка": ["шланг", "підводка"],
-            "Насоси": ["насос"],
-            "Бойлери": ["бойлер"],
-            "Змішувачі": ["змішувач"],
-            "Витяжки": ["витяжк"],
-            "Сушки для рушників": ["сушк"],
-        }
-        SPARE_PARTS_KEYWORDS = {
-            "Автоматика для котлів": ["автоматика"],
-            "Термопари": ["термопар"],
-            "Сигналізатори газу": ["сигналізатор"],
-            "Газові клапани та редуктори": ["клапан", "редуктор"],
-            "Блоки управління та розпалу": ["блок розпалу", "блок сіт", "блок мр-9", "блок honeywell", "блок мініsit",
-                                            "блок honneywell"],
-            "Пальники та форсунки": ["пальник", "форсунк", "жиклер", "інжектор"],
-            "Датчики та індикатори": ["датчик", "термометр", "термостат", "манометр"],
-            "Електричні компоненти": ["електрод", "свіча", "п'єзо", "пьезо", "мікровимикач", "кабель"],
-            "Мембрани та прокладки": ["мембран", "прокладк", "сальник"],
-            "Крани та вентилі": ["кран", "вентиль"],
-            "Сильфони": ["сильфон"],
-            "Димоходи та комплектуючі": ["адаптер", "коліно труби", "вставка труби", "димоход"],
-            "Кришки та розсікачі": ["кришка розсікача"],
-            "Трубки": ["трубка"],
-            "Теплообмінники та ізоляція": ["теплообмінник", "ізоляція", "радіатор колонки"],
-            "Кріплення та фіксатори": ["фіксатор", "скоба", "тримач"],
-            "Аноди": ["анод"],
-        }
+        # Видалено всі словники з ключовими словами для авто-категоризації
+        # MAIN_GOODS_KEYWORDS = {...}
+        # SPARE_PARTS_KEYWORDS = {...}
 
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
+
+            # [Оновлено] Категорія береться безпосередньо з назви групи в XML
             group_id_node = product_node.find('.//Групи/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
-            final_category = None
-            product_name_lower = name.lower()
-            for category, keywords in MAIN_GOODS_KEYWORDS.items():
-                if any(keyword in product_name_lower for keyword in keywords):
-                    final_category = category
-                    break
-            if not final_category:
-                for category, keywords in SPARE_PARTS_KEYWORDS.items():
-                    if any(keyword in product_name_lower for keyword in keywords):
-                        final_category = category
-                        break
-            if not final_category:
-                group_name_lower = groups.get(group_id, "").lower()
-                if "запчастин" in product_name_lower or "запчастин" in group_name_lower:
-                    final_category = "Інші запчастини"
-            if not final_category:
-                final_category = "Різне"
+            final_category = groups.get(group_id, "Різне")
+
+            # Видалено логіку визначення final_category за ключовими словами
+            # ... (removed keyword logic) ...
+
             image_tags = product_node.findall('Картинка')
             image_filename_from_xml = ''
             if image_tags:
@@ -1097,7 +1039,7 @@ def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
 
 
-# [ФІНАЛЬНА ВЕРСІЯ 5.1] API для динамічного завантаження, що враховує всі фільтри
+# API для динамічного завантаження, що враховує всі фільтри
 @app.route('/api/catalog/load_more')
 def api_load_more():
     page = request.args.get('page', 1, type=int)
