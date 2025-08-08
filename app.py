@@ -1072,32 +1072,52 @@ def bas_import():
             if not final_image_url:
                 final_image_url = default_image_url
 
-            price = 0.0
-            in_stock = False
-            offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
-            if offer_node is not None:
-                price_node = offer_node.find('.//ЦенаЗаЕдиницу')
-                if price_node is not None and price_node.text:
-                    try:
-                        price = float(re.match(r"[\d.]+", price_node.text.replace(',', '.')).group(0))
-                    except (ValueError, AttributeError):
-                        pass
-                quantity_node = offer_node.find('Количество')
-                if quantity_node is not None and quantity_node.text:
-                    try:
-                        if int(float(quantity_node.text.strip())) > 0: in_stock = True
-                    except (ValueError, TypeError):
-                        pass
+                price = 0.0
+                in_stock = False
 
-            if not in_stock:
-                stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
-                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
-                    'true', 'да', 'є', 'yes']:
-                    in_stock = True
-                else:
-                    stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
-                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.lower() == 'true':
+                # 1. Основний спосіб: перевірка блоку <Предложение> на кількість та ціну
+                offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
+                if offer_node is not None:
+                    # Отримуємо ціну
+                    price_node = offer_node.find('.//ЦенаЗаЕдиницу')
+                    if price_node is not None and price_node.text:
+                        try:
+                            # Надійно парсимо число, навіть якщо там є зайві символи
+                            price_match = re.search(r"[\d.,]+", price_node.text)
+                            if price_match:
+                                price = float(price_match.group(0).replace(',', '.'))
+                        except (ValueError, AttributeError):
+                            price = 0.0
+
+                    # Отримуємо кількість
+                    quantity_node = offer_node.find('Количество')
+                    if quantity_node is not None and quantity_node.text:
+                        try:
+                            # Якщо кількість більше нуля, товар точно є в наявності
+                            if float(quantity_node.text.strip().replace(',', '.')) > 0:
+                                in_stock = True
+                        except (ValueError, TypeError):
+                            # Якщо не вдалося розпарсити кількість, просто ігноруємо
+                            pass
+
+                # 2. Додатковий (резервний) спосіб: перевірка властивості "Наличие"
+                # Цей блок спрацює, якщо кількість 0 або тег <Предложение> взагалі відсутній.
+                # Це дозволяє позначити товар як "в наявності" (напр. під замовлення), навіть якщо кількість 0.
+                if not in_stock:
+                    # Список можливих позитивних значень для властивості "Наличие"
+                    positive_stock_values = ['true', 'да', 'є', 'yes', 'в наличии']
+
+                    # Шукаємо властивість за назвою "Наличие"
+                    stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
+                    if stock_prop_node is not None and stock_prop_node.text and \
+                            stock_prop_node.text.strip().lower() in positive_stock_values:
                         in_stock = True
+                    else:
+                        # Якщо не знайшли, шукаємо за загальновідомим ID "ИД-Наличие"
+                        stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
+                        if stock_prop_node_alt is not None and stock_prop_node_alt.text and \
+                                stock_prop_node_alt.text.strip().lower() == 'true':
+                            in_stock = True
 
             # --- Логіка визначення бренду також без змін ---
             brand = None
