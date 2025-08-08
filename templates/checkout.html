@@ -99,7 +99,7 @@
             <div class="city-search-wrapper"><i class="fas fa-search"></i><input type="text" id="city-search-input" placeholder="Вкажіть населений пункт"></div>
             <p class="city-search-prompt">Почніть вводити назву населеного пункту від 3-х букв</p>
             <div class="city-list-container" id="city-list-container">
-                <h5>Популярні населені пункти</h5>
+                <h5 id="popular-cities-title">Популярні населені пункти</h5>
                 <ul id="popular-cities-list"></ul>
                 <ul id="search-cities-list" style="display:none;"></ul>
             </div>
@@ -212,6 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const citySearchInput = document.getElementById('city-search-input');
             const popularCitiesList = document.getElementById('popular-cities-list');
             const searchCitiesList = document.getElementById('search-cities-list');
+            const popularCitiesTitle = document.getElementById('popular-cities-title');
             let searchTimeout;
 
             const popularCities = [
@@ -235,7 +236,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             citySearchInput.addEventListener('input', function() {
                 const query = this.value.trim();
-                popularCitiesList.parentElement.style.display = query.length < 3 ? 'block' : 'none';
+                // *** ОСЬ ТУТ БУЛО ВИПРАВЛЕННЯ ***
+                popularCitiesTitle.style.display = query.length < 3 ? 'block' : 'none';
+                popularCitiesList.style.display = query.length < 3 ? 'block' : 'none';
                 searchCitiesList.style.display = query.length >= 3 ? 'block' : 'none';
                 if (query.length < 3) { searchCitiesList.innerHTML = ''; return; }
                 clearTimeout(searchTimeout);
@@ -251,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
             function fetchCities(query) {
                 fetch(`/api/np/cities?q=${encodeURIComponent(query)}`).then(res => res.json()).then(cities => {
                     searchCitiesList.innerHTML = '';
-                    if (cities.length > 0) {
+                    if (cities && cities.length > 0) {
                         cities.forEach(city => {
                             const li = document.createElement('li');
                             li.textContent = city.name;
