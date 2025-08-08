@@ -281,7 +281,7 @@ def get_category_hierarchy():
 
     for category, brand in products:
         category = category.strip()
-        # Визначаємо основну категорію
+        # Визначаємо основну категорі��
         main_category = None
 
         # Перевіряємо чи це основна категорія
@@ -610,7 +610,7 @@ def google_logged_in(blueprint, token):
 
 # ────────────────────────────────
 #  КОШИК ТА ОФОРМЛЕННЯ ЗАМОВЛЕННЯ
-# ────────────────────────────────
+# ──────────��─────────────────────
 @app.route('/add_to_cart', methods=['POST'])
 def add_to_cart():
     data = request.get_json()
@@ -914,7 +914,7 @@ def admin_unfinished():
 def send_message():
     form = request.form
     form_data = {'name': form.get('name'), 'email': form.get('email'), 'message': form.get('message')}
-    subject = f"Нове повідомлення з сайту від {form_data['name']}"
+    subject = f"Нове пові��омлення з сайту від {form_data['name']}"
     html_body = render_template('email/contact_form_notification.html', data=form_data, shop=shop_info)
     if send_email(os.getenv("SMTP_USER"), subject, html_body):
         return jsonify(status="success", message="✅ Повідомлення успішно надіслано!")
@@ -1015,7 +1015,7 @@ def bas_import():
         # ================================================================
         # [ОПТИМІЗАЦІЯ №1]: Отримуємо всі існуючі товари з бази ОДНИМ ЗАПИТОМ
         # ================================================================
-        print("Оптимізація: Завантажую ��снуючі товари з бази даних...")
+        print("Оптимізація: Завантажую ��снуючі товари з баз�� даних...")
         # Завантажуємо тільки ID та назву для економії пам'яті
         existing_products_raw = db.session.query(Product.id, Product.name).all()
         # Створюємо словник для миттєвого пошуку: { 'Назва товару': id }
@@ -1097,7 +1097,7 @@ def bas_import():
                             brand = known_brand
                             break
             if brand:
-                # Спочатку видаляємо HTML-теги, потім замінюємо &nbsp; на звичайний пробіл,
+                # Спочатку видаляємо HTML-��еги, потім замінюємо &nbsp; на звичайний пробіл,
                 # а потім прибираємо зайві пробіли на початку та в кінці.
                 brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
                 if brand:  # Перевіряємо, чи щось залишилось після очищення
@@ -1315,5 +1315,9 @@ def load_more_products():
         page=page, per_page=12, error_out=False
     )
 
-    # Рендеримо тільки картки товарів
-    return render_template('_product_cards.html', products=products.items)
+    # Рендеримо картки товарів з правильним шаблоном
+    rendered_products = []
+    for product in products.items:
+        rendered_products.append(render_template('_product_card.html', product=product))
+
+    return ''.join(rendered_products)
