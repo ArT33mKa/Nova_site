@@ -1231,44 +1231,57 @@ def find_np_cities():
 
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання відділень АБО поштоматів для населеного пункту."""
+    """Отримання відділень АБО поштоматів для населеного пункту (надійна версія)."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
-    warehouse_type = request.args.get('type', 'branch')  # 'branch' або 'postomat', за замовчуванням 'branch'
+    warehouse_type = request.args.get('type', 'branch')  # 'branch' або 'postomat'
 
     if not api_key:
         return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
     if not city_ref:
         return jsonify([])
 
-    # Словник з Ref ID для типів відділень
-    warehouse_type_refs = {
-        "postomat": "f9316480-5f2d-425d-bc2c-ac73a02de323", # Поштомати
-        "branch": "6f8c7162-4b72-4b0a-88e5-906948c6a92f,841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28" # Вантажні та поштові відділення
+    # ID для фільтрації вже на нашому боці
+    POSTOMAT_REF = "f9316480-5f2d-425d-bc2c-ac73a02de323"
+    BRANCH_REFS = {
+        "6f8c7162-4b72-4b0a-88e5-906948c6a92f",  # Поштове відділення
+        "841339c7-591a-42e2-8234-7a0a00f0ed6f",  # Вантажне відділення
+        "9a6886f2-89b7-41b0-9b0c-e675a080cb28"  # Міні-відділення
     }
 
-    method_properties = {
-        "SettlementRef": city_ref,
-        # Додаємо фільтр за типом, якщо він є в нашому словнику
-        "TypeOfWarehouseRef": warehouse_type_refs.get(warehouse_type)
-    }
-
+    # Запитуємо ВСІ відділення для міста
     payload = {
         "apiKey": api_key,
         "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
-        "methodProperties": method_properties
+        "methodProperties": {
+            "SettlementRef": city_ref,
+            "Limit": "500"  # Запитуємо з запасом
+        }
     }
 
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=7)
         response.raise_for_status()
         data = response.json()
+
         if data['success']:
             all_warehouses = data.get('data', [])
-            # Повертаємо тільки опис (назву) відділення
-            return jsonify([w['Description'] for w in all_warehouses])
-        return jsonify([]) # Повертаємо порожній список, якщо запит успішний, але даних нема
+            filtered_warehouses = []
+
+            # А тепер фільтруємо результат в залежності від того, що обрав користувач
+            if warehouse_type == 'postomat':
+                for wh in all_warehouses:
+                    if wh.get('TypeOfWarehouseRef') == POSTOMAT_REF:
+                        filtered_warehouses.append(wh['Description'])
+            elif warehouse_type == 'branch':
+                for wh in all_warehouses:
+                    if wh.get('TypeOfWarehouseRef') in BRANCH_REFS:
+                        filtered_warehouses.append(wh['Description'])
+
+            return jsonify(filtered_warehouses)
+
+        return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503

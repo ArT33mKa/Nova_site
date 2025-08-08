@@ -567,9 +567,31 @@ img {
     top: 10px;
     right: 10px;
     z-index: 3;
-    /* Решта стилів залишаються з попередніх правок */
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #ddd;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--gray-color);
+    font-size: 1.2rem;
+    transition: all 0.2s;
 }
-/* Щоб показувати тільки одну з двох іконок зірки */
+
+.favorite-btn:hover {
+    background: white;
+    transform: scale(1.1);
+}
+
+.favorite-btn.active {
+    color: #ffc107; /* "Золотий" колір для активної зірки */
+    border-color: #ffc107;
+}
+
+/* Цей блок залишається без змін, він керує показом повної/порожньої зірки */
 .favorite-btn .fa-star { display: none; }
 .favorite-btn .far-star { display: inline-block; }
 .favorite-btn.active .fa-star { display: inline-block; }
