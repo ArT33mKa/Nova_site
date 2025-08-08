@@ -404,6 +404,17 @@ def catalog(category_slug):
     # Додаємо інші фільтри
     if selected_brands:
         query = query.filter(Product.brand.in_(selected_brands))
+    # [НОВЕ] Розраховуємо мін/макс ціну ДО застосування фільтра по ціні
+    price_query = query
+    price_range = db.session.query(
+        func.floor(func.min(Product.price)),
+        func.ceil(func.max(Product.price))
+    ).select_from(price_query.subquery()).one()
+
+    min_price_available = price_range[0] or 0
+    max_price_available = price_range[1] or 10000
+
+    # Тепер застосовуємо фільтри по ціні до основного запиту
     if min_price:
         query = query.filter(Product.price >= min_price)
     if max_price:
@@ -443,7 +454,9 @@ def catalog(category_slug):
         category_slug=category_slug,
         main_categories=main_categories,
         category_structure=category_structure,
-        subcategories_with_counts=subcategories_with_counts
+        subcategories_with_counts=subcategories_with_counts,
+        min_price_available = min_price_available,
+        max_price_available = max_price_available,
     )
 
 

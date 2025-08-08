@@ -70,10 +70,15 @@
                 <details class="filter-group" {% if request.args.get('min_price') or request.args.get('max_price') %}open{% endif %}>
                     <summary class="filter-title">Ціна, ₴</summary>
                     <div class="filter-options">
-                        <div class="price-filter-wrapper">
-                            <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}" class="price-input">
-                            <span class="price-divider">–</span>
-                            <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}" class="price-input">
+                        <div class="price-inputs">
+                            <input type="number" name="min_price"
+                                   placeholder="Від {{ min_price_available|int }}"
+                                   value="{{ request.args.get('min_price', '') }}">
+
+                            <input type="number" name="max_price"
+                                   placeholder="До {{ max_price_available|int }}"
+                                   value="{{ request.args.get('max_price', '') }}">
+
                             <button type="submit" class="price-ok-btn">OK</button>
                         </div>
                     </div>

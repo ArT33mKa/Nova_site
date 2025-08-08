@@ -2501,3 +2501,64 @@ details[open] > summary::after {
 .filter-options {
     padding-top: 15px;
 }
+
+.price-inputs {
+    display: flex; /* Головний фікс - використовуємо flexbox! */
+    align-items: center;
+    border: 1px solid #ccc;
+    border-radius: var(--border-radius);
+    background-color: white;
+    overflow: hidden; /* Гарантує, що нічого не вилізе за межі заокруглених кутів */
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* Коли ми клікаємо на будь-яке поле всередині - підсвічуємо весь блок */
+.price-inputs:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.2);
+}
+
+/* Поля для вводу "Від" і "До" */
+.price-inputs input[type="number"] {
+    width: 100%; /* Дозволяємо полю рости */
+    border: none; /* Прибираємо власну рамку */
+    background: transparent; /* Робимо фон прозорим */
+    padding: 12px 15px; /* Вертикальні відступи для висоти */
+    text-align: center;
+    font-size: 1rem;
+    flex: 1; /* Головний фікс: поля ділять доступний простір порівну */
+    min-width: 50px; /* Мінімальна ширина, щоб вони не зникли */
+}
+
+/* Вертикальна лінія-розділювач між полями "Від" і "До" */
+.price-inputs input:first-of-type {
+    border-right: 1px solid #ccc;
+}
+
+/* Прибираємо стандартні стрілочки у полів для чисел */
+.price-inputs input::-webkit-inner-spin-button,
+.price-inputs input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.price-inputs input {
+  -moz-appearance: textfield;
+}
+
+/* Кнопка "Ок" */
+.price-ok-btn {
+    padding: 12px 22px;
+    font-size: 1rem;
+    font-weight: 600;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 0; /* Прибираємо власне заокруглення */
+    cursor: pointer;
+    transition: background-color 0.2s;
+    align-self: stretch; /* Розтягуємо кнопку на всю висоту контейнера */
+}
+
+.price-ok-btn:hover {
+    background-color: var(--secondary-color);
+}
