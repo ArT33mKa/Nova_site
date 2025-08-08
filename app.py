@@ -1234,23 +1234,24 @@ def get_np_warehouses():
     """Отримання відділень АБО поштоматів для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
-    warehouse_type = request.args.get('type', 'all')  # 'branch' або 'postomat'
+    warehouse_type = request.args.get('type', 'branch')  # 'branch' або 'postomat', за замовчуванням 'branch'
 
     if not api_key:
         return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
     if not city_ref:
         return jsonify([])
 
-    # Оновлені, більш надійні Ref ID
+    # Словник з Ref ID для типів відділень
     warehouse_type_refs = {
-        "postomat": "f9316480-5f2d-425d-bc2c-ac73a02de323",
-        "branch": "6f8c7162-4b72-4b0a-88e5-906948c6a92f,841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28"
+        "postomat": "f9316480-5f2d-425d-bc2c-ac73a02de323", # Поштомати
+        "branch": "6f8c7162-4b72-4b0a-88e5-906948c6a92f,841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28" # Вантажні та поштові відділення
     }
 
-    method_properties = {"SettlementRef": city_ref}
-
-    if warehouse_type in warehouse_type_refs:
-        method_properties["TypeOfWarehouseRef"] = warehouse_type_refs[warehouse_type]
+    method_properties = {
+        "SettlementRef": city_ref,
+        # Додаємо фільтр за типом, якщо він є в нашому словнику
+        "TypeOfWarehouseRef": warehouse_type_refs.get(warehouse_type)
+    }
 
     payload = {
         "apiKey": api_key,
@@ -1260,14 +1261,14 @@ def get_np_warehouses():
     }
 
     try:
-        response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
+        response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=7)
         response.raise_for_status()
         data = response.json()
         if data['success']:
             all_warehouses = data.get('data', [])
+            # Повертаємо тільки опис (назву) відділення
             return jsonify([w['Description'] for w in all_warehouses])
-        # Якщо успішно, але даних нема, повертаємо порожній список
-        return jsonify([])
+        return jsonify([]) # Повертаємо порожній список, якщо запит успішний, але даних нема
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
