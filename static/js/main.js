@@ -96,7 +96,7 @@ function switchAuthTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
 }
 
-// [ЗМІНЕНО] Функц��я тепер приймає залежності
+// [ЗМІНЕНО] Фун��ц��я тепер приймає залежності
 function initCabinetModal(pageOverlay, closeAllSidebars) {
     const cabinetModal = document.getElementById('cabinet-modal');
     if (!cabinetModal) return;
@@ -452,7 +452,6 @@ function initContactForm() {
                 showToast(data.message, data.status === 'success' ? 'success' : 'error');
                 if (data.status === 'success') this.reset();
             }).catch(() => showToast('Сталася помилка при відправці.', 'error'));
-        });
     }
 }
 
@@ -787,5 +786,41 @@ function initAutoApplyFilters() {
         if (e.target.type === 'number') {
             debouncedSubmit();
         }
+    });
+}
+
+// Додаємо функцію initShowMoreFilters
+function initShowMoreFilters() {
+    const filterGroups = document.querySelectorAll('.filter-group');
+
+    filterGroups.forEach(group => {
+        const content = group.querySelector('.filter-options-list');
+        if (!content) return;
+
+        const items = content.querySelectorAll('.checkbox-item');
+        if (items.length <= 7) return;
+
+        // Приховуємо елементи після 7-го
+        items.forEach((item, index) => {
+            if (index >= 7) {
+                item.style.display = 'none';
+            }
+        });
+
+        // Створюємо кнопку "Показати ще"
+        const showMoreBtn = document.createElement('button');
+        showMoreBtn.className = 'show-more-btn';
+        showMoreBtn.textContent = 'Показати ще';
+        showMoreBtn.onclick = () => {
+            const isExpanded = showMoreBtn.classList.toggle('expanded');
+            items.forEach((item, index) => {
+                if (index >= 7) {
+                    item.style.display = isExpanded ? 'flex' : 'none';
+                }
+            });
+            showMoreBtn.textContent = isExpanded ? 'Приховати' : 'Показати ще';
+        };
+
+        group.appendChild(showMoreBtn);
     });
 }

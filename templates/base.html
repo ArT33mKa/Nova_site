@@ -26,7 +26,7 @@
     <div id="page-overlay"></div>
 
     <script>
-        window.isAdmin = {{ current_user.is_authenticated and current_user.is_admin|tojson }};
+        window.isAdmin = {% if current_user.is_authenticated and current_user.is_admin %}true{% else %}false{% endif %};
     </script>
 
     <!-- Підключаємо тільки один головний скрипт! -->
