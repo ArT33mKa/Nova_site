@@ -17,11 +17,11 @@
                 <input type="hidden" name="brand" value="{{ brand }}">
                 {% endfor %}
 
-                <!-- ФІЛЬТР КАТЕГОРІЙ (нова логіка) -->
+                <!-- ФІЛЬТР КАТЕГОРІЙ -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Категорії</h4>
                     <div class="radio-style-list">
-                        {# Посилання "Всі категорії", яке скидає фільтр категорії, але зберігає інші #}
+                        {# Посилання "Всі категорії" #}
                         {% set all_cat_params = current_filters.copy() %}
                         {% do all_cat_params.pop('page', None) %}
                         <a href="{{ url_for('catalog', **all_cat_params) }}" class="radio-item {% if not current_category %}active{% endif %}">
@@ -78,7 +78,7 @@
                     </div>
                 </div>
 
-                <!-- ФІЛЬТР ЦІНИ (з кнопкою "OK") -->
+                <!-- ФІЛЬТР ЦІНИ -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
                     <div class="price-filter-wrapper">
@@ -88,35 +88,7 @@
                         <button type="submit" class="price-ok-btn">OK</button>
                     </div>
                 </div>
-                <div class="categories-sidebar">
-                    {% for main_cat, data in hierarchy.items() %}
-                        <div class="category-item">
-                            {% if current_category == main_cat %}
-                                <strong>{{ main_cat }} ({{ data.count }})</strong>
-                                {% for subcat, count in data.subcategories.items()|sort %}
-                                    <div class="subcategory">
-                                        <a href="{{ url_for('catalog', category_slug=subcat|replace(' ', '-')) }}">
-                                            {{ subcat }} ({{ count }})
-                                        </a>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <a href="{{ url_for('catalog', category_slug=main_cat|replace(' ', '-')) }}">
-                                    {{ main_cat }} ({{ data.count }})
-                                </a>
-                                {% if current_category in data.subcategories %}
-                                    {% for subcat, count in data.subcategories.items()|sort %}
-                                        <div class="subcategory {% if current_category == subcat %}active{% endif %}">
-                                            <a href="{{ url_for('catalog', category_slug=subcat|replace(' ', '-')) }}">
-                                                {{ subcat }} ({{ count }})
-                                            </a>
-                                        </div>
-                                    {% endfor %}
-                                {% endif %}
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                </div>
+
                 <!-- ФІЛЬТР ВИРОБНИКІВ -->
                 {% if brand_counts %}
                 <div class="filter-group">
@@ -146,7 +118,7 @@
 
                 {# Тег для обраної категорії #}
                 {% if current_category %}
-                     {# [ВИПРАВЛЕНО] Посилання для скидання категорії тепер веде на головний каталог, ЗБЕРІГАЮЧИ інші фільтри #}
+                     {# [ВИПРАВЛЕНО] Посилання для скидання категорії ��епер веде на головний каталог, ЗБЕРІГАЮЧИ інші фільтри #}
                      {% set cat_reset_params = current_filters.copy() %}
                      {% do cat_reset_params.pop('category_slug', None) %} {# Видаляємо саме slug, а не посилання #}
                      <a href="{{ url_for('catalog', **cat_reset_params) }}" class="filter-tag category-tag">{{ current_category }} ×</a>
@@ -187,7 +159,7 @@
                  {% if products.has_next %}
                     <div class="load-more-container">
                         <button id="load-more-btn" class="btn btn-outline btn-lg">Завантажити ще</button>
-                        <div id="loading-spinner" style="display: none;">Завантаження...</div>
+                        <div id="loading-spinner" style="display: none;">За��антаження...</div>
                     </div>
                 {% endif %}
             {% else %}
