@@ -12,7 +12,6 @@
 </header>
 
 <div class="cart-page container">
-    {# [ВИПРАВЛЕНО] Тепер перевіряється змінна, що передається з серверу #}
     {% if not cart_items %}
     <div class="text-center" style="padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
         <h2>Ваш кошик порожній</h2>
@@ -26,8 +25,7 @@
             <div class="cart-item-row" data-id="{{ item.product.id }}">
                 <div class="cart-item-image">
                     <a href="{{ url_for('product_detail', product_id=item.product.id) }}">
-                        {# [ВИПРАВЛЕНО] Використовуємо правильний шлях до зображення #}
-                        <img src="{{ item.product.image }}" alt="{{ item.product.name }}">
+                        <img src="{{ product.image }}" alt="{{ product.name }}">
                     </a>
                 </div>
                 <div class="cart-item-details">
@@ -35,7 +33,7 @@
                     <div class="text-muted">{{ "%.2f"|format(item.product.price) }} ₴ / шт.</div>
                 </div>
                 <div class="cart-item-quantity-controls">
-                    {# [ВИПРАВЛЕНО] Додано data-id для коректної роботи JS #}
+                    <!-- [ВИПРАВЛЕНО] Додано data-id для коректної роботи JS -->
                     <button class="qty-btn minus" data-id="{{ item.product.id }}">-</button>
                     <span class="quantity-display">{{ item.quantity }}</span>
                     <button class="qty-btn plus" data-id="{{ item.product.id }}">+</button>

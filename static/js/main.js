@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
     initLoadMore();
+    initShowMoreFilters();
     updateCartView();
     updateFavoritesUI();
     initSearchLogic();
@@ -404,7 +405,7 @@ function renderFavoritesModal() {
                     <div class="product-image">
                         <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
                         ${stockStatus}
-                        <button class="favorite-btn active" title="Видалити з обраного"></button>
+                        <button class="favorite-btn active" title="Видалити з обраного"><i class="fas fa-star"></i></button>
                         ${adminActionsHtml}
                     </div>
                     <div class="product-info">
@@ -456,6 +457,26 @@ function initContactForm() {
     }
 }
 
+function initCatalogFilters() {
+    const showMoreBtn = document.getElementById('show-more-brands-btn');
+    if (showMoreBtn) {
+        showMoreBtn.addEventListener('click', function() {
+            const list = this.previousElementSibling;
+            const isExpanded = this.dataset.expanded === 'true';
+            if (isExpanded) {
+                list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
+                this.textContent = 'Показати більше';
+                this.dataset.expanded = 'false';
+            } else {
+                list.querySelectorAll('.brand-item.hidden').forEach(item => item.classList.remove('hidden'));
+                this.textContent = 'Приховати';
+                this.dataset.expanded = 'true';
+            }
+        });
+        const list = showMoreBtn.previousElementSibling;
+        list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
+    }
+}
 
 function initReviewsPage() {
     const openModal = modal => modal?.classList.add('active');
@@ -611,7 +632,7 @@ function initSimilarProductsCarousel() {
 
 function initLoadMore() {
     const loadMoreBtn = document.getElementById('load-more-btn');
-    const productsGrid = document.getElementById('products-grid-container');
+    const productsGrid = document.getElementById('products-grid-container'); // [ЗМІНА] Краще використовувати ID
     const loadingSpinner = document.getElementById('loading-spinner');
 
     if (!loadMoreBtn || !productsGrid) {
@@ -625,10 +646,12 @@ function initLoadMore() {
         loadMoreBtn.style.display = 'none';
         if (loadingSpinner) loadingSpinner.style.display = 'block';
 
+        // [НОВЕ] Збираємо всі активні фільтри з data-атрибутів кнопки
         const params = new URLSearchParams();
         params.set('page', currentPage);
-
-        // Залишаємо тільки потрібні фільтри
+        if (loadMoreBtn.dataset.categorySlug) {
+            params.set('category_slug', loadMoreBtn.dataset.categorySlug);
+        }
         if (loadMoreBtn.dataset.search) {
             params.set('search', loadMoreBtn.dataset.search);
         }
@@ -638,6 +661,7 @@ function initLoadMore() {
         if (loadMoreBtn.dataset.maxPrice) {
             params.set('max_price', loadMoreBtn.dataset.maxPrice);
         }
+
 
         fetch(`/api/catalog/load_more?${params.toString()}`)
             .then(response => {
@@ -733,6 +757,36 @@ function initSearchLogic() {
             history = history.filter(item => item !== termToRemove);
             saveHistory(history);
             renderHistory(); // Re-render to show changes
+        }
+    });
+}
+
+function initShowMoreFilters() {
+    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
+        const limit = parseInt(list.dataset.showLimit, 10);
+        const items = Array.from(list.children);
+
+        if (items.length > limit) {
+            // Ховаємо всі елементи, що перевищують ліміт
+            for (let i = limit; i < items.length; i++) {
+                items[i].style.display = 'none';
+            }
+
+            // Створюємо та додаємо кнопку
+            const remainingCount = items.length - limit;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'show-more-filters-btn';
+            button.textContent = `Показати ще ${remainingCount}`;
+            list.insertAdjacentElement('afterend', button);
+
+            // Додаємо обробник події для кнопки
+            button.addEventListener('click', () => {
+                for (let i = limit; i < items.length; i++) {
+                    items[i].style.display = ''; // Повертаємо стандартне відображення
+                }
+                button.remove(); // Видаляємо кнопку після використання
+            });
         }
     });
 }

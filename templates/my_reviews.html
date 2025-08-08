@@ -22,7 +22,8 @@
             <div class="review-card-body">
                 <div class="review-card-product-info">
                     <a href="{{ url_for('product_detail', product_id=review.product_id) }}">
-                        <img src="{{ review.product.image }}" alt="{{ review.product.name }}">
+                        <!-- [ВИПРАВЛЕНО] Використовуємо фільтр для генерації URL -->
+                        <img src="{{ product.image }}" alt="{{ product.name }}">
                     </a>
                     <div>
                         <a href="{{ url_for('product_detail', product_id=review.product_id) }}"><strong>{{ review.product.name }}</strong></a>

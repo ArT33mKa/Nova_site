@@ -12,270 +12,215 @@
                     <div class="checkout-section-header">
                         <span class="icon">1</span><h4>Контактні дані</h4>
                     </div>
-                     <div class="form-group-inline" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div class="form-group"><input type="text" name="customer_first_name" id="customer_first_name" required value="{% if current_user.is_authenticated %}{{ current_user.first_name }}{% endif %}" placeholder="Ім'я"></div>
-                        <div class="form-group"><input type="text" name="customer_last_name" id="customer_last_name" required value="{% if current_user.is_authenticated %}{{ current_user.last_name or '' }}{% endif %}" placeholder="Прізвище"></div>
+                    <div class="form-group-inline" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label for="customer_first_name">Ім'я</label>
+                            <input type="text" name="customer_first_name" id="customer_first_name" required value="{% if current_user.is_authenticated %}{{ current_user.first_name }}{% endif %}" placeholder="Іван">
+                        </div>
+                        <div class="form-group">
+                            <label for="customer_last_name">Прізвище</label>
+                            <input type="text" name="customer_last_name" id="customer_last_name" required value="{% if current_user.is_authenticated %}{{ current_user.last_name or '' }}{% endif %}" placeholder="Іванов">
+                        </div>
                     </div>
-                    <div class="form-group"><input type="tel" name="customer_phone" id="customer_phone" required placeholder="+380 (__) ___-__-__" value="{% if current_user.is_authenticated and current_user.phone %}{{ current_user.phone }}{% endif %}"></div>
+                    <div class="form-group">
+                        <label for="customer_phone">Номер телефону</label>
+                        <!-- >>> ЗМІНІТЬ ЦЕЙ INPUT -->
+                        <input type="tel" name="customer_phone" id="customer_phone" required placeholder="+380 (__) ___-__-__" value="{% if current_user.is_authenticated and current_user.phone %}{{ current_user.phone }}{% endif %}">
+                    </div>
                 </section>
 
                 <section class="checkout-section">
                     <div class="checkout-section-header">
-                        <span class="icon">2</span><h4>Доставка "Нова Пошта"</h4>
+                        <span class="icon">2</span><h4>Доставка</h4>
                     </div>
-                    <div class="delivery-type-selector">
-                        {# [ВИПРАВЛЕНО] Значення (value) тепер відповідають API: 'branch' та 'postomat' #}
-                        <label class="delivery-type-option">
-                            <input type="radio" name="delivery_method_type" value="branch" checked>
-                            <div class="delivery-type-card">У відділення</div>
-                        </label>
-                        <label class="delivery-type-option">
-                            <input type="radio" name="delivery_method_type" value="postomat">
-                            <div class="delivery-type-card">У поштомат</div>
-                        </label>
-                         {# Це поле буде зберігати фінальний тип доставки для серверу #}
-                        <input type="hidden" name="delivery_method" id="delivery_method" value="Нова Пошта">
-                    </div>
-
-                    <div id="nova-poshta-fields-container">
-                        <div class="form-group">
-                            <label for="delivery_city_display">Населений пункт</label>
-                             {# [ВИПРАВЛЕНО] Цей блок тепер просто тригер для модального вікна #}
-                            <div class="custom-select-trigger" id="city-select-trigger">
-                                <span id="delivery_city_display_text">Вкажіть населений пункт</span>
-                                <i class="fas fa-chevron-down"></i>
+                    <div class="radio-group" id="delivery-method-group">
+                        <label class="radio-option active">
+                            <input type="radio" name="delivery_method" value="Самовивіз з магазину" checked>
+                            <div>
+                                <strong>Самовивіз з магазину</strong>
+                                <p>Безкоштовно за адресою: {{ shop.city }}, {{ shop.address }}</p>
                             </div>
-                            <input type="hidden" name="delivery_city" id="delivery_city_input" required>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="delivery_method" value="Нова Пошта">
+                             <div>
+                                <strong>Нова Пошта</strong>
+                                <p>Доставка у відділення або поштомат по Україні.</p>
+                            </div>
+                        </label>
+                    </div>
+                    <!-- >>> ЗАМІНІТЬ ЦЕЙ БЛОК НА НОВИЙ -->
+                    <div id="nova-poshta-details" class="nova-poshta-container" style="display: none;">
+                        <div class="form-group" style="position: relative;">
+                            <label for="delivery_city">Населений пункт</label>
+                            <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста чи села" autocomplete="off">
+                            <div id="city-suggestions" class="suggestions-dropdown"></div>
                         </div>
-                        {# [ВИПРАВЛЕНО] Замість кастомного селекту тепер надійний стандартний <select> #}
-                        <div class="form-group" id="warehouse-form-group" style="display: none;">
-                            <label id="warehouse-label" for="delivery_warehouse_select">Відділення</label>
-                            <select name="delivery_warehouse" id="delivery_warehouse_select" class="form-control" required disabled>
-                                <option value="">Спочатку оберіть місто</option>
-                            </select>
+                        <div class="form-group">
+                            <label for="delivery_warehouse">Відділення або поштомат</label>
+                            <div class="custom-select-wrapper">
+                                <select name="delivery_warehouse" id="delivery_warehouse" disabled>
+                                    <option value="">Спочатку виберіть населений пункт</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </section>
 
+
+
                 <section class="checkout-section">
-                     <div class="checkout-section-header">
+                    <div class="checkout-section-header">
                         <span class="icon">3</span><h4>Оплата</h4>
                     </div>
                     <div class="radio-group">
-                        <label class="radio-option active"><input type="radio" name="payment_method" value="Післяплата" checked><div><strong>Післяплата</strong></div></label>
-                        <label class="radio-option"><input type="radio" name="payment_method" value="Оплата на рахунок"><div><strong>Оплата на рахунок</strong></div></label>
+                        <label class="radio-option active">
+                            <input type="radio" name="payment_method" value="Післяплата" checked>
+                            <div>
+                                <strong>Післяплата (при отриманні)</strong>
+                                <p>Оплата готівкою або карткою у відділенні "Нової Пошти".</p>
+                            </div>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="payment_method" value="Оплата на рахунок">
+                             <div>
+                                <strong>Оплата на рахунок</strong>
+                                <p>Реквізити для оплати будуть надіслані після підтвердження замовлення.</p>
+                            </div>
+                        </label>
                     </div>
                 </section>
 
                 <section class="checkout-section" id="comment-section">
-                    <div id="comment-toggle" class="comment-toggle"><span>Коментар до замовлення</span><i class="fas fa-chevron-down"></i></div>
+                    <div id="comment-toggle" class="comment-toggle">
+                        <span>Коментар до замовлення</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
                     <div id="comment-content" class="comment-content" style="display: none;">
                         <textarea name="order_comment" id="order_comment" placeholder="Введіть коментар" maxlength="254"></textarea>
                         <div id="comment-char-counter" class="char-counter">Залишилось символів: 254</div>
                     </div>
                 </section>
+
             </div>
 
-            <!-- Права колонка -->
+
+
+            <!-- Права колонка з підсумком замовлення -->
             <aside class="order-summary-v2">
                 <section class="checkout-section">
                     <h4>Ваше замовлення</h4>
                     <div id="summary-item-list"></div>
                     <div class="summary-totals">
-                        <div class="summary-total-row"><span>Вартість товарів:</span><span id="summary-subtotal">...</span></div>
-                        <div class="summary-total-row"><span>Доставка:</span><span>За тарифами</span></div>
-                        <div class="summary-total-row grand-total"><span>Разом до сплати:</span><span id="summary-grand-total">...</span></div>
+                        <div class="summary-total-row">
+                            <span>Вартість товарів:</span>
+                            <span id="summary-subtotal">...</span>
+                        </div>
+                        <div class="summary-total-row">
+                            <span>Доставка:</span>
+                            <span>За тарифами</span>
+                        </div>
+                        <div class="summary-total-row grand-total">
+                            <span>Разом до сплати:</span>
+                            <span id="summary-grand-total">...</span>
+                        </div>
                     </div>
-                    <button type="submit" id="submit-checkout-btn" class="btn btn-primary btn-block btn-lg">Підтвердити замовлення</button>
+                     <button type="submit" id="submit-checkout-btn" class="btn btn-primary btn-block btn-lg">Підтвердити замовлення</button>
                 </section>
             </aside>
         </form>
     </div>
 </div>
-
-<!-- Модальне вікно вибору міста -->
-<div class="city-modal" id="city-modal">
-    <div class="city-modal-content">
-        <div class="city-modal-header"><h4>Вибір населеного пункту</h4><button type="button" class="close-modal-btn" id="close-city-modal-btn">&times;</button></div>
-        <div class="city-modal-body">
-            <div class="city-search-wrapper"><i class="fas fa-search"></i><input type="text" id="city-search-input" placeholder="Вкажіть населений пункт"></div>
-            <p class="city-search-prompt">Почніть вводити назву населеного пункту</p>
-            <div class="city-list-container" id="city-list-container">
-                 <ul id="cities-list"></ul>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="modal-backdrop" id="modal-backdrop"></div>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-.delivery-type-selector { display: flex; gap: 10px; margin-bottom: 20px; }
-.delivery-type-option { flex: 1; }
-.delivery-type-option input[type="radio"] { display: none; }
-.delivery-type-card { padding: 12px; border: 2px solid #ddd; border-radius: 8px; text-align: center; cursor: pointer; font-weight: 500; transition: all 0.2s ease; }
-.delivery-type-option input[type="radio"]:checked + .delivery-type-card { border-color: var(--primary-color); background-color: rgba(0, 102, 204, 0.05); color: var(--primary-color); }
-.custom-select-trigger { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 15px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; cursor: pointer; background-color: white; }
-.custom-select-trigger.selected span { color: var(--dark-color); }
-.modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1040; display: none; }
-.city-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1050; display: none; justify-content: center; align-items: center; padding: 15px; }
-.city-modal-content { background: white; border-radius: 12px; max-width: 500px; width: 100%; display: flex; flex-direction: column; max-height: 80vh; }
-.city-modal-header { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-.city-modal-header h4 { margin: 0; font-size: 1.2rem; }
-.close-modal-btn { background: none; border: none; font-size: 2rem; cursor: pointer; color: #888; }
-.city-modal-body { padding: 20px; overflow-y: auto; }
-.city-search-wrapper { position: relative; margin-bottom: 10px; }
-.city-search-wrapper i { position: absolute; top: 50%; left: 15px; transform: translateY(-50%); color: #aaa; }
-#city-search-input { width: 100%; padding: 12px 15px 12px 40px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
-.city-search-prompt { font-size: 0.9rem; color: #888; text-align: center; margin-bottom: 15px; }
-.city-list-container ul { list-style: none; padding: 0; }
-.city-list-container li { padding: 12px 15px; cursor: pointer; border-radius: 6px; }
-.city-list-container li:hover { background-color: #f5f5f5; }
-.comment-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; cursor: pointer; font-weight: 500; font-size: 1rem; }
-.comment-toggle i { transition: transform 0.3s ease; }
-.comment-toggle.active i { transform: rotate(180deg); }
-.comment-content { padding-top: 15px; border-top: 1px solid var(--light-gray); margin-top: 10px;}
-.comment-content textarea { width: 100%; min-height: 100px; resize: vertical; padding: 10px; border: 1px solid #ccc; border-radius: 4px;}
-.char-counter { text-align: right; font-size: 0.85rem; color: var(--gray-color); margin-top: 5px; }
+    /* Стилі для підказок міст */
+    .suggestions-dropdown { display: none; position: absolute; background-color: white; border: 1px solid #ddd; border-top: none; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 0 0 8px 8px;}
+    .suggestion-item { padding: 10px 15px; cursor: pointer; font-size: 15px; }
+    .suggestion-item:hover { background-color: #f0f0f0; }
+    .suggestion-item.active { background-color: var(--primary-color); color: white; }
+    .suggestion-item-loading { padding: 10px 15px; color: #888; font-style: italic; }
+
+    /* Стилі для поля вводу телефону */
+    #customer_phone { color: #333; }
+    #customer_phone::placeholder { color: #aaa; }
+
+    /* Стилі для блоку коментаря */
+    .comment-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; cursor: pointer; font-weight: 500; font-size: 1rem; }
+    .comment-toggle i { transition: transform 0.3s ease; }
+    .comment-toggle.active i { transform: rotate(180deg); }
+    .comment-content { padding-top: 15px; border-top: 1px solid var(--light-gray); margin-top: 10px;}
+    .comment-content textarea { width: 100%; min-height: 100px; resize: vertical; padding: 10px; border: 1px solid #ccc; border-radius: 4px;}
+    .char-counter { text-align: right; font-size: 0.85rem; color: var(--gray-color); margin-top: 5px; }
+
+    /* Новий стиль для контейнера Нової Пошти */
+    .nova-poshta-container { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
 </style>
 {% endblock %}
 
 {% block extra_js %}
-{# [КЛЮЧОВЕ ВИПРАВЛЕННЯ] Повністю новий, чистий та робочий JavaScript для Нової Пошти #}
+<!-- >>> ПОВНІСТЮ ЗАМІНІТЬ БЛОК extra_js НА ЦЕЙ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- ІНІЦІАЛІЗАЦІЯ ВСІХ КОМПОНЕНТІВ ---
     setupRadioGroups();
     loadCartSummary();
-    initNovaPoshtaSelector();
+    setupDeliveryLogic();
+    setupEnterKeyNavigation();
     setupCommentField();
 
-    function formatPhoneNumber(value) {
-        if (!value) return '';
-        let digits = value.replace(/\D/g, '');
-        if (digits.startsWith('380')) digits = digits.substring(3);
-        else if (digits.startsWith('80')) digits = digits.substring(2);
-        else if (digits.startsWith('0')) digits = digits.substring(1);
-        digits = digits.substring(0, 9);
-        const len = digits.length;
-        if (len === 0) return '+380 (';
-        if (len <= 2) return `+380 (${digits}`;
-        if (len <= 5) return `+380 (${digits.substring(0, 2)}) ${digits.substring(2)}`;
-        if (len <= 7) return `+380 (${digits.substring(0, 2)}) ${digits.substring(2, 5)}-${digits.substring(5)}`;
-        return `+380 (${digits.substring(0, 2)}) ${digits.substring(2, 5)}-${digits.substring(5, 7)}-${digits.substring(7, 9)}`;
-    }
+    // Нова, покращена маска для телефону
     const phoneInput = document.getElementById('customer_phone');
-    if(phoneInput) {
-        phoneInput.addEventListener('input', e => { e.target.value = formatPhoneNumber(e.target.value); });
+    if (phoneInput) {
+        // Застосовуємо маску, якщо в полі вже є номер (наприклад, з профілю користувача)
+        if (phoneInput.value) {
+            phoneInput.value = formatPhoneNumber(phoneInput.value);
+        }
+        phoneInput.addEventListener('input', handlePhoneInput, false);
+        phoneInput.addEventListener('focus', handlePhoneInput, false);
+        phoneInput.addEventListener('blur', (e) => {
+            if (e.target.value === '+380') {
+                e.target.value = '';
+            }
+        });
     }
 
-    function initNovaPoshtaSelector() {
-        const deliveryTypeRadios = document.querySelectorAll('input[name="delivery_method_type"]');
-        const citySelectTrigger = document.getElementById('city-select-trigger');
-        const warehouseFormGroup = document.getElementById('warehouse-form-group');
-        const warehouseSelect = document.getElementById('delivery_warehouse_select');
-        const warehouseLabel = document.getElementById('warehouse-label');
+    // --- ФУНКЦІЇ ---
 
-        const cityModal = document.getElementById('city-modal');
-        const backdrop = document.getElementById('modal-backdrop');
-        const closeCityModalBtn = document.getElementById('close-city-modal-btn');
-        const citySearchInput = document.getElementById('city-search-input');
-        const citiesList = document.getElementById('cities-list');
-
-        let cityRef = null;
-        let searchTimeout;
-
-        deliveryTypeRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                const deliveryType = document.querySelector('input[name="delivery_method_type"]:checked').value;
-                warehouseLabel.textContent = deliveryType === 'branch' ? 'Відділення' : 'Поштомат';
-                if (cityRef) {
-                    fetchWarehouses(cityRef, deliveryType);
-                }
-            });
-        });
-
-        const openModal = () => { cityModal.style.display = 'flex'; backdrop.style.display = 'block'; citySearchInput.focus(); };
-        const closeModal = () => { cityModal.style.display = 'none'; backdrop.style.display = 'none'; };
-
-        citySelectTrigger.addEventListener('click', openModal);
-        closeCityModalBtn.addEventListener('click', closeModal);
-        backdrop.addEventListener('click', closeModal);
-
-        citySearchInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            const query = citySearchInput.value.trim();
-            const prompt = document.querySelector('.city-search-prompt');
-            if (query.length < 2) {
-                citiesList.innerHTML = '';
-                if(prompt) prompt.textContent = 'Введіть мінімум 2 символи для пошуку';
-                return;
-            }
-            if(prompt) prompt.textContent = 'Завантаження...';
-            citiesList.innerHTML = '';
-            searchTimeout = setTimeout(() => fetchCities(query), 300);
-        });
-
-        function fetchCities(query) {
-            const prompt = document.querySelector('.city-search-prompt');
-            fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data && data.length > 0) {
-                        if(prompt) prompt.style.display = 'none';
-                        data.forEach(city => {
-                            const li = document.createElement('li');
-                            li.textContent = city.name;
-                            li.dataset.ref = city.ref;
-                            li.dataset.name = city.name;
-                            li.addEventListener('click', () => selectCity(city));
-                            citiesList.appendChild(li);
-                        });
-                    } else {
-                        if(prompt) {
-                            prompt.style.display = 'block';
-                            prompt.textContent = 'Нічого не знайдено. Спробуйте інший запит.';
-                        }
-                    }
-                })
-                .catch(() => { if(prompt) prompt.textContent = 'Помилка завантаження міст.' });
+    function formatPhoneNumber(value) {
+        if (!value) return value;
+        const phoneNumber = value.replace(/[^\d]/g, '');
+        // Нормалізація номера
+        let normalized = '';
+        if (phoneNumber.startsWith('380') && phoneNumber.length > 3) {
+            normalized = phoneNumber.substring(3);
+        } else if (phoneNumber.startsWith('0') && phoneNumber.length > 1) {
+            normalized = phoneNumber.substring(1);
+        } else {
+            normalized = phoneNumber;
         }
 
-        function selectCity(city) {
-            cityRef = city.ref;
-            document.getElementById('delivery_city_display_text').textContent = city.name;
-            document.getElementById('delivery_city_input').value = city.name;
-            citySelectTrigger.classList.add('selected');
-            closeModal();
+        const phoneNumberLength = normalized.length;
+        let formatted = '+380';
 
-            warehouseFormGroup.style.display = 'block';
-            const deliveryType = document.querySelector('input[name="delivery_method_type"]:checked').value;
-            fetchWarehouses(cityRef, deliveryType);
+        if (phoneNumberLength > 0) {
+            formatted += ' (' + normalized.substring(0, 2);
         }
-
-        function fetchWarehouses(currentCityRef, deliveryType) {
-            warehouseSelect.disabled = true;
-            warehouseSelect.innerHTML = '<option>Завантаження...</option>';
-            const warehouseTypeName = deliveryType === 'branch' ? 'відділення' : 'поштомат';
-
-            fetch(`/api/np/warehouses?city_ref=${currentCityRef}&type=${deliveryType}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
-                         warehouseSelect.innerHTML = `<option value="">${data.error}</option>`;
-                         return;
-                    }
-                    if (data && data.length > 0) {
-                        warehouseSelect.innerHTML = `<option value="">-- Оберіть ${warehouseTypeName} --</option>`;
-                        data.forEach(wh => {
-                            warehouseSelect.add(new Option(wh, wh));
-                        });
-                        warehouseSelect.disabled = false;
-                    } else {
-                        warehouseSelect.innerHTML = `<option value="">${warehouseTypeName.charAt(0).toUpperCase() + warehouseTypeName.slice(1)} не знайдені</option>`;
-                    }
-                });
+        if (phoneNumberLength > 2) {
+            formatted += ') ' + normalized.substring(2, 5);
         }
+        if (phoneNumberLength > 5) {
+            formatted += '-' + normalized.substring(5, 7);
+        }
+        if (phoneNumberLength > 7) {
+            formatted += '-' + normalized.substring(7, 9);
+        }
+        return formatted;
+    }
+
+    function handlePhoneInput(e) {
+        e.target.value = formatPhoneNumber(e.target.value);
     }
 
     function setupCommentField() {
@@ -283,32 +228,119 @@ document.addEventListener('DOMContentLoaded', function() {
         const content = document.getElementById('comment-content');
         const textarea = document.getElementById('order_comment');
         const counter = document.getElementById('comment-char-counter');
-        if (!toggle || !content || !textarea || !counter) return;
-
         const maxLength = 254;
+
+        if (!toggle || !content) return;
+
         toggle.addEventListener('click', () => {
-            const isHidden = content.style.display === 'none';
-            content.style.display = isHidden ? 'block' : 'none';
-            toggle.classList.toggle('active', isHidden);
+            toggle.classList.toggle('active');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+            } else {
+                content.style.display = 'none';
+            }
         });
+
         textarea.addEventListener('input', () => {
             const remaining = maxLength - textarea.value.length;
             counter.textContent = `Залишилось символів: ${remaining}`;
         });
     }
 
+    function setupDeliveryLogic() {
+        const deliveryGroup = document.getElementById('delivery-method-group');
+        const novaPoshtaDetails = document.getElementById('nova-poshta-details');
+        const cityInput = document.getElementById('delivery_city');
+        const citySuggestions = document.getElementById('city-suggestions');
+        const warehouseSelect = document.getElementById('delivery_warehouse');
+        let searchTimeout;
+
+        deliveryGroup.addEventListener('change', (e) => {
+            const isNovaPoshta = e.target.value === 'Нова Пошта';
+            novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
+            cityInput.required = isNovaPoshta;
+            warehouseSelect.required = isNovaPoshta;
+        });
+
+        cityInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                citySuggestions.style.display = 'none';
+                return;
+            }
+
+            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Пошук...</div>';
+            citySuggestions.style.display = 'block';
+
+            searchTimeout = setTimeout(() => {
+                fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(cities => {
+                        citySuggestions.innerHTML = '';
+                        if (cities.length > 0) {
+                            cities.forEach(city => {
+                                const item = document.createElement('div');
+                                item.className = 'suggestion-item';
+                                item.textContent = city.name;
+                                item.dataset.ref = city.ref;
+                                item.addEventListener('click', () => selectCity(city));
+                                citySuggestions.appendChild(item);
+                            });
+                        } else {
+                            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Нічого не знайдено</div>';
+                        }
+                    });
+            }, 300);
+        });
+
+        function selectCity(city) {
+            cityInput.value = city.name;
+            citySuggestions.style.display = 'none';
+            fetchWarehouses(city.ref);
+        }
+
+        function fetchWarehouses(cityRef) {
+            warehouseSelect.disabled = true;
+            warehouseSelect.innerHTML = '<option value="">Завантаження відділень...</option>';
+
+            fetch(`/api/np/warehouses?city_ref=${cityRef}`)
+                .then(res => res.json())
+                .then(warehouses => {
+                    warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення або поштомат --</option>';
+                    if (warehouses && warehouses.length > 0 && !warehouses.error) {
+                        warehouses.forEach(wh => {
+                            const option = new Option(wh, wh);
+                            warehouseSelect.add(option);
+                        });
+                        warehouseSelect.disabled = false;
+                    } else {
+                        warehouseSelect.innerHTML = `<option value="">${warehouses.error || 'Відділення не знайдені'}</option>`;
+                    }
+                });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!cityInput.contains(e.target) && !citySuggestions.contains(e.target)) {
+                citySuggestions.style.display = 'none';
+            }
+        });
+    }
+
+    // Решта функцій без змін
     function setupRadioGroups() {
-        document.querySelectorAll('.delivery-type-selector, .radio-group').forEach(group => {
-            const checked = group.querySelector('input:checked');
-            if (checked) checked.closest('label').classList.add('active');
+        document.querySelectorAll('.radio-group').forEach(group => {
             group.addEventListener('change', e => {
-                if (e.target.type === 'radio') {
-                    const parentLabel = e.target.closest('label');
-                    if (!parentLabel) return;
-                    group.querySelectorAll('label').forEach(opt => opt.classList.remove('active'));
-                    parentLabel.classList.add('active');
-                }
+                const radio = e.target;
+                const label = radio.closest('.radio-option');
+                if (!label) return;
+                group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
+                label.classList.add('active');
             });
+             // Initial active state
+            const checked = group.querySelector('input:checked');
+            if (checked) checked.closest('.radio-option').classList.add('active');
         });
     }
 
@@ -317,8 +349,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const listContainer = document.getElementById('summary-item-list');
             const subtotalEl = document.getElementById('summary-subtotal');
             const grandTotalEl = document.getElementById('summary-grand-total');
-            if(!listContainer || !subtotalEl || !grandTotalEl) return;
-
             listContainer.innerHTML = '';
             if (data.items.length > 0) {
                 data.items.forEach(item => {
@@ -334,6 +364,24 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             subtotalEl.textContent = `${data.total.toFixed(2)} ₴`;
             grandTotalEl.textContent = `${data.total.toFixed(2)} ₴`;
+        });
+    }
+
+    function setupEnterKeyNavigation() {
+        const form = document.getElementById('checkout-form');
+        if (!form) return;
+        form.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'delivery_city') {
+                e.preventDefault();
+                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select')).filter(el => !el.disabled);
+                const currentIndex = inputs.indexOf(e.target);
+                const nextInput = inputs[currentIndex + 1];
+                if (nextInput) {
+                    nextInput.focus();
+                } else {
+                    form.querySelector('button[type="submit"]').focus();
+                }
+            }
         });
     }
 });

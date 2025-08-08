@@ -567,28 +567,14 @@ img {
     top: 10px;
     right: 10px;
     z-index: 3;
-    width: 28px;  /* ОНОВЛЕНО: зменшений розмір */
-    height: 28px; /* ОНОВЛЕНО: зменшений розмір */
-    border: none;
-    background-color: transparent;
-    cursor: pointer;
-    transition: transform 0.2s;
-
-    /* Шлях до сірої зірки за замовчуванням */
-    background-image: url('/static/img/unfavorite.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
+    /* Решта стилів залишаються з попередніх правок */
 }
+/* Щоб показувати тільки одну з двох іконок зірки */
+.favorite-btn .fa-star { display: none; }
+.favorite-btn .far-star { display: inline-block; }
+.favorite-btn.active .fa-star { display: inline-block; }
+.favorite-btn.active .far-star { display: none; }
 
-.favorite-btn:hover {
-    transform: scale(1.1); /* Ефект при наведенні */
-}
-
-/* При активації - міняємо фон на жовту зірку */
-.favorite-btn.active {
-    background-image: url('/static/img/favorite.png');
-}
 
 /* Кнопки адміністратора */
 .admin-product-actions {

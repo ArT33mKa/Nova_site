@@ -15,7 +15,11 @@
         {% endif %}
 
         <!-- Кнопка "Обране" (зверху справа) -->
-        <button class="favorite-btn" title="Додати в обране"></button>
+        <button class="favorite-btn" title="Додати в обране">
+            <i class="far fa-star"></i>
+            <i class="fas fa-star"></i>
+        </button>
+
         <!-- Адмін-кнопки (знизу справа на фото) -->
         {% if current_user.is_authenticated and current_user.is_admin %}
         <div class="admin-product-actions">

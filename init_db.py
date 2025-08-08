@@ -1,3 +1,5 @@
+# init_db.py (ВИПРАВЛЕНА ВЕРСІЯ)
+
 from app import app, db, User
 
 def initialize_database():
@@ -14,8 +16,8 @@ def initialize_database():
             print(">>> 2. Створення адміністратора...")
             admin = User(
                 username='admin',
-                first_name='Артем',
-                last_name='Омельченко',  # <-- ДОДАЙТЕ ЦЕЙ РЯДОК
+                first_name='Admin',
+                last_name='User',  # <-- ДОДАЙТЕ ЦЕЙ РЯДОК
                 email='artemcool200911@gmail.com',
                 is_admin=True
             )
