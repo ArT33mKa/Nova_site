@@ -6,6 +6,7 @@
     <div class="breadcrumbs">
         <a href="{{ url_for('index') }}">Головна</a> /
         <a href="{{ url_for('catalog') }}">Каталог</a>
+        {# Цей блок більше не потрібен для нової логіки, але не заважає #}
         {% if main_category_of_current and current_category != main_category_of_current %}
             / <a href="{{ url_for('catalog', category_slug=main_category_of_current.lower().replace(' ', '-')) }}">{{ main_category_of_current }}</a>
         {% endif %}
@@ -13,24 +14,29 @@
     </div>
 
     <div class="catalog-content">
+        <!-- [ФІНАЛЬНА ВЕРСІЯ] -->
         <aside class="filters-sidebar sticky-sidebar">
             <form id="filters-form" method="GET" action="{{ url_for('catalog', category_slug=category_slug) }}">
 
-                <!-- [НОВА ВЕРСІЯ 4.0] Простий плаский список категорій -->
+                <!-- Розділені списки категорій -->
                 <div class="filter-group">
-                    <h4 class="filter-title always-open">Категорії</h4>
                     <div class="filter-options-list">
-
-                        <!-- Кнопка "Всі категорії" -->
-                        <a href="{{ url_for('catalog', **current_filters) }}"
+                        <!-- Завжди показуємо "Всі товари" -->
+                        <a href="{{ url_for('catalog') }}"
                            class="filter-category-link {% if not category_slug %}active{% endif %}">
-                            <span>Всі товари</span>
+                            <strong>Всі товари</strong>
                         </a>
+                    </div>
+                </div>
 
-                        <!-- Цикл для виводу всіх знайдених категорій -->
-                        {% for cat_name, count in hierarchy.items()|sort %}
+                <!-- Спочатку виводимо ОСНОВНІ категорії -->
+                {% if hierarchy.main %}
+                <div class="filter-group">
+                    <h4 class="filter-title always-open">Основні товари</h4>
+                    <div class="filter-options-list">
+                        {% for cat_name, count in hierarchy.main.items() %}
                             {% set slug = cat_name.lower().replace(' ', '-') %}
-                            <a href="{{ url_for('catalog', category_slug=slug, **current_filters) }}"
+                            <a href="{{ url_for('catalog', category_slug=slug) }}"
                                class="filter-category-link {% if category_slug == slug %}active{% endif %}">
                                 <span>{{ cat_name }}</span>
                                 <span class="filter-count">{{ count }}</span>
@@ -38,8 +44,26 @@
                         {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
-                <!-- ФІЛЬТР ЦІНИ (без змін) -->
+                <!-- Потім виводимо ЗАПЧАСТИНИ -->
+                {% if hierarchy.parts %}
+                <div class="filter-group">
+                    <h4 class="filter-title always-open">Запчастини та комплектуючі</h4>
+                    <div class="filter-options-list">
+                         {% for cat_name, count in hierarchy.parts.items() %}
+                            {% set slug = cat_name.lower().replace(' ', '-') %}
+                            <a href="{{ url_for('catalog', category_slug=slug) }}"
+                               class="filter-category-link {% if category_slug == slug %}active{% endif %}">
+                                <span>{{ cat_name }}</span>
+                                <span class="filter-count">{{ count }}</span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- ФІЛЬТР ЦІНИ -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
                     <div class="price-inputs">
@@ -49,7 +73,7 @@
                     </div>
                 </div>
 
-                <!-- Невидимі поля для пошуку -->
+                <!-- Невидиме поле для пошуку, щоб він не скидався -->
                 {% if search_query %}
                     <input type="hidden" name="search" value="{{ search_query }}">
                 {% endif %}
@@ -74,26 +98,22 @@
 
             <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
 
-            <!-- [ВИПРАВЛЕНО] Блок з обраними фільтрами тепер коректно генерує посилання для скидання -->
             {% if current_category or search_query or request.args.get('min_price') or request.args.get('max_price') %}
             <div class="selected-filters-bar">
                 <span>Обрані фільтри:</span>
 
-                {# Тег для обраної категорії #}
                 {% if current_category %}
                      {% set cat_reset_params = request.args.copy() %}
                      {% do cat_reset_params.pop('category_slug', None) %}
                      <a href="{{ url_for('catalog', **cat_reset_params) }}" class="filter-tag category-tag">{{ current_category }} ×</a>
                 {% endif %}
 
-                {# Тег для пошукового запиту #}
                 {% if search_query %}
                     {% set search_reset_params = request.args.copy() %}
                     {% do search_reset_params.pop('search', None) %}
                     <a href="{{ url_for('catalog', category_slug=category_slug, **search_reset_params) }}" class="filter-tag">{{ search_query }} ×</a>
                 {% endif %}
 
-                {# Посилання "Скинути все" #}
                 <a href="{{ url_for('catalog') }}" class="filter-tag-reset">Скинути все</a>
             </div>
             {% endif %}
@@ -106,7 +126,6 @@
                 </div>
                  {% if products.has_next %}
                     <div class="load-more-container">
-                        {# [ВАЖЛИВО] Передаємо всі активні фільтри в кнопку для коректної роботи JS #}
                         <button id="load-more-btn"
                                 class="btn btn-outline btn-lg"
                                 data-category-slug="{{ category_slug or '' }}"
