@@ -903,9 +903,7 @@ def bas_import():
         catalog_node = root.find('.//Каталог')
         if catalog_node is None: return "failure\nНе знайдено тег <Каталог>.", 400
 
-        # [ЗМІНА] Ця логіка тепер не використовується для визначення категорії, але залишаємо її
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
-
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю обробку...")
 
@@ -915,15 +913,19 @@ def bas_import():
         products_to_update, products_to_add = [], []
         default_image_url = _get_cloudinary_url(None)
 
-        # [ГОЛОВНИЙ ФІКС] Створюємо словник для визначення категорій за ключовими словами в назві
+        # [ГОЛОВНИЙ ФІКС v2.0] Оновлений та розширений словник ключових слів.
+        # Порядок важливий! Більш специфічні категорії мають бути вище.
         CATEGORY_KEYWORDS = {
-            "Поливочна система": ["полив", "шланг", "конектор", "розпилювач", "зрошувач", "пістолет"],
-            "Насоси": ["насос", "помпа", "гідрофор"],
+            "Газові колонки": ["колонка газова", "газова колонка"],
+            "Сушка для рушників": ["сушка для рушників", "рушникосушарка"],
             "Бойлери": ["бойлер", "водонагрівач"],
-            "Змішувачі": ["змішувач", "кран", "сифон"],
-            "Витяжки": ["витяжк", "вентилятор"],
-            "Газові колонки": ["колонк", "газов"],
-            "Сушка для рушників": ["сушк", "рушник"],
+            "Витяжки": ["витяжка", "вентилятор"],
+            "Насоси": ["насос", "помпа", "гідрофор", "насосна станція"],
+            "Змішувачі": ["змішувач", "кран", "сифон"],  # "кран" може захоплювати зайве, але це краще, ніж нічого
+            "Поливочна система": ["полив", "шланг", "зрошувач", "конектор", "пістолет", "фітинг", "штуцер"],
+            # Категорія "Запчастини" тепер має свої власні ключові слова.
+            "Запчастини": ["запчастин", "комплект", "ремонт", "термопара", "анод", "тэн", "прокладка", "кран-букса",
+                           "картридж"]
         }
 
         for product_node in products_from_xml:
@@ -933,13 +935,31 @@ def bas_import():
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
 
-            # --- [НОВА ЛОГІКА ВИЗНАЧЕННЯ КАТЕГОРІЇ] ---
-            category = "Запчастини"  # Категорія за замовчуванням
+            # Отримуємо оригінальну назву групи з файлу 1С
+            group_id_node = product_node.find('.//Групи/Ид')
+            group_id = group_id_node.text if group_id_node is not None else None
+            category_from_1c_group = groups.get(group_id, "")
+
+            # --- [НОВА ГІБРИДНА ЛОГІКА ВИЗНАЧЕННЯ КАТЕГОРІЇ v2.0] ---
+            final_category = None
+
+            # 1. Спроба визначити за НАЗВОЮ ТОВАРУ (пріоритетний метод)
             for main_cat, keywords in CATEGORY_KEYWORDS.items():
                 if any(keyword in name.lower() for keyword in keywords):
-                    category = main_cat
+                    final_category = main_cat
                     break
-            # --- Кінець нової логіки ---
+
+            # 2. Якщо за назвою не вдалося, спроба визначити за НАЗВОЮ ГРУПИ З 1С
+            if not final_category and category_from_1c_group:
+                for main_cat, keywords in CATEGORY_KEYWORDS.items():
+                    if any(keyword in category_from_1c_group.lower() for keyword in keywords):
+                        final_category = main_cat
+                        break
+
+            # 3. Якщо нічого не допомогло, це точно запчастина
+            if not final_category:
+                final_category = "Запчастини"
+            # --- Кінець нової гібридної логіки ---
 
             image_tags = product_node.findall('Картинка')
             image_filename_from_xml = ''
@@ -999,7 +1019,7 @@ def bas_import():
                 brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
                 brand = brand[:100] if brand else None
 
-            product_data = {'name': name, 'price': price, 'description': description, 'category': category,
+            product_data = {'name': name, 'price': price, 'description': description, 'category': final_category,
                             'brand': brand, 'image': final_image_url, 'in_stock': in_stock}
             if name in existing_products_map:
                 product_data['id'] = existing_products_map[name]
