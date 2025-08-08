@@ -33,11 +33,13 @@
                         {% if current_category %}
                             {# Посилання назад, якщо це підкатегорія #}
                             {% set parent_found = namespace(value=None) %}
-                            {% for parent, children in category_structure.items() %}
-                                {% if current_category in children %}
-                                    {% set parent_found.value = parent %}
-                                {% endif %}
-                            {% endfor %}
+                            {% if category_structure %}
+                                {% for parent, children in category_structure.items() %}
+                                    {% if current_category in children %}
+                                        {% set parent_found.value = parent %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
 
                             {% if parent_found.value %}
                                 <a href="{{ url_for('catalog', category_slug=parent_found.value.lower().replace(' ', '-'), **current_filters) }}" class="radio-item is-parent" style="color: #0066cc; font-weight: bold;">

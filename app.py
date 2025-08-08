@@ -325,6 +325,16 @@ def catalog(category_slug):
     # Get the main categories and their counts from the hierarchy
     main_categories = {cat: data['count'] for cat, data in hierarchy.items()}
 
+    # Create category structure for template
+    category_structure = {}
+    for main_cat, data in hierarchy.items():
+        category_structure[main_cat] = list(data['subcategories'].keys())
+
+    # Get subcategories with counts for current category
+    subcategories_with_counts = {}
+    if current_category and current_category in hierarchy:
+        subcategories_with_counts = hierarchy[current_category]['subcategories']
+
     # Отримуємо фільтри
     current_filters = request.args.copy()
     if 'page' in current_filters:
@@ -416,7 +426,9 @@ def catalog(category_slug):
         selected_brands=selected_brands,
         current_filters=current_filters,
         category_slug=category_slug,
-        main_categories=main_categories  # Add this line
+        main_categories=main_categories,
+        category_structure=category_structure,
+        subcategories_with_counts=subcategories_with_counts
     )
 
 
@@ -685,7 +697,7 @@ def checkout():
         except Exception as e:
             print(f">>> ПОМИЛКА СПОВІЩЕННЯ: {e}")
         session.pop('cart', None)
-        flash('Дякуємо! Ваше замовле��ня прийнято.', 'success')
+        flash('Дякуємо! Ваше замовлення прийнято.', 'success')
         return redirect(url_for('index'))
     return render_template('checkout.html')
 
@@ -837,7 +849,7 @@ def delete_review(review_id):
     review = Review.query.get_or_404(review_id)
     db.session.delete(review);
     db.session.commit()
-    flash("Запис видалено.", "success")
+    flash("Запис вид��лено.", "success")
     return redirect(request.referrer or url_for('admin_reviews'))
 
 
@@ -897,7 +909,7 @@ def send_message():
 
 # ────────────────────────────────
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - НАДІЙНА ВЕРСІЯ
-# ───────────────────────────────
+# ───────────────────���───────────
 
 
 def require_api_key(f):
@@ -1071,7 +1083,7 @@ def bas_import():
                             break
             if brand:
                 # Спочатку видаляємо HTML-теги, потім замінюємо &nbsp; на звичайний пробіл,
-                # а потім приб��раємо зайві пробіли на початку та в кінці.
+                # а потім прибираємо зайві пробіли на початку та в кінці.
                 brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
                 if brand:  # Перевіряємо, чи щось залишилось після очищення
                     brand = brand[:100]  # Обрізаємо до 100 символів
@@ -1201,7 +1213,7 @@ def find_np_cities():
 
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання ТІЛЬКИ ВІДДІЛЕНЬ для населеного пункту."""
+    """Отримання ТІЛЬКИ ВІДДІЛЕНЬ для населеного пу��кту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
 
