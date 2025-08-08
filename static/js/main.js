@@ -405,7 +405,7 @@ function renderFavoritesModal() {
                     <div class="product-image">
                         <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
                         ${stockStatus}
-                        <button class="favorite-btn active" title="Видалити з обраного"><i class="fas fa-star"></i></button>
+                        <button class="favorite-btn active" title="Видалити з обраного"></button>
                         ${adminActionsHtml}
                     </div>
                     <div class="product-info">

@@ -567,16 +567,16 @@ img {
     top: 10px;
     right: 10px;
     z-index: 3;
-    width: 38px;  /* Трохи більший розмір для кращого вигляду */
-    height: 38px;
-    border: none; /* Прибираємо рамку, бо зображення має свою форму */
+    width: 34px;  /* ОНОВЛЕНО: зменшений розмір */
+    height: 34px; /* ОНОВЛЕНО: зменшений розмір */
+    border: none;
     background-color: transparent;
     cursor: pointer;
     transition: transform 0.2s;
 
     /* Шлях до сірої зірки за замовчуванням */
     background-image: url('/static/img/unfavorite.png');
-    background-size: contain;     /* Масштабує зображення, щоб воно влізло в кнопку */
+    background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
 }
