@@ -21,10 +21,18 @@
                 <div class="filter-group">
                     {% if current_category %}
                         {# Посилання для повернення до батьківської категорії або до всіх категорій #}
-                        {% set back_link_url = url_for('catalog', **current_filters.copy().to_dict()|rejectattr('__eq__', 'category_slug')|list) %}
+                        {% set back_link_filters = current_filters.copy() %}
+                        {# [ВИПРАВЛЕНО] Простий і надійний спосіб видалити ключ #}
+                        {% do back_link_filters.pop('category_slug', None) %}
+
+                        {# За замовчуванням посилання веде на головний каталог з усіма фільтрами, крім категорії #}
+                        {% set back_link_url = url_for('catalog', **back_link_filters) %}
+
                         {% if main_category_of_current and current_category != main_category_of_current %}
-                            {# Якщо ми в підкатегорії, посилання веде на батьківську #}
-                            {% set back_link_url = url_for('catalog', category_slug=main_category_of_current.lower().replace(' ', '-'), **current_filters) %}
+                            {# Якщо ми в підкатегорії, посилання веде на батьківську, зберігаючи інші фільтри #}
+                            {% set parent_filters = current_filters.copy() %}
+                            {% do parent_filters.setlist('category_slug', [main_category_of_current.lower().replace(' ', '-')]) %}
+                            {% set back_link_url = url_for('catalog', **parent_filters) %}
                         {% endif %}
 
                         <a href="{{ back_link_url }}" class="back-to-categories-link">
