@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initProductDescriptionToggle();
     initOptimizedCartLogic();
     initFavoritesLogic();
-    initCabinetModal(pageOverlay, closeAllSidebars); // [ЗМІНЕН��] Передаємо залежності
+    initCabinetModal(pageOverlay, closeAllSidebars); // [ЗМІНЕНО] Передаємо залежності
     initAutoApplyFilters();
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
@@ -96,7 +96,7 @@ function switchAuthTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
 }
 
-// [ЗМІНЕНО] Фун��ц��я тепер приймає залежності
+// [ЗМІНЕНО] Функція тепер приймає залежності
 function initCabinetModal(pageOverlay, closeAllSidebars) {
     const cabinetModal = document.getElementById('cabinet-modal');
     if (!cabinetModal) return;
@@ -404,7 +404,7 @@ function renderFavoritesModal() {
                     <div class="product-image">
                         <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
                         ${stockStatus}
-                        <button class="favorite-btn active" title="Видалити з обраног��"><i class="fas fa-star"></i></button>
+                        <button class="favorite-btn active" title="Видалити з обраного"><i class="fas fa-star"></i></button>
                         ${adminActionsHtml}
                     </div>
                     <div class="product-info">
@@ -452,6 +452,7 @@ function initContactForm() {
                 showToast(data.message, data.status === 'success' ? 'success' : 'error');
                 if (data.status === 'success') this.reset();
             }).catch(() => showToast('Сталася помилка при відправці.', 'error'));
+        });
     }
 }
 
@@ -633,50 +634,39 @@ function initLoadMore() {
     const productsGrid = document.querySelector('.products-grid');
     const loadingSpinner = document.getElementById('loading-spinner');
 
-    if (!loadMoreBtn || !productsGrid) return;
+    if (!loadMoreBtn || !productsGrid) {
+        return;
+    }
 
     let currentPage = 1;
 
-    loadMoreBtn.addEventListener('click', function() {
+    loadMoreBtn.addEventListener('click', () => {
         currentPage++;
         loadMoreBtn.style.display = 'none';
         if (loadingSpinner) loadingSpinner.style.display = 'block';
 
-        // Отримуємо поточні параметри URL
-        const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set('page', currentPage);
+        const params = new URLSearchParams(window.location.search);
+        params.set('page', currentPage);
 
-        fetch(`/api/catalog/load_more?${urlParams.toString()}`)
-            .then(response => response.text())
-            .then(html => {
-                // Створюємо тимчасовий контейнер для парсингу
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
+        fetch(`/api/catalog/load_more?${params.toString()}`)
+            .then(response => {
+                const moreAvailable = response.headers.get('X-More-Available') === 'true';
+                return response.text().then(html => ({ html, moreAvailable }));
+            })
+            .then(({ html, moreAvailable }) => {
+                if (html.trim() !== "") {
+                    productsGrid.insertAdjacentHTML('beforeend', html);
+                }
 
-                // Знаходимо тільки картки товарів
-                const newProducts = doc.querySelectorAll('.product-card');
-
-                if (newProducts.length > 0) {
-                    // Додаємо кожну картку до існуючої сітки
-                    newProducts.forEach(product => {
-                        productsGrid.appendChild(product);
-                    });
-
-                    // Оновлюємо стани кнопок та інтерактивних елементів
-                    updateCartView();
-                    updateFavoritesUI();
-                    initializeProductCards();
-
-                    // Перевіряємо чи є ще товари
-                    const hasMoreProducts = newProducts.length === 12; // Припустимо, що на сторінці 12 товарів
-                    loadMoreBtn.style.display = hasMoreProducts ? 'block' : 'none';
+                if (moreAvailable) {
+                    loadMoreBtn.style.display = 'inline-block';
                 } else {
                     loadMoreBtn.style.display = 'none';
                 }
             })
             .catch(error => {
-                console.error('Помилка завантаження:', error);
-                loadMoreBtn.style.display = 'block';
+                console.error('Error loading more products:', error);
+                loadMoreBtn.style.display = 'inline-block';
             })
             .finally(() => {
                 if (loadingSpinner) loadingSpinner.style.display = 'none';
@@ -684,76 +674,66 @@ function initLoadMore() {
     });
 }
 
-// Оновлена логіка для кнопки "Завантажити ще"
-document.addEventListener('DOMContentLoaded', function() {
-    const loadMoreBtn = document.getElementById('load-more-btn');
-    const productsGrid = document.querySelector('.products-grid');
-    const loadingSpinner = document.getElementById('loading-spinner');
+function initShowMoreFilters() {
+    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
+        const limit = parseInt(list.dataset.showLimit, 10);
+        const items = Array.from(list.children);
 
-    let currentPage = 1;
+        if (items.length > limit) {
+            // Ховаємо всі елементи, що перевищують ліміт
+            for (let i = limit; i < items.length; i++) {
+                items[i].style.display = 'none';
+            }
 
-    if (loadMoreBtn) {
-        loadMoreBtn.addEventListener('click', function() {
-            currentPage++;
-            loadMoreBtn.style.display = 'none';
-            loadingSpinner.style.display = 'block';
+            // Створюємо та додаємо кнопку
+            const remainingCount = items.length - limit;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'show-more-filters-btn';
+            button.textContent = `Ще ${remainingCount}`;
+            list.insertAdjacentElement('afterend', button);
 
-            // Отримуємо всі поточні параметри URL
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.set('page', currentPage);
-
-            // Формуємо URL для запиту
-            const fetchURL = `${window.location.pathname}?${urlParams.toString()}`;
-
-            fetch(fetchURL)
-                .then(response => response.text())
-                .then(html => {
-                    // Створюємо тимчасовий контейнер для парсингу HTML
-                    const tempContainer = document.createElement('div');
-                    tempContainer.innerHTML = html;
-
-                    // Знаходимо нові товари в отриманому HTML
-                    const newProductsGrid = tempContainer.querySelector('.products-grid');
-                    if (newProductsGrid) {
-                        // Додаємо тільки картки товарів
-                        const newProducts = Array.from(newProductsGrid.children);
-                        newProducts.forEach(product => {
-                            productsGrid.appendChild(product);
-                        });
-
-                        // Перевіряємо наявність кнопки "Завантажити ще" в новому контенті
-                        const hasMoreProducts = tempContainer.querySelector('#load-more-btn') !== null;
-                        loadMoreBtn.style.display = hasMoreProducts ? 'block' : 'none';
-
-                        // Оновлюємо стани кнопок та інтерактивних елементів
-                        updateCartView();
-                        updateFavoritesUI();
-                    } else {
-                        console.error('Не вдалося знайти нові товари в відповіді');
-                        loadMoreBtn.style.display = 'none';
-                    }
-                })
-                .catch(error => {
-                    console.error('Помилка завантаження:', error);
-                    loadMoreBtn.style.display = 'block';
-                })
-                .finally(() => {
-                    loadingSpinner.style.display = 'none';
-                });
-        });
-    }
-});
-
-// Функція ініціалізації карток товарів
-function initializeProductCards() {
-    // Додайте тут логіку ініціалізації нових карток товарів
-    // Наприклад, додавання в кошик, обробка кнопок тощо
-    // ...existing code for product card initialization...
+            // Додаємо обробник події для кнопки
+            button.addEventListener('click', () => {
+                for (let i = limit; i < items.length; i++) {
+                    items[i].style.display = ''; // Повертаємо стандартне відображення
+                }
+                button.remove(); // Видаляємо кнопку після використання
+            });
+        }
+    });
 }
 
-// ===================================================================
-//  ДОДАТКОВІ ФУНКЦІЇ
-// ===================================================================
+function initShowMoreFilters() {
+    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
+        const limit = parseInt(list.dataset.showLimit, 10);
+        const items = Array.from(list.children);
+
+        if (items.length > limit) {
+            // Ховаємо всі елементи, що перевищують ліміт
+            for (let i = limit; i < items.length; i++) {
+                items[i].style.display = 'none';
+            }
+
+            // Створюємо та додаємо кнопку
+            const remainingCount = items.length - limit;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'show-more-filters-btn';
+            button.textContent = `Показати ще ${remainingCount}`;
+            list.insertAdjacentElement('afterend', button);
+
+            // Додаємо обробник події для кнопки
+            button.addEventListener('click', () => {
+                for (let i = limit; i < items.length; i++) {
+                    items[i].style.display = ''; // Повертаємо стандартне відображення
+                }
+                button.remove(); // Видаляємо кнопку після використання
+            });
+        }
+    });
+}
+
 function initAutoApplyFilters() {
     const filtersForm = document.getElementById('auto-filters-form');
     if (!filtersForm) return;
@@ -786,41 +766,5 @@ function initAutoApplyFilters() {
         if (e.target.type === 'number') {
             debouncedSubmit();
         }
-    });
-}
-
-// Додаємо функцію initShowMoreFilters
-function initShowMoreFilters() {
-    const filterGroups = document.querySelectorAll('.filter-group');
-
-    filterGroups.forEach(group => {
-        const content = group.querySelector('.filter-options-list');
-        if (!content) return;
-
-        const items = content.querySelectorAll('.checkbox-item');
-        if (items.length <= 7) return;
-
-        // Приховуємо елементи після 7-го
-        items.forEach((item, index) => {
-            if (index >= 7) {
-                item.style.display = 'none';
-            }
-        });
-
-        // Створюємо кнопку "Показати ще"
-        const showMoreBtn = document.createElement('button');
-        showMoreBtn.className = 'show-more-btn';
-        showMoreBtn.textContent = 'Показати ще';
-        showMoreBtn.onclick = () => {
-            const isExpanded = showMoreBtn.classList.toggle('expanded');
-            items.forEach((item, index) => {
-                if (index >= 7) {
-                    item.style.display = isExpanded ? 'flex' : 'none';
-                }
-            });
-            showMoreBtn.textContent = isExpanded ? 'Приховати' : 'Показати ще';
-        };
-
-        group.appendChild(showMoreBtn);
     });
 }

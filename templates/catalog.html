@@ -158,15 +158,11 @@
                         {% include '_product_card.html' %}
                     {% endfor %}
                 </div>
-                {% if products.has_next %}
-    <div class="load-more-container">
-        <button id="load-more-btn" class="btn btn-outline btn-lg">
-            <i class="fas fa-sync-alt"></i> Завантажити ще
-        </button>
-        <div id="loading-spinner" style="display: none;">
-            <i class="fas fa-spinner fa-spin"></i> Завантаження...
-        </div>
-    </div>
+                 {% if products.has_next %}
+                    <div class="load-more-container">
+                        <button id="load-more-btn" class="btn btn-outline btn-lg">Завантажити ще</button>
+                        <div id="loading-spinner" style="display: none;">За��антаження...</div>
+                    </div>
                 {% endif %}
             {% else %}
                 <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">

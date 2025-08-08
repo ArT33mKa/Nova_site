@@ -1894,28 +1894,9 @@ img {
     /* Це правило застосовується до всього блоку, де лежить кнопка */
     grid-column: 1 / -1; /* Головний фікс: розтягуємо на всі колонки grid-контейнера */
     width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 30px 0;
-}
-
-/* Стилі для кнопки "Показати ще" */
-#load-more-btn {
-    width: 100%; /* Кнопка займає всю ширину свого контейнера */
-    max-width: 400px; /* Але не стає надто широкою на великих екранах */
-    padding: 15px 30px;
-    font-size: 1.1rem;
-    min-width: 200px;
-    margin: 0 auto;
-}
-
-#loading-spinner {
     text-align: center;
-    margin: 0 auto;
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%);
+    margin-top: 40px;
+    padding: 20px 0;
 }
 
 /* 3. Стилізуємо саму кнопку, щоб вона теж була широкою */
@@ -2181,7 +2162,6 @@ details[open] > summary.filter-title {
     background-color: var(--primary-color);
     color: white;
 }
-
 .current-category-header {
     margin-bottom: 20px;
 }
@@ -2357,10 +2337,9 @@ details[open] > summary.filter-title {
 .load-more-container {
     grid-column: 1 / -1;
     width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 30px 0;
+    text-align: center;
+    margin-top: 40px;
+    padding: 20px 0;
 }
 
 .radio-style-list .radio-item {
