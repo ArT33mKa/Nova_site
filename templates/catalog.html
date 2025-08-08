@@ -67,8 +67,8 @@
                 </div>
 
                 <!-- ФІЛЬТР ЦІНИ (акордеон) -->
-                <details class="filter-group" {% if request.args.get('min_price') or request.args.get('max_price') %}open{% endif %}>
-                    <summary class="filter-title">Ціна, ₴</summary>
+                <div class="filter-group">
+                    <h4 class="filter-title">Ціна, ₴</h4>
                     <div class="filter-options">
                         <div class="price-inputs">
                             <input type="number" name="min_price"
@@ -82,12 +82,12 @@
                             <button type="submit" class="price-ok-btn">OK</button>
                         </div>
                     </div>
-                </details>
+                </div>
 
                 <!-- ФІЛЬТР ВИРОБНИКІВ (акордеон) -->
                 {% if brand_counts %}
-                <details class="filter-group" {% if selected_brands %}open{% endif %}>
-                    <summary class="filter-title">Виробник</summary>
+                <div class="filter-group">
+                    <h4 class="filter-title">Виробник</h4>
                     <div class="filter-options">
                         <div class="filter-options-list" data-show-limit="7">
                             {% for brand, count in brand_counts %}
@@ -99,7 +99,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                </details>
+                </div>
                 {% endif %}
 
             </form>

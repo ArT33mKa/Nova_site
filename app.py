@@ -322,61 +322,42 @@ def catalog(category_slug):
     page = request.args.get('page', 1, type=int)
     hierarchy = get_category_hierarchy()
 
-    # Get the main categories and their counts from the hierarchy
-    main_categories = {cat: data['count'] for cat, data in hierarchy.items()}
-
-    # Create category structure for template
-    category_structure = {}
-    for main_cat, data in hierarchy.items():
-        category_structure[main_cat] = list(data['subcategories'].keys())
-
-    # Define current_category first
-    current_category = None
-    if category_slug:
-        category_name = category_slug.replace('-', ' ')
-        # Search in main categories and subcategories
-        for main_cat, data in hierarchy.items():
-            if main_cat.lower() == category_name.lower():
-                current_category = main_cat
-                break
-            for subcat in data['subcategories']:
-                if subcat.lower() == category_name.lower():
-                    current_category = subcat
-                    break
-            if current_category:
-                break
-
-    # Get subcategories with counts for current category
-    subcategories_with_counts = {}
-    if current_category and current_category in hierarchy:
-        subcategories_with_counts = hierarchy[current_category]['subcategories']
-
-    # Отримуємо фільтри
-    current_filters = request.args.copy()
-    if 'page' in current_filters:
-        current_filters.pop('page')
-
+    # --- 1. Отримуємо всі можливі фільтри з URL ---
     selected_brands = request.args.getlist('brand')
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
 
-    # Визначаємо поточну категорію
+    # --- 2. [ВИПРАВЛЕНО] Логіка автовизначення категорії, якщо обрано бренд ---
+    if selected_brands and not category_slug:
+        most_common_category_query = db.session.query(Product.category) \
+            .filter(Product.brand.in_(selected_brands)) \
+            .group_by(Product.category) \
+            .order_by(func.count(Product.id).desc()) \
+            .first()
+        if most_common_category_query:
+            category_slug = most_common_category_query[0].lower().replace(' ', '-')
+
+    # --- 3. [ВИПРАВЛЕНО] Визначаємо поточну категорію (один раз і надійно) ---
+    current_category = None
+    main_category = None
+    subcategories = []
     if category_slug:
         category_name = category_slug.replace('-', ' ')
-
-        # Шукаємо в основних категоріях та підкатегоріях
-        for main_cat, data in hierarchy.items():
-            if main_cat.lower() == category_name.lower():
-                current_category = main_cat
+        for m_cat, data in hierarchy.items():
+            if m_cat.lower() == category_name.lower():
+                current_category = m_cat
+                main_category = m_cat
+                subcategories = list(data.get('subcategories', {}).keys())
                 break
-            for subcat in data['subcategories']:
-                if subcat.lower() == category_name.lower():
-                    current_category = subcat
+            if current_category: break
+            for sub_cat in data.get('subcategories', {}):
+                if sub_cat.lower() == category_name.lower():
+                    current_category = sub_cat
+                    main_category = m_cat
                     break
-            if current_category:
-                break
+            if current_category: break
 
-    # Формуємо базовий запит
+    # --- 4. Формуємо базовий запит до БД ---
     query = Product.query.filter(
         Product.in_stock == True,
         Product.description.isnot(None),
@@ -384,79 +365,66 @@ def catalog(category_slug):
         Product.image.notlike('default_tovar%')
     )
 
-    # Додаємо фільтр за категорією
+    # --- 5. Застосовуємо фільтр по КАТЕГОРІЇ до основного запиту ---
     if current_category:
-        # Знаходимо основну категорію
-        main_category = None
-        for main_cat, data in hierarchy.items():
-            if main_cat == current_category or current_category in data['subcategories']:
-                main_category = main_cat
-                break
-
-        if main_category == current_category:
-            # Якщо вибрана основна категорія, показуємо всі товари з неї та підкатегорій
-            subcategories = list(hierarchy[main_category]['subcategories'].keys())
+        if current_category == main_category:
+            # Якщо обрана головна категорія, беремо її та всі її підкатегорії
             query = query.filter(Product.category.in_([main_category] + subcategories))
         else:
-            # Якщо вибрана підкатегорія, показуємо тільки її товари
+            # Якщо обрана підкатегорія
             query = query.filter(Product.category == current_category)
 
-    # Додаємо інші фільтри
-    if selected_brands:
-        query = query.filter(Product.brand.in_(selected_brands))
-    # [НОВЕ] Розраховуємо мін/макс ціну ДО застосування фільтра по ціні
-    price_query = query
+    # --- 6. [ВИПРАВЛЕНО] Розраховуємо діапазон цін для товарів у ВЖЕ ВІДФІЛЬТРОВАНІЙ КАТЕГОРІЇ ---
+    price_query = query # Беремо запит з уже застосованим фільтром категорії
     price_range = db.session.query(
         func.floor(func.min(Product.price)),
         func.ceil(func.max(Product.price))
     ).select_from(price_query.subquery()).one()
-
     min_price_available = price_range[0] or 0
     max_price_available = price_range[1] or 10000
 
-    # Тепер застосовуємо фільтри по ціні до основного запиту
+    # --- 7. Застосовуємо решту фільтрів (бренд, ціна) до основного запиту ---
+    if selected_brands:
+        query = query.filter(Product.brand.in_(selected_brands))
     if min_price:
         query = query.filter(Product.price >= min_price)
     if max_price:
         query = query.filter(Product.price <= max_price)
 
-    # Отримуємо доступні бренди для поточних фільтрів
-    brands_query = db.session.query(Product.brand) \
-        .filter(Product.brand.isnot(None)) \
-        .filter(Product.brand != '')
+    # --- 8. [ВИПРАВЛЕНО] Отримуємо доступні бренди на основі ВСІХ фільтрів, крім самого бренду ---
+    brands_query = db.session.query(Product.brand, func.count(Product.brand)) \
+        .select_from(query.subquery()) \
+        .group_by(Product.brand) \
+        .order_by(Product.brand)
+    brand_counts = [(brand, count) for brand, count in brands_query if brand]
 
-    if current_category:
-        if main_category == current_category:
-            brands_query = brands_query.filter(Product.category.in_([main_category] + subcategories))
-        else:
-            brands_query = brands_query.filter(Product.category == current_category)
 
-    brands = brands_query.distinct().all()
-    brand_counts = []
-    for brand in brands:
-        count = query.filter(Product.brand == brand[0]).count()
-        if count > 0:
-            brand_counts.append((brand[0], count))
+    # --- 9. Отримуємо товари з пагінацією ---
+    products = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
 
-    # Отримуємо товари з пагінацією
-    products = query.order_by(Product.id.desc()).paginate(
-        page=page, per_page=12, error_out=False
-    )
+    # --- 10. Готуємо дані для шаблону ---
+    current_filters = request.args.copy()
+    if 'page' in current_filters:
+        current_filters.pop('page')
+
+    main_categories_for_template = {cat: data['count'] for cat, data in hierarchy.items()}
+    subcategories_with_counts = hierarchy.get(main_category, {}).get('subcategories', {}) if main_category else {}
+    category_structure_for_template = {main_cat: list(data['subcategories'].keys()) for main_cat, data in hierarchy.items()}
 
     return render_template(
         'catalog.html',
         products=products,
         hierarchy=hierarchy,
         current_category=current_category,
-        brand_counts=sorted(brand_counts),
+        brand_counts=brand_counts,
         selected_brands=selected_brands,
         current_filters=current_filters,
         category_slug=category_slug,
-        main_categories=main_categories,
-        category_structure=category_structure,
-        subcategories_with_counts=subcategories_with_counts,
-        min_price_available = min_price_available,
-        max_price_available = max_price_available,
+        min_price_available=min_price_available,
+        max_price_available=max_price_available,
+        main_categories=main_categories_for_template,
+        category_structure=category_structure_for_template,
+        subcategories_with_counts=subcategories_with_counts
     )
 
 
