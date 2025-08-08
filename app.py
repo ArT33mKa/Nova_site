@@ -335,7 +335,7 @@ def catalog(category_slug):
                 if 'search' in redirect_args: redirect_args.pop('search')
                 return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
 
-    # [ГОЛОВНЕ ВИПРАВЛЕННЯ] Основний фільтр - тільки товари в наявності.
+    # [ГОЛОВНИЙ ФІЛЬТР] Показуємо лише товари, що є в наявності.
     query = Product.query.filter(Product.in_stock == True)
 
     if search_query:
@@ -1112,6 +1112,7 @@ def api_load_more():
                     break
             if current_category: break
 
+    # [ЗБЕРЕЖЕНО ВИПРАВЛЕННЯ] Основний фільтр - тільки товари в наявності.
     query = Product.query.filter(Product.in_stock == True)
 
     if search_query: query = query.filter(Product.name.ilike(f'%{search_query}%'))
