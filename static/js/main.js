@@ -632,45 +632,47 @@ function initSimilarProductsCarousel() {
 
 function initLoadMore() {
     const loadMoreBtn = document.getElementById('load-more-btn');
-    const productsGrid = document.querySelector('.products-grid');
+    const productsGrid = document.getElementById('products-grid-container'); // [ЗМІНА] Краще використовувати ID
     const loadingSpinner = document.getElementById('loading-spinner');
 
     if (!loadMoreBtn || !productsGrid) {
         return;
     }
 
-    let currentPage = 1; // Починаємо з першої сторінки
+    let currentPage = 1;
 
     loadMoreBtn.addEventListener('click', () => {
         currentPage++;
         loadMoreBtn.style.display = 'none';
         if (loadingSpinner) loadingSpinner.style.display = 'block';
 
-        // Збираємо всі активні фільтри зі сторінки
-        const params = new URLSearchParams(window.location.search);
+        // [НОВЕ] Збираємо всі активні фільтри з data-атрибутів кнопки
+        const params = new URLSearchParams();
         params.set('page', currentPage);
-
-        // [ВИПРАВЛЕНО] Додаємо slug категорії до параметрів запиту
-        const categorySlug = loadMoreBtn.dataset.categorySlug;
-        if (categorySlug) {
-            params.set('category_slug', categorySlug);
+        if (loadMoreBtn.dataset.categorySlug) {
+            params.set('category_slug', loadMoreBtn.dataset.categorySlug);
         }
+        if (loadMoreBtn.dataset.search) {
+            params.set('search', loadMoreBtn.dataset.search);
+        }
+        if (loadMoreBtn.dataset.minPrice) {
+            params.set('min_price', loadMoreBtn.dataset.minPrice);
+        }
+        if (loadMoreBtn.dataset.maxPrice) {
+            params.set('max_price', loadMoreBtn.dataset.maxPrice);
+        }
+
 
         fetch(`/api/catalog/load_more?${params.toString()}`)
             .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
+                if (!response.ok) throw new Error('Network response was not ok');
                 const moreAvailable = response.headers.get('X-More-Available') === 'true';
                 return response.text().then(html => ({ html, moreAvailable }));
             })
             .then(({ html, moreAvailable }) => {
                 if (html.trim() !== "") {
-                    // Додаємо нові товари до сітки
                     productsGrid.insertAdjacentHTML('beforeend', html);
                 }
-
-                // Показуємо або ховаємо кнопку "Завантажити ще"
                 if (moreAvailable) {
                     loadMoreBtn.style.display = 'inline-block';
                 } else {
@@ -679,7 +681,7 @@ function initLoadMore() {
             })
             .catch(error => {
                 console.error('Error loading more products:', error);
-                loadMoreBtn.style.display = 'inline-block'; // Показуємо кнопку знову в разі помилки
+                loadMoreBtn.style.display = 'inline-block';
             })
             .finally(() => {
                 if (loadingSpinner) loadingSpinner.style.display = 'none';
@@ -755,36 +757,6 @@ function initSearchLogic() {
             history = history.filter(item => item !== termToRemove);
             saveHistory(history);
             renderHistory(); // Re-render to show changes
-        }
-    });
-}
-
-function initShowMoreFilters() {
-    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
-        const limit = parseInt(list.dataset.showLimit, 10);
-        const items = Array.from(list.children);
-
-        if (items.length > limit) {
-            // Ховаємо всі елементи, що перевищують ліміт
-            for (let i = limit; i < items.length; i++) {
-                items[i].style.display = 'none';
-            }
-
-            // Створюємо та додаємо кнопку
-            const remainingCount = items.length - limit;
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'show-more-filters-btn';
-            button.textContent = `Ще ${remainingCount}`;
-            list.insertAdjacentElement('afterend', button);
-
-            // Додаємо обробник події для кнопки
-            button.addEventListener('click', () => {
-                for (let i = limit; i < items.length; i++) {
-                    items[i].style.display = ''; // Повертаємо стандартне відображення
-                }
-                button.remove(); // Видаляємо кнопку після використання
-            });
         }
     });
 }

@@ -11,38 +11,32 @@
 
     <div class="catalog-content">
         <aside class="filters-sidebar sticky-sidebar">
-            <form id="auto-filters-form" method="GET">
-                {# Передаємо існуючі фільтри, щоб не втратити їх при зміні категорії #}
-                {% for brand in selected_brands %}<input type="hidden" name="brand" value="{{ brand }}">{% endfor %}
-                {% if request.args.get('min_price') %}<input type="hidden" name="min_price" value="{{ request.args.get('min_price') }}">{% endif %}
-                {% if request.args.get('max_price') %}<input type="hidden" name="max_price" value="{{ request.args.get('max_price') }}">{% endif %}
-
-                <!-- ФІЛЬТР КАТЕГОРІЙ (НОВА, СПРОЩЕНА ЛОГІКА) -->
+            <form id="filters-form" method="GET" action="{{ url_for('catalog', category_slug=category_slug) }}">
+                <!-- ФІЛЬТР КАТЕГОРІЙ (НОВА, ПОКРАЩЕНА ЛОГІКА) -->
                 <div class="filter-group">
                     {% if current_category %}
-                        {# Посилання для повернення до батьківської категорії або до всіх категорій #}
-                        {% set back_link_filters = current_filters.copy() %}
-                        {# [ВИПРАВЛЕНО] Простий і надійний спосіб видалити ключ #}
-                        {% do back_link_filters.pop('category_slug', None) %}
+                        {# [НОВЕ] Готуємо параметри для посилань, щоб очищувати пошук #}
+                        {% set reset_params = current_filters.copy() %}
+                        {% do reset_params.pop('search', None) %}
 
-                        {# За замовчуванням посилання веде на головний каталог з усіма фільтрами, крім категорії #}
-                        {% set back_link_url = url_for('catalog', **back_link_filters) %}
+                        {# [НОВЕ] Визначаємо текст і URL для посилання "Назад" #}
+                        {% set back_link_text = 'Всі категорії' %}
+                        {% set back_link_url = url_for('catalog', **reset_params) %}
 
                         {% if main_category_of_current and current_category != main_category_of_current %}
-                            {# Якщо ми в підкатегорії, посилання веде на батьківську, зберігаючи інші фільтри #}
-                            {% set parent_filters = current_filters.copy() %}
-                            {% do parent_filters.setlist('category_slug', [main_category_of_current.lower().replace(' ', '-')]) %}
-                            {% set back_link_url = url_for('catalog', **parent_filters) %}
+                            {# Якщо ми в підкатегорії, посилання веде на батьківську #}
+                            {% set back_link_text = main_category_of_current %}
+                            {% set back_link_url = url_for('catalog', category_slug=main_category_of_current.lower().replace(' ', '-'), **reset_params) %}
                         {% endif %}
 
                         <a href="{{ back_link_url }}" class="back-to-categories-link">
                             <i class="fas fa-arrow-left"></i>
-                            <span>{{ main_category_of_current or 'Всі категорії' }}</span>
+                            <span>{{ back_link_text }}</span>
                         </a>
 
-                        {# Список підкатегорій, якщо вони є #}
-                        {% set subcategories = hierarchy.get(current_category, {}).get('subcategories', {}) %}
-                        {% if subcategories %}
+                        {# [НОВЕ] Показуємо підкатегорії тільки якщо вони є і ми в головній категорії #}
+                        {% set subcategories = hierarchy.get(main_category_of_current, {}).get('subcategories', {}) %}
+                        {% if subcategories and current_category == main_category_of_current %}
                         <div class="subcategory-list">
                             {% for subcat_name, count in subcategories.items() %}
                                 <a href="{{ url_for('catalog', category_slug=subcat_name.lower().replace(' ', '-'), **current_filters) }}" class="filter-category-link">
@@ -66,9 +60,7 @@
                         </div>
                     {% endif %}
                 </div>
-            </form>
 
-            <form id="filters-form" method="GET" action="{{ url_for('catalog', category_slug=category_slug) }}">
                 <!-- ФІЛЬТР ЦІНИ -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
@@ -83,63 +75,65 @@
 
         <!-- Основний контент з товарами -->
         <div class="products-container">
-            <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
-
+             <!-- [НОВЕ] Рядок пошуку (залишаємо як є, він працює) -->
             <div class="search-bar-container">
                 <form id="search-form" method="GET" action="{{ url_for('catalog') }}" class="search-form">
-                    <!-- Приховані поля для збереження фільтрів при пошуку -->
                     {% if category_slug %}<input type="hidden" name="category_slug" value="{{ category_slug }}">{% endif %}
                     {% if request.args.get('min_price') %}<input type="hidden" name="min_price" value="{{ request.args.get('min_price') }}">{% endif %}
                     {% if request.args.get('max_price') %}<input type="hidden" name="max_price" value="{{ request.args.get('max_price') }}">{% endif %}
-
                     <div class="search-input-wrapper">
                         <input type="search" name="search" id="search-input" value="{{ search_query or '' }}" placeholder="Я шукаю..." autocomplete="off">
-                        <button type="submit" class="search-btn" title="Знайти">
-                            <i class="fas fa-search"></i>
-                        </button>
-                        <!-- Контейнер для історії пошуку -->
+                        <button type="submit" class="search-btn" title="Знайти"><i class="fas fa-search"></i></button>
                         <div id="search-history-dropdown" class="search-history-dropdown"></div>
                     </div>
                 </form>
             </div>
 
-            <!-- [ВИПРАВЛЕНО] Повністю новий блок для відображення активних фільтрів -->
-            {% if current_category or selected_brands or request.args.get('min_price') or request.args.get('max_price') %}
+            <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
+
+            <!-- Блок з обраними фільтрами -->
+            {% if current_category or search_query %}
             <div class="selected-filters-bar">
                 <span>Обрані фільтри:</span>
 
                 {# Тег для обраної категорії #}
                 {% if current_category %}
-                     {# [ВИПРАВЛЕНО] Посилання для скидання категорії ��епер веде на головний каталог, ЗБЕРІГАЮЧИ інші фільтри #}
+                     {# [ВИПРАВЛЕНО] Посилання для скидання категорії очищує і пошук #}
                      {% set cat_reset_params = current_filters.copy() %}
-                     {% do cat_reset_params.pop('category_slug', None) %} {# Видаляємо саме slug, а не посилання #}
+                     {% do cat_reset_params.pop('category_slug', None) %}
+                     {% do cat_reset_params.pop('search', None) %}
                      <a href="{{ url_for('catalog', **cat_reset_params) }}" class="filter-tag category-tag">{{ current_category }} ×</a>
                 {% endif %}
 
-                {# Теги для видалення фільтра по ціні #}
-                {% if request.args.get('min_price') %}
-                    {% set new_params = current_filters.copy() %}{% do new_params.pop('min_price') %}
-                    <a href="{{ url_for('catalog', category_slug=category_slug, **new_params) }}" class="filter-tag">Від {{ request.args.get('min_price') }} ₴ ×</a>
-                {% endif %}
-                {% if request.args.get('max_price') %}
-                    {% set new_params = current_filters.copy() %}{% do new_params.pop('max_price') %}
-                    <a href="{{ url_for('catalog', category_slug=category_slug, **new_params) }}" class="filter-tag">До {{ request.args.get('max_price') }} ₴ ×</a>
+                {# Тег для пошукового запиту #}
+                {% if search_query %}
+                    {% set search_reset_params = current_filters.copy() %}
+                    {% do search_reset_params.pop('search', None) %}
+                    <a href="{{ url_for('catalog', category_slug=category_slug, **search_reset_params) }}" class="filter-tag">{{ search_query }} ×</a>
                 {% endif %}
 
-                {# Посилання "Скинути все" тепер веде на головний каталог без параметрів #}
+                {# Посилання "Скинути все" #}
                 <a href="{{ url_for('catalog') }}" class="filter-tag-reset">Скинути все</a>
             </div>
             {% endif %}
 
             {% if products.items %}
-                <div class="products-grid">
+                <div class="products-grid" id="products-grid-container">
                     {% for product in products.items %}
                         {% include '_product_card.html' %}
                     {% endfor %}
                 </div>
                  {% if products.has_next %}
                     <div class="load-more-container">
-                        <button id="load-more-btn" class="btn btn-outline btn-lg" data-category-slug="{{ category_slug or '' }}">Завантажити ще</button>
+                        {# [ВАЖЛИВО] Передаємо всі фільтри в кнопку #}
+                        <button id="load-more-btn"
+                                class="btn btn-outline btn-lg"
+                                data-category-slug="{{ category_slug or '' }}"
+                                data-search="{{ search_query or '' }}"
+                                data-min-price="{{ request.args.get('min_price', '') }}"
+                                data-max-price="{{ request.args.get('max_price', '') }}">
+                            Завантажити ще
+                        </button>
                         <div id="loading-spinner" style="display: none;">Завантаження...</div>
                     </div>
                 {% endif %}
