@@ -35,7 +35,6 @@
                     </div>
 
                     <div id="nova-poshta-fields-container">
-                        <input type="hidden" id="delivery_city_ref" name="delivery_city_ref">
                         <div class="form-group">
                             <label for="city-select-trigger">Населений пункт</label>
                             <div class="custom-select-trigger" id="city-select-trigger">
@@ -192,7 +191,6 @@ document.addEventListener('DOMContentLoaded', function() {
         let currentCityRef = null;
         let currentDeliveryType = 'У відділення';
 
-        // Перемикач "Відділення / Поштомат"
         deliveryTypeRadios.forEach(radio => {
             radio.addEventListener('change', function() {
                 currentDeliveryType = this.value;
@@ -214,6 +212,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const citySearchInput = document.getElementById('city-search-input');
             const popularCitiesList = document.getElementById('popular-cities-list');
             const searchCitiesList = document.getElementById('search-cities-list');
+            let searchTimeout;
+
             const popularCities = [
                 { name: "Київ", ref: "8d5a980d-391c-11dd-90d9-001a92567626" },
                 { name: "Одеса", ref: "e718a680-4b33-11e4-ab6d-005056801329" },
@@ -228,7 +228,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 li.dataset.name = city.name;
                 popularCitiesList.appendChild(li);
             });
-            let searchTimeout;
 
             citySelectTrigger.addEventListener('click', () => { cityModal.style.display = 'flex'; backdrop.style.display = 'block'; });
             [closeCityModalBtn, backdrop].forEach(el => el.addEventListener('click', closeCityModal));
@@ -236,9 +235,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             citySearchInput.addEventListener('input', function() {
                 const query = this.value.trim();
-                document.getElementById('popular-cities-list').style.display = query.length < 3 ? 'block' : 'none';
-                document.getElementById('search-cities-list').style.display = query.length >= 3 ? 'block' : 'none';
-                if (query.length < 3) return;
+                popularCitiesList.parentElement.style.display = query.length < 3 ? 'block' : 'none';
+                searchCitiesList.style.display = query.length >= 3 ? 'block' : 'none';
+                if (query.length < 3) { searchCitiesList.innerHTML = ''; return; }
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => fetchCities(query), 300);
             });
@@ -260,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             li.dataset.name = city.name;
                             searchCitiesList.appendChild(li);
                         });
-                    } else { searchCitiesList.innerHTML = '<li style="cursor:default;">Нічого не знайдено</li>'; }
+                    } else { searchCitiesList.innerHTML = '<li style="cursor:default; color:#888;">Нічого не знайдено</li>'; }
                 });
             }
 
@@ -293,12 +292,66 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Універсальні функції для кастомного Select
-    function initCustomSelect(triggerId, hiddenInputName) { /* ... код без змін ... */ }
-    function updateCustomSelect(triggerId, items, placeholder, disabled) { /* ... код без змін ... */ }
-    document.addEventListener('click', function() { /* ... код без змін ... */ });
+    function initCustomSelect(triggerId, hiddenInputName) {
+        const trigger = document.getElementById(triggerId);
+        const optionsContainer = document.getElementById(triggerId.replace('-trigger', '-options-container'));
+        const hiddenInput = document.querySelector(`input[name="${hiddenInputName}"]`);
 
-    // --- Інші допоміжні функції ---
+        trigger.addEventListener('click', function(e) {
+            if (trigger.dataset.disabled === 'true') return;
+            e.stopPropagation();
+            const isOpen = !optionsContainer.classList.contains('open');
+            closeAllCustomSelects();
+            if (isOpen) {
+                optionsContainer.classList.add('open');
+                trigger.classList.add('open');
+            }
+        });
+
+        optionsContainer.addEventListener('click', function(e) {
+            if (e.target && e.target.classList.contains('option-placeholder')) return;
+            if (e.target && e.target.tagName === 'DIV') {
+                const value = e.target.textContent;
+                trigger.querySelector('span').textContent = value;
+                if (hiddenInput) hiddenInput.value = value;
+                trigger.classList.add('selected');
+                closeAllCustomSelects();
+            }
+        });
+    }
+
+    function updateCustomSelect(triggerId, items, placeholder, disabled) {
+        const trigger = document.getElementById(triggerId);
+        const optionsContainer = document.getElementById(triggerId.replace('-trigger', '-options-container'));
+        const hiddenInput = document.querySelector(`input[name="${triggerId.replace('-select-trigger', '')}"]`);
+
+        trigger.querySelector('span').textContent = placeholder;
+        trigger.dataset.disabled = String(disabled);
+        trigger.classList.remove('selected');
+        if(hiddenInput) hiddenInput.value = '';
+
+        optionsContainer.innerHTML = '';
+        if (items && items.length > 0) {
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.textContent = item;
+                optionsContainer.appendChild(div);
+            });
+        } else {
+             const div = document.createElement('div');
+             div.className = 'option-placeholder';
+             div.textContent = placeholder;
+             optionsContainer.appendChild(div);
+        }
+    }
+
+    function closeAllCustomSelects() {
+        document.querySelectorAll('.custom-select-options.open').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('.custom-select-trigger.open').forEach(el => el.classList.remove('open'));
+    }
+
+    document.addEventListener('click', closeAllCustomSelects);
+
     function formatPhoneNumber(value) {
         if (!value) return '';
         let digits = value.replace(/\D/g, '');
@@ -307,134 +360,37 @@ document.addEventListener('DOMContentLoaded', function() {
         else if (digits.startsWith('0')) digits = digits.substring(1);
         digits = digits.substring(0, 9);
         const len = digits.length;
-        if (len === 0) return '';
+        if (len === 0) return '+380 (';
         if (len <= 2) return `+380 (${digits}`;
         if (len <= 5) return `+380 (${digits.substring(0, 2)}) ${digits.substring(2)}`;
         if (len <= 7) return `+380 (${digits.substring(0, 2)}) ${digits.substring(2, 5)}-${digits.substring(5)}`;
         return `+380 (${digits.substring(0, 2)}) ${digits.substring(2, 5)}-${digits.substring(5, 7)}-${digits.substring(7, 9)}`;
     }
-
     function setupCommentField() {
         const toggle = document.getElementById('comment-toggle');
         const content = document.getElementById('comment-content');
         const textarea = document.getElementById('order_comment');
         const counter = document.getElementById('comment-char-counter');
         const maxLength = 254;
-
         if (!toggle || !content) return;
-
         toggle.addEventListener('click', () => {
             toggle.classList.toggle('active');
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-            } else {
-                content.style.display = 'none';
-            }
+            content.style.display = (content.style.display === 'none') ? 'block' : 'none';
         });
-
         textarea.addEventListener('input', () => {
-            const remaining = maxLength - textarea.value.length;
-            counter.textContent = `Залишилось символів: ${remaining}`;
+            counter.textContent = `Залишилось символів: ${maxLength - textarea.value.length}`;
         });
     }
-
-    function setupDeliveryLogic() {
-        const deliveryGroup = document.getElementById('delivery-method-group');
-        const novaPoshtaDetails = document.getElementById('nova-poshta-details');
-        const cityInput = document.getElementById('delivery_city');
-        const citySuggestions = document.getElementById('city-suggestions');
-        const warehouseSelect = document.getElementById('delivery_warehouse');
-        let searchTimeout;
-
-        deliveryGroup.addEventListener('change', (e) => {
-            const isNovaPoshta = e.target.value === 'Нова Пошта';
-            novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
-            cityInput.required = isNovaPoshta;
-            warehouseSelect.required = isNovaPoshta;
-        });
-
-        cityInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            const query = this.value.trim();
-
-            if (query.length < 2) {
-                citySuggestions.style.display = 'none';
-                return;
-            }
-
-            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Пошук...</div>';
-            citySuggestions.style.display = 'block';
-
-            searchTimeout = setTimeout(() => {
-                fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
-                    .then(res => res.json())
-                    .then(cities => {
-                        citySuggestions.innerHTML = '';
-                        if (cities.length > 0) {
-                            cities.forEach(city => {
-                                const item = document.createElement('div');
-                                item.className = 'suggestion-item';
-                                item.textContent = city.name;
-                                item.dataset.ref = city.ref;
-                                item.addEventListener('click', () => selectCity(city));
-                                citySuggestions.appendChild(item);
-                            });
-                        } else {
-                            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Нічого не знайдено</div>';
-                        }
-                    });
-            }, 300);
-        });
-
-        function selectCity(city) {
-            cityInput.value = city.name;
-            citySuggestions.style.display = 'none';
-            fetchWarehouses(city.ref);
-        }
-
-        function fetchWarehouses(cityRef) {
-            warehouseSelect.disabled = true;
-            warehouseSelect.innerHTML = '<option value="">Завантаження відділень...</option>';
-
-            fetch(`/api/np/warehouses?city_ref=${cityRef}`)
-                .then(res => res.json())
-                .then(warehouses => {
-                    warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення або поштомат --</option>';
-                    if (warehouses && warehouses.length > 0 && !warehouses.error) {
-                        warehouses.forEach(wh => {
-                            const option = new Option(wh, wh);
-                            warehouseSelect.add(option);
-                        });
-                        warehouseSelect.disabled = false;
-                    } else {
-                        warehouseSelect.innerHTML = `<option value="">${warehouses.error || 'Відділення не знайдені'}</option>`;
-                    }
-                });
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!cityInput.contains(e.target) && !citySuggestions.contains(e.target)) {
-                citySuggestions.style.display = 'none';
-            }
-        });
-    }
-
-    // Решта функцій без змін
     function setupRadioGroups() {
-        document.querySelectorAll('.radio-group').forEach(group => {
+        document.querySelectorAll('.radio-group, .delivery-type-selector').forEach(group => {
             group.addEventListener('change', e => {
-                const radio = e.target;
-                const label = radio.closest('.radio-option');
+                if (e.target.type !== 'radio') return;
+                const label = e.target.closest('label');
                 if (!label) return;
-                group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
-                label.classList.add('active');
+                group.querySelectorAll('label').forEach(opt => opt.querySelector('input:checked') ? null : null);
             });
-             // Initial active state
-            const checked = group.querySelector('input:checked');
-            if (checked) checked.closest('.radio-option').classList.add('active');
         });
     }
-
     function loadCartSummary() {
         fetch('/get_cart').then(res => res.json()).then(data => {
             const listContainer = document.getElementById('summary-item-list');
@@ -443,35 +399,27 @@ document.addEventListener('DOMContentLoaded', function() {
             listContainer.innerHTML = '';
             if (data.items.length > 0) {
                 data.items.forEach(item => {
-                    listContainer.insertAdjacentHTML('beforeend', `
-                        <div class="summary-item">
-                            <img src="${item.image}" alt="${item.name}">
-                            <div class="summary-item-details">
-                                <div class="name">${item.name}</div>
-                                <div class="price">${item.quantity} x ${item.price.toFixed(2)} ₴</div>
-                            </div>
-                        </div>`);
+                    listContainer.insertAdjacentHTML('beforeend', `<div class="summary-item"><img src="${item.image}" alt="${item.name}"><div class="summary-item-details"><div class="name">${item.name}</div><div class="price">${item.quantity} x ${item.price.toFixed(2)} ₴</div></div></div>`);
                 });
             }
             subtotalEl.textContent = `${data.total.toFixed(2)} ₴`;
             grandTotalEl.textContent = `${data.total.toFixed(2)} ₴`;
         });
     }
-
     function setupEnterKeyNavigation() {
         const form = document.getElementById('checkout-form');
         if (!form) return;
         form.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'delivery_city') {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'city-search-input') {
                 e.preventDefault();
-                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), select')).filter(el => !el.disabled);
+                const inputs = Array.from(form.querySelectorAll('input:not([type="radio"]), .custom-select-trigger')).filter(el => {
+                    const style = window.getComputedStyle(el);
+                    return style.display !== 'none' && style.visibility !== 'hidden';
+                });
                 const currentIndex = inputs.indexOf(e.target);
                 const nextInput = inputs[currentIndex + 1];
-                if (nextInput) {
-                    nextInput.focus();
-                } else {
-                    form.querySelector('button[type="submit"]').focus();
-                }
+                if (nextInput) nextInput.focus();
+                else form.querySelector('button[type="submit"]').focus();
             }
         });
     }
