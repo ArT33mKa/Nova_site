@@ -96,7 +96,7 @@ function switchAuthTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
 }
 
-// [ЗМІНЕНО] Фун��ц��я тепер приймає залежності
+// [ЗМІНЕНО] Функц��я тепер приймає залежності
 function initCabinetModal(pageOverlay, closeAllSidebars) {
     const cabinetModal = document.getElementById('cabinet-modal');
     if (!cabinetModal) return;
@@ -452,6 +452,7 @@ function initContactForm() {
                 showToast(data.message, data.status === 'success' ? 'success' : 'error');
                 if (data.status === 'success') this.reset();
             }).catch(() => showToast('Сталася помилка при відправці.', 'error'));
+        });
     }
 }
 
@@ -785,35 +786,6 @@ function initAutoApplyFilters() {
         // Застосовуємо з затримкою для полів вводу (ціна)
         if (e.target.type === 'number') {
             debouncedSubmit();
-        }
-    });
-}
-
-function initShowMoreFilters() {
-    document.querySelectorAll('.filter-options-list').forEach(list => {
-        const items = list.querySelectorAll('.checkbox-item');
-        const showLimit = parseInt(list.dataset.showLimit) || 5;
-
-        if (items.length > showLimit) {
-            // Приховуємо елементи після ліміту
-            for (let i = showLimit; i < items.length; i++) {
-                items[i].style.display = 'none';
-            }
-
-            // Створюємо кнопку "Показати ще"
-            const showMoreBtn = document.createElement('button');
-            showMoreBtn.className = 'show-more-filters-btn';
-            showMoreBtn.textContent = 'Показати ще';
-            list.appendChild(showMoreBtn);
-
-            let isExpanded = false;
-            showMoreBtn.addEventListener('click', () => {
-                isExpanded = !isExpanded;
-                for (let i = showLimit; i < items.length; i++) {
-                    items[i].style.display = isExpanded ? 'flex' : 'none';
-                }
-                showMoreBtn.textContent = isExpanded ? 'Показати менше' : 'Показати ще';
-            });
         }
     });
 }
