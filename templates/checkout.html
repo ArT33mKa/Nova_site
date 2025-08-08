@@ -24,7 +24,7 @@
                         <span class="icon">2</span><h4>Доставка "Нова Пошта"</h4>
                     </div>
                     <div class="delivery-type-selector">
-                        {# [ЗМІНЕНО] Значення (value) тепер відповідають API: 'branch' та 'postomat' #}
+                        {# [ВИПРАВЛЕНО] Значення (value) тепер відповідають API: 'branch' та 'postomat' #}
                         <label class="delivery-type-option">
                             <input type="radio" name="delivery_method_type" value="branch" checked>
                             <div class="delivery-type-card">У відділення</div>
@@ -40,14 +40,14 @@
                     <div id="nova-poshta-fields-container">
                         <div class="form-group">
                             <label for="delivery_city_display">Населений пункт</label>
-                             {# [ЗМІНЕНО] Цей блок тепер просто тригер для модального вікна #}
+                             {# [ВИПРАВЛЕНО] Цей блок тепер просто тригер для модального вікна #}
                             <div class="custom-select-trigger" id="city-select-trigger">
                                 <span id="delivery_city_display_text">Вкажіть населений пункт</span>
                                 <i class="fas fa-chevron-down"></i>
                             </div>
                             <input type="hidden" name="delivery_city" id="delivery_city_input" required>
                         </div>
-                        {# [ЗМІНЕНО] Замість кастомного селекту тепер надійний стандартний <select> #}
+                        {# [ВИПРАВЛЕНО] Замість кастомного селекту тепер надійний стандартний <select> #}
                         <div class="form-group" id="warehouse-form-group" style="display: none;">
                             <label id="warehouse-label" for="delivery_warehouse_select">Відділення</label>
                             <select name="delivery_warehouse" id="delivery_warehouse_select" class="form-control" required disabled>
@@ -67,7 +67,6 @@
                     </div>
                 </section>
 
-                {# [ВИПРАВЛЕНО] Поле для коментаря тепер працює #}
                 <section class="checkout-section" id="comment-section">
                     <div id="comment-toggle" class="comment-toggle"><span>Коментар до замовлення</span><i class="fas fa-chevron-down"></i></div>
                     <div id="comment-content" class="comment-content" style="display: none;">
@@ -111,7 +110,6 @@
 {% endblock %}
 
 {% block extra_css %}
-{# Ваші CSS стилі залишаються майже без змін, я лише трохи їх почистив #}
 <style>
 .delivery-type-selector { display: flex; gap: 10px; margin-bottom: 20px; }
 .delivery-type-option { flex: 1; }
@@ -144,7 +142,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{# [КЛЮЧОВЕ ВИПРАВЛЕННЯ] Повністю новий, чистий та робочий JavaScript #}
+{# [КЛЮЧОВЕ ВИПРАВЛЕННЯ] Повністю новий, чистий та робочий JavaScript для Нової Пошти #}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     setupRadioGroups();
@@ -152,164 +150,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initNovaPoshtaSelector();
     setupCommentField();
 
-    // --- Ініціалізація маски для телефону (без змін) ---
-    const phoneInput = document.getElementById('customer_phone');
-    if (phoneInput) {
-        if (phoneInput.value) { phoneInput.value = formatPhoneNumber(phoneInput.value); }
-        phoneInput.addEventListener('input', e => {
-            const pos = e.target.selectionStart;
-            const originalLength = e.target.value.length;
-            e.target.value = formatPhoneNumber(e.target.value);
-            const newLength = e.target.value.length;
-            e.target.selectionEnd = pos + (newLength - originalLength);
-        });
-        phoneInput.addEventListener('blur', e => {
-            if (e.target.value === '+380 (') { e.target.value = ''; }
-        });
-    }
-
-    // --- ОСНОВНА ЛОГІКА ДЛЯ НОВОЇ ПОШТИ (ПОВНІСТЮ ПЕРЕПИСАНА) ---
-    function initNovaPoshtaSelector() {
-        // Отримуємо всі необхідні елементи з DOM
-        const deliveryTypeRadios = document.querySelectorAll('input[name="delivery_method_type"]');
-        const citySelectTrigger = document.getElementById('city-select-trigger');
-        const warehouseFormGroup = document.getElementById('warehouse-form-group');
-        const warehouseSelect = document.getElementById('delivery_warehouse_select');
-        const warehouseLabel = document.getElementById('warehouse-label');
-
-        const cityModal = document.getElementById('city-modal');
-        const backdrop = document.getElementById('modal-backdrop');
-        const closeCityModalBtn = document.getElementById('close-city-modal-btn');
-        const citySearchInput = document.getElementById('city-search-input');
-        const citiesList = document.getElementById('cities-list');
-
-        let cityRef = null; // Зберігаємо Ref обраного міста
-        let searchTimeout;
-
-        // 1. Обробник перемикання типу доставки (Відділення / Поштомат)
-        deliveryTypeRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                const deliveryType = document.querySelector('input[name="delivery_method_type"]:checked').value;
-                warehouseLabel.textContent = deliveryType === 'branch' ? 'Відділення' : 'Поштомат';
-                // Якщо місто вже обрано, оновлюємо список відділень
-                if (cityRef) {
-                    fetchWarehouses(cityRef, deliveryType);
-                }
-            });
-        });
-
-        // 2. Логіка модального вікна для вибору міста
-        citySelectTrigger.addEventListener('click', () => {
-            cityModal.style.display = 'flex';
-            backdrop.style.display = 'block';
-        });
-
-        const closeModal = () => {
-            cityModal.style.display = 'none';
-            backdrop.style.display = 'none';
-        }
-        closeCityModalBtn.addEventListener('click', closeModal);
-        backdrop.addEventListener('click', closeModal);
-
-        // 3. Пошук міст при вводі в поле
-        citySearchInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            const query = citySearchInput.value.trim();
-            if (query.length < 2) {
-                citiesList.innerHTML = '<li>Введіть мінімум 2 символи</li>';
-                return;
-            }
-            citiesList.innerHTML = '<li>Завантаження...</li>';
-            searchTimeout = setTimeout(() => fetchCities(query), 300);
-        });
-
-        // 4. Функція для запиту списку міст з API
-        function fetchCities(query) {
-            fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
-                .then(res => res.json())
-                .then(data => {
-                    citiesList.innerHTML = '';
-                    if (data.length > 0) {
-                        data.forEach(city => {
-                            const li = document.createElement('li');
-                            li.textContent = city.name;
-                            li.dataset.ref = city.ref;
-                            li.dataset.name = city.name;
-                            li.addEventListener('click', () => selectCity(city));
-                            citiesList.appendChild(li);
-                        });
-                    } else {
-                        citiesList.innerHTML = '<li>Нічого не знайдено</li>';
-                    }
-                })
-                .catch(() => citiesList.innerHTML = '<li>Помилка завантаження</li>');
-        }
-
-        // 5. Функція, що виконується при виборі міста
-        function selectCity(city) {
-            cityRef = city.ref;
-            document.getElementById('city-select-trigger').classList.add('selected');
-            document.getElementById('delivery_city_display_text').textContent = city.name;
-            document.getElementById('delivery_city_input').value = city.name;
-            closeModal();
-
-            // Показуємо блок вибору відділень
-            warehouseFormGroup.style.display = 'block';
-            const deliveryType = document.querySelector('input[name="delivery_method_type"]:checked').value;
-            fetchWarehouses(cityRef, deliveryType);
-        }
-
-        // 6. Функція для завантаження відділень/поштоматів
-        function fetchWarehouses(currentCityRef, deliveryType) {
-            warehouseSelect.disabled = true;
-            warehouseSelect.innerHTML = '<option>Завантаження...</option>';
-            const warehouseTypeName = deliveryType === 'branch' ? 'відділення' : 'поштомат';
-
-            // [КЛЮЧОВИЙ ФІКС] Передаємо `type` в запиті
-            fetch(`/api/np/warehouses?city_ref=${currentCityRef}&type=${deliveryType}`)
-                .then(res => res.json())
-                .then(data => {
-                    warehouseSelect.innerHTML = `<option value="">-- Оберіть ${warehouseTypeName} --</option>`;
-                    if (data && data.length > 0 && !data.error) {
-                        data.forEach(wh => {
-                            warehouseSelect.add(new Option(wh, wh));
-                        });
-                        warehouseSelect.disabled = false;
-                    } else {
-                        warehouseSelect.innerHTML = `<option value="">${data.error || `${warehouseTypeName.charAt(0).toUpperCase() + warehouseTypeName.slice(1)} не знайдені`}</option>`;
-                    }
-                });
-        }
-    }
-
-    // --- ЛОГІКА ДЛЯ КОМЕНТАРЯ (ВИПРАВЛЕНО) ---
-    function setupCommentField() {
-        const toggle = document.getElementById('comment-toggle');
-        const content = document.getElementById('comment-content');
-        const textarea = document.getElementById('order_comment');
-        const counter = document.getElementById('comment-char-counter');
-        const maxLength = 254;
-
-        if (!toggle || !content || !textarea || !counter) return;
-
-        toggle.addEventListener('click', () => {
-            toggle.classList.toggle('active');
-            // Плавне відкриття/закриття
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-            } else {
-                content.style.display = 'none';
-            }
-        });
-
-        textarea.addEventListener('input', () => {
-            const remaining = maxLength - textarea.value.length;
-            counter.textContent = `Залишилось символів: ${remaining}`;
-        });
-    }
-
-
-    // --- Решта допоміжних функцій (без значних змін) ---
     function formatPhoneNumber(value) {
         if (!value) return '';
         let digits = value.replace(/\D/g, '');
@@ -324,13 +164,143 @@ document.addEventListener('DOMContentLoaded', function() {
         if (len <= 7) return `+380 (${digits.substring(0, 2)}) ${digits.substring(2, 5)}-${digits.substring(5)}`;
         return `+380 (${digits.substring(0, 2)}) ${digits.substring(2, 5)}-${digits.substring(5, 7)}-${digits.substring(7, 9)}`;
     }
+    const phoneInput = document.getElementById('customer_phone');
+    if(phoneInput) {
+        phoneInput.addEventListener('input', e => { e.target.value = formatPhoneNumber(e.target.value); });
+    }
+
+    function initNovaPoshtaSelector() {
+        const deliveryTypeRadios = document.querySelectorAll('input[name="delivery_method_type"]');
+        const citySelectTrigger = document.getElementById('city-select-trigger');
+        const warehouseFormGroup = document.getElementById('warehouse-form-group');
+        const warehouseSelect = document.getElementById('delivery_warehouse_select');
+        const warehouseLabel = document.getElementById('warehouse-label');
+
+        const cityModal = document.getElementById('city-modal');
+        const backdrop = document.getElementById('modal-backdrop');
+        const closeCityModalBtn = document.getElementById('close-city-modal-btn');
+        const citySearchInput = document.getElementById('city-search-input');
+        const citiesList = document.getElementById('cities-list');
+
+        let cityRef = null;
+        let searchTimeout;
+
+        deliveryTypeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const deliveryType = document.querySelector('input[name="delivery_method_type"]:checked').value;
+                warehouseLabel.textContent = deliveryType === 'branch' ? 'Відділення' : 'Поштомат';
+                if (cityRef) {
+                    fetchWarehouses(cityRef, deliveryType);
+                }
+            });
+        });
+
+        const openModal = () => { cityModal.style.display = 'flex'; backdrop.style.display = 'block'; citySearchInput.focus(); };
+        const closeModal = () => { cityModal.style.display = 'none'; backdrop.style.display = 'none'; };
+
+        citySelectTrigger.addEventListener('click', openModal);
+        closeCityModalBtn.addEventListener('click', closeModal);
+        backdrop.addEventListener('click', closeModal);
+
+        citySearchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            const query = citySearchInput.value.trim();
+            const prompt = document.querySelector('.city-search-prompt');
+            if (query.length < 2) {
+                citiesList.innerHTML = '';
+                if(prompt) prompt.textContent = 'Введіть мінімум 2 символи для пошуку';
+                return;
+            }
+            if(prompt) prompt.textContent = 'Завантаження...';
+            citiesList.innerHTML = '';
+            searchTimeout = setTimeout(() => fetchCities(query), 300);
+        });
+
+        function fetchCities(query) {
+            const prompt = document.querySelector('.city-search-prompt');
+            fetch(`/api/np/cities?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        if(prompt) prompt.style.display = 'none';
+                        data.forEach(city => {
+                            const li = document.createElement('li');
+                            li.textContent = city.name;
+                            li.dataset.ref = city.ref;
+                            li.dataset.name = city.name;
+                            li.addEventListener('click', () => selectCity(city));
+                            citiesList.appendChild(li);
+                        });
+                    } else {
+                        if(prompt) {
+                            prompt.style.display = 'block';
+                            prompt.textContent = 'Нічого не знайдено. Спробуйте інший запит.';
+                        }
+                    }
+                })
+                .catch(() => { if(prompt) prompt.textContent = 'Помилка завантаження міст.' });
+        }
+
+        function selectCity(city) {
+            cityRef = city.ref;
+            document.getElementById('delivery_city_display_text').textContent = city.name;
+            document.getElementById('delivery_city_input').value = city.name;
+            citySelectTrigger.classList.add('selected');
+            closeModal();
+
+            warehouseFormGroup.style.display = 'block';
+            const deliveryType = document.querySelector('input[name="delivery_method_type"]:checked').value;
+            fetchWarehouses(cityRef, deliveryType);
+        }
+
+        function fetchWarehouses(currentCityRef, deliveryType) {
+            warehouseSelect.disabled = true;
+            warehouseSelect.innerHTML = '<option>Завантаження...</option>';
+            const warehouseTypeName = deliveryType === 'branch' ? 'відділення' : 'поштомат';
+
+            fetch(`/api/np/warehouses?city_ref=${currentCityRef}&type=${deliveryType}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                         warehouseSelect.innerHTML = `<option value="">${data.error}</option>`;
+                         return;
+                    }
+                    if (data && data.length > 0) {
+                        warehouseSelect.innerHTML = `<option value="">-- Оберіть ${warehouseTypeName} --</option>`;
+                        data.forEach(wh => {
+                            warehouseSelect.add(new Option(wh, wh));
+                        });
+                        warehouseSelect.disabled = false;
+                    } else {
+                        warehouseSelect.innerHTML = `<option value="">${warehouseTypeName.charAt(0).toUpperCase() + warehouseTypeName.slice(1)} не знайдені</option>`;
+                    }
+                });
+        }
+    }
+
+    function setupCommentField() {
+        const toggle = document.getElementById('comment-toggle');
+        const content = document.getElementById('comment-content');
+        const textarea = document.getElementById('order_comment');
+        const counter = document.getElementById('comment-char-counter');
+        if (!toggle || !content || !textarea || !counter) return;
+
+        const maxLength = 254;
+        toggle.addEventListener('click', () => {
+            const isHidden = content.style.display === 'none';
+            content.style.display = isHidden ? 'block' : 'none';
+            toggle.classList.toggle('active', isHidden);
+        });
+        textarea.addEventListener('input', () => {
+            const remaining = maxLength - textarea.value.length;
+            counter.textContent = `Залишилось символів: ${remaining}`;
+        });
+    }
 
     function setupRadioGroups() {
         document.querySelectorAll('.delivery-type-selector, .radio-group').forEach(group => {
-            // Set initial active state
             const checked = group.querySelector('input:checked');
             if (checked) checked.closest('label').classList.add('active');
-
             group.addEventListener('change', e => {
                 if (e.target.type === 'radio') {
                     const parentLabel = e.target.closest('label');
@@ -347,6 +317,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const listContainer = document.getElementById('summary-item-list');
             const subtotalEl = document.getElementById('summary-subtotal');
             const grandTotalEl = document.getElementById('summary-grand-total');
+            if(!listContainer || !subtotalEl || !grandTotalEl) return;
+
             listContainer.innerHTML = '';
             if (data.items.length > 0) {
                 data.items.forEach(item => {
@@ -367,81 +339,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-2. app.py (Дрібне, але важливе виправлення в API)
-У вашому API для "Нової Пошти" потрібно було трохи покращити логіку, щоб вона надійніше обробляла різні типи відділень.
-code
-Python
-# Замініть вашу функцію get_np_warehouses на цю
-@app.route('/api/np/warehouses')
-def get_np_warehouses():
-    """Отримання відділень АБО поштоматів для населеного пункту."""
-    api_key = os.getenv('NOVA_POSHTA_API_KEY')
-    city_ref = request.args.get('city_ref', '')
-    warehouse_type = request.args.get('type', 'branch')  # 'branch' або 'postomat', за замовчуванням 'branch'
-
-    if not api_key:
-        return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
-    if not city_ref:
-        return jsonify([])
-
-    # Словник з Ref ID для типів відділень
-    warehouse_type_refs = {
-        "postomat": "f9316480-5f2d-425d-bc2c-ac73a02de323", # Поштомати
-        "branch": "6f8c7162-4b72-4b0a-88e5-906948c6a92f,841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28" # Вантажні та поштові відділення
-    }
-
-    method_properties = {
-        "SettlementRef": city_ref,
-        # Додаємо фільтр за типом, якщо він є в нашому словнику
-        "TypeOfWarehouseRef": warehouse_type_refs.get(warehouse_type)
-    }
-
-    payload = {
-        "apiKey": api_key,
-        "modelName": "AddressGeneral",
-        "calledMethod": "getWarehouses",
-        "methodProperties": method_properties
-    }
-
-    try:
-        response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=7)
-        response.raise_for_status()
-        data = response.json()
-        if data['success']:
-            all_warehouses = data.get('data', [])
-            # Повертаємо тільки опис (назву) відділення
-            return jsonify([w['Description'] for w in all_warehouses])
-        return jsonify([]) # Повертаємо порожній список, якщо запит успішний, але даних нема
-    except requests.exceptions.RequestException as e:
-        print(f"Помилка API Нової Пошти (відділення): {e}")
-        return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
-3. cart.html (Невелике виправлення)
-Я помітив, що зображення товару у кошику могло не відображатися, а також кнопки +/- не мали data-id, що могло викликати проблеми з їх роботою.
-code
-Html
-<!-- Знайдіть цей блок у файлі cart.html і замініть його -->
-<div class="cart-item-row" data-id="{{ item.product.id }}">
-    <div class="cart-item-image">
-        <a href="{{ url_for('product_detail', product_id=item.product.id) }}">
-            {# [ВИПРАВЛЕНО] Використовуємо правильну змінну для зображення #}
-            <img src="{{ item.product.image }}" alt="{{ item.product.name }}">
-        </a>
-    </div>
-    <div class="cart-item-details">
-        <a href="{{ url_for('product_detail', product_id=item.product.id) }}"><strong>{{ item.product.name }}</strong></a>
-        <div class="text-muted">{{ "%.2f"|format(item.product.price) }} ₴ / шт.</div>
-    </div>
-    <div class="cart-item-quantity-controls">
-        {# [ВИПРАВЛЕНО] Додано data-id для коректної роботи JS #}
-        <button class="qty-btn minus" data-id="{{ item.product.id }}">-</button>
-        <span class="quantity-display">{{ item.quantity }}</span>
-        <button class="qty-btn plus" data-id="{{ item.product.id }}">+</button>
-    </div>
-    <div class="cart-item-price">
-        <strong id="item-total-{{ item.product.id }}">{{ "%.2f"|format(item.item_total) }} ₴</strong>
-    </div>
-    <div class="cart-item-remove">
-        <button class="remove-from-cart-btn" data-id="{{ item.product.id }}" title="Видалити">×</button>
-    </div>
-</div>
-Після заміни цих файлів все має запрацювати як очікується. Просто скопіюйте вміст наданих блоків у відповідні файли вашого проєкту.

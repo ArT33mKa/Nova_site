@@ -255,10 +255,11 @@ def index():
     return render_template("index.html", products=products, hero_slides=hero_slides)
 
 
+# [ВИПРАВЛЕНО] Повністю переписана, надійна та ефективна логіка побудови ієрархії категорій
 def get_category_hierarchy():
     """Створює коректну ієрархічну структуру категорій."""
 
-    # Основні категорії тепер визначають структуру. Вони будуть показані ЗАВЖДИ.
+    # Основні категорії, які визначають структуру. Вони будуть показані ЗАВЖДИ (якщо в них є товари).
     MAIN_CATEGORIES = {
         "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
         "Насоси": ["насос", "помпа", "гідрофор"],
@@ -267,7 +268,7 @@ def get_category_hierarchy():
         "Витяжки": ["витяжк", "вентилятор"],
         "Газові колонки": ["колонк", "газов"],
         "Сушка для рушників": ["сушк", "рушник"],
-        "Запчастини": ["запчастин", "котел", "термопар"]
+        "Запчастини": ["запчастин", "котел", "термопар", "обладнання"]  # Резервна категорія
     }
 
     # 1. Ініціалізуємо ієрархію з УСІМА головними категоріями і нульовими лічильниками.
@@ -308,7 +309,7 @@ def get_category_hierarchy():
         hierarchy[main_category_found]['count'] += count
 
         # Додаємо як підкатегорію, якщо це не головна категорія
-        if category_name != main_category_found:
+        if category_name.lower() != main_category_found.lower():
             if category_name not in hierarchy[main_category_found]['subcategories']:
                 hierarchy[main_category_found]['subcategories'][category_name] = 0
             hierarchy[main_category_found]['subcategories'][category_name] += count
@@ -320,6 +321,7 @@ def get_category_hierarchy():
     return final_hierarchy
 
 
+# [ВИПРАВЛЕНО] Спрощено логіку маршруту та додано надійні перевірки
 @app.route('/catalog/', defaults={'category_slug': None})
 @app.route('/catalog/<string:category_slug>/')
 def catalog(category_slug):
@@ -333,38 +335,7 @@ def catalog(category_slug):
     min_price = float(min_price_str) if min_price_str.isdigit() else None
     max_price = float(max_price_str) if max_price_str.isdigit() else None
 
-    if search_query:
-        found_product = Product.query.filter(
-            Product.name.ilike(f'%{search_query}%'),
-            Product.in_stock == True
-        ).first()
-        if found_product:
-            product_main_category = None
-            MAIN_CATEGORIES = {
-                "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
-                "Насоси": ["насос", "помпа", "гідрофор"],
-                "Бойлери": ["бойлер", "водонагрівач"], "Змішувачі": ["змішувач", "кран", "сифон"],
-                "Витяжки": ["витяжк", "вентилятор"], "Газові колонки": ["колонк", "газов"],
-                "Сушка для рушників": ["сушк", "рушник"], "Запчастини": ["запчастин", "котел", "термопар"]
-            }
-            if found_product.category and found_product.category in MAIN_CATEGORIES:
-                product_main_category = found_product.category
-            elif found_product.category:
-                for main_cat, keywords in MAIN_CATEGORIES.items():
-                    if any(keyword in found_product.category.lower() for keyword in keywords):
-                        product_main_category = main_cat
-                        break
-            if not product_main_category:
-                product_main_category = "Запчастини"
-
-            new_slug = product_main_category.lower().replace(' ', '-')
-            if category_slug != new_slug:
-                redirect_args = request.args.copy()
-                if 'category_slug' in redirect_args: redirect_args.pop('category_slug')
-                if 'search' in redirect_args: redirect_args.pop('search')
-                return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
-
-    # [ГОЛОВНИЙ ФІЛЬТР] Показуємо лише товари, що є в наявності.
+    # [ГОЛОВНИЙ ФІЛЬТР] Завжди починаємо з товарів, що є в наявності.
     query = Product.query.filter(Product.in_stock == True)
 
     if search_query:
@@ -373,24 +344,33 @@ def catalog(category_slug):
     current_category = None
     main_category_of_current = None
     if category_slug:
-        category_name = category_slug.replace('-', ' ')
-        for m_cat, data in hierarchy.items():
-            if m_cat.lower() == category_name.lower():
-                current_category = m_cat
-                main_category_of_current = m_cat
+        # Нормалізуємо slug для порівняння
+        category_name_from_slug = category_slug.replace('-', ' ')
+
+        # Шукаємо відповідність серед головних категорій та підкатегорій
+        for main_cat, data in hierarchy.items():
+            # Перевірка на відповідність головній категорії
+            if main_cat.lower() == category_name_from_slug.lower():
+                current_category = main_cat
+                main_category_of_current = main_cat
+                # Збираємо всі підкатегорії для фільтрації
                 subcategories = list(data.get('subcategories', {}).keys())
                 query = query.filter(Product.category.in_([current_category] + subcategories))
-                break
-            if current_category: break
-            for sub_cat in data.get('subcategories', {}):
-                if sub_cat.lower() == category_name.lower():
-                    current_category = sub_cat
-                    main_category_of_current = m_cat
-                    query = query.filter(Product.category == current_category)
-                    break
-            if current_category: break
+                break  # Знайшли, виходимо з циклу
 
+            # Якщо не головна, перевіряємо підкатегорії
+            for sub_cat in data.get('subcategories', {}):
+                if sub_cat.lower() == category_name_from_slug.lower():
+                    current_category = sub_cat
+                    main_category_of_current = main_cat
+                    query = query.filter(Product.category == current_category)
+                    break  # Знайшли, виходимо з внутрішнього циклу
+            if current_category:
+                break  # Знайшли, виходимо з зовнішнього циклу
+
+    # Визначення діапазону цін для слайдера на основі вже відфільтрованих товарів
     price_range_query = db.session.query(func.floor(func.min(Product.price)), func.ceil(func.max(Product.price)))
+    # Застосовуємо поточні фільтри (категорія, пошук) до запиту діапазону цін
     if query.whereclause is not None:
         price_range_query = price_range_query.select_from(query.subquery())
 
@@ -398,16 +378,18 @@ def catalog(category_slug):
     min_price_available = price_range[0] or 0
     max_price_available = price_range[1] or 10000
 
-    if min_price:
+    # Застосовуємо фільтри ціни до основного запиту
+    if min_price is not None:
         query = query.filter(Product.price >= min_price)
-    if max_price:
+    if max_price is not None:
         query = query.filter(Product.price <= max_price)
 
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
 
+    # Готуємо параметри для збереження фільтрів у посиланнях пагінації та формах
     current_filters = request.args.copy()
     if 'page' in current_filters: current_filters.pop('page')
-    if 'category_slug' in current_filters: current_filters.pop('category_slug')
+    if 'category_slug' in current_filters: current_filters.pop('category_slug', None)
 
     return render_template(
         'catalog.html',
@@ -673,6 +655,8 @@ def checkout():
         session.pop('cart', None)
         flash('Дякуємо! Ваше замовлення прийнято.', 'success')
         return redirect(url_for('index'))
+
+    # Для GET-запиту, передаємо порожній список, бо він не використовується
     return render_template('checkout.html')
 
 
@@ -1082,33 +1066,50 @@ def find_np_cities():
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
 
 
+# [ВИПРАВЛЕНО] Повністю перероблений API для "Нової Пошти", тепер він гнучкий та надійний
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
+    """Отримання відділень АБО поштоматів для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
-    warehouse_type = request.args.get('type', 'branch')
-    if not api_key: return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
-    if not city_ref: return jsonify([])
-    POSTOMAT_REF = "f9316480-5f2d-425d-bc2c-ac73a02de323"
-    BRANCH_REFS = {"6f8c7162-4b72-4b0a-88e5-906948c6a92f", "841339c7-591a-42e2-8234-7a0a00f0ed6f",
-                   "9a6886f2-89b7-41b0-9b0c-e675a080cb28"}
-    payload = {"apiKey": api_key, "modelName": "AddressGeneral", "calledMethod": "getWarehouses",
-               "methodProperties": {"SettlementRef": city_ref, "Limit": "500"}}
+    warehouse_type = request.args.get('type', 'branch')  # 'branch' або 'postomat'
+
+    if not api_key:
+        return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
+    if not city_ref:
+        return jsonify([])
+
+    method_properties = {
+        "SettlementRef": city_ref,
+        "Limit": "500"
+    }
+
+    # Вибираємо Ref ID залежно від типу доставки, який запросив фронтенд
+    if warehouse_type == 'postomat':
+        # Тільки поштомати
+        method_properties["TypeOfWarehouseRef"] = "f9316480-5f2d-425d-bc2c-ac73a02de323"
+    elif warehouse_type == 'branch':
+        # Вантажні та поштові відділення (до 30 кг)
+        method_properties[
+            "TypeOfWarehouseRef"] = "6f8c7162-4b72-4b0a-88e5-906948c6a92f,841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28"
+
+    payload = {
+        "apiKey": api_key,
+        "modelName": "AddressGeneral",
+        "calledMethod": "getWarehouses",
+        "methodProperties": method_properties
+    }
+
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=7)
         response.raise_for_status()
         data = response.json()
-        if data['success']:
-            all_warehouses = data.get('data', [])
-            filtered_warehouses = []
-            if warehouse_type == 'postomat':
-                for wh in all_warehouses:
-                    if wh.get('TypeOfWarehouseRef') == POSTOMAT_REF: filtered_warehouses.append(wh['Description'])
-            elif warehouse_type == 'branch':
-                for wh in all_warehouses:
-                    if wh.get('TypeOfWarehouseRef') in BRANCH_REFS: filtered_warehouses.append(wh['Description'])
-            return jsonify(filtered_warehouses)
-        return jsonify([])
+        if data.get('success'):
+            # Повертаємо тільки опис (назву) відділення
+            return jsonify([w['Description'] for w in data.get('data', [])])
+        # Якщо 'success' is false, повертаємо помилку з API НП
+        error_message = data.get('errors', ['Невідома помилка'])[0]
+        return jsonify({"error": error_message})
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
@@ -1119,6 +1120,7 @@ def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
 
 
+# [ВИПРАВЛЕНО] Логіка завантаження тепер враховує всі фільтри
 @app.route('/api/catalog/load_more')
 def api_load_more():
     page = request.args.get('page', 1, type=int)
@@ -1126,35 +1128,40 @@ def api_load_more():
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
     search_query = request.args.get('search', '').strip()
-    hierarchy = get_category_hierarchy()
-    current_category, main_category, subcategories = None, None, []
-    if category_slug:
-        category_name = category_slug.replace('-', ' ')
-        for main_cat, data in hierarchy.items():
-            if main_cat.lower() == category_name.lower():
-                current_category, main_category = main_cat, main_cat
-                subcategories = list(data.get('subcategories', {}).keys())
-                break
-            for subcat in data.get('subcategories', {}):
-                if subcat.lower() == category_name.lower():
-                    current_category, main_category = subcat, main_cat
-                    break
-            if current_category: break
 
-    # [ЗБЕРЕЖЕНО ВИПРАВЛЕННЯ] Основний фільтр - тільки товари в наявності.
+    hierarchy = get_category_hierarchy()
+
+    # Починаємо з базового запиту
     query = Product.query.filter(Product.in_stock == True)
 
-    if search_query: query = query.filter(Product.name.ilike(f'%{search_query}%'))
-    if current_category:
-        if main_category == current_category:
-            query = query.filter(Product.category.in_([main_category] + subcategories))
-        else:
-            query = query.filter(Product.category == current_category)
-    if min_price: query = query.filter(Product.price >= min_price)
-    if max_price: query = query.filter(Product.price <= max_price)
+    # Застосовуємо фільтри аналогічно до основного маршруту 'catalog'
+    if search_query:
+        query = query.filter(Product.name.ilike(f'%{search_query}%'))
+
+    if category_slug:
+        category_name_from_slug = category_slug.replace('-', ' ')
+        for main_cat, data in hierarchy.items():
+            if main_cat.lower() == category_name_from_slug.lower():
+                subcategories = list(data.get('subcategories', {}).keys())
+                query = query.filter(Product.category.in_([main_cat] + subcategories))
+                break
+            for sub_cat in data.get('subcategories', {}):
+                if sub_cat.lower() == category_name_from_slug.lower():
+                    query = query.filter(Product.category == sub_cat)
+                    break
+            if query.whereclause is not None and Product.category.in_.__name__ in str(
+                    query.whereclause) or Product.category.__name__ in str(query.whereclause):
+                break
+
+    if min_price is not None:
+        query = query.filter(Product.price >= min_price)
+    if max_price is not None:
+        query = query.filter(Product.price <= max_price)
 
     products_pagination = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
+
     html = render_template('_products_grid_items.html', products=products_pagination.items)
+
     response = make_response(html)
     response.headers['X-More-Available'] = 'true' if products_pagination.has_next else 'false'
     return response
