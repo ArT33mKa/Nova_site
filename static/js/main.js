@@ -96,7 +96,7 @@ function switchAuthTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
 }
 
-// [ЗМІНЕНО] Фун��ц��я тепер приймає залежності
+// [ЗМІНЕНО] Функц��я тепер приймає залежності
 function initCabinetModal(pageOverlay, closeAllSidebars) {
     const cabinetModal = document.getElementById('cabinet-modal');
     if (!cabinetModal) return;
@@ -452,6 +452,7 @@ function initContactForm() {
                 showToast(data.message, data.status === 'success' ? 'success' : 'error');
                 if (data.status === 'success') this.reset();
             }).catch(() => showToast('Сталася помилка при відправці.', 'error'));
+        });
     }
 }
 
@@ -788,47 +789,3 @@ function initAutoApplyFilters() {
         }
     });
 }
-
-// Ініціалізація фільтрів "Показати більше"
-function initShowMoreFilters() {
-    document.querySelectorAll('.filter-options-list').forEach(filterList => {
-        const showLimit = parseInt(filterList.dataset.showLimit) || 5;
-        const items = filterList.querySelectorAll('.checkbox-item');
-        const totalItems = items.length;
-
-        // Якщо елементів більше ліміту
-        if (totalItems > showLimit) {
-            // Приховуємо зайві елементи
-            items.forEach((item, index) => {
-                if (index >= showLimit) {
-                    item.style.display = 'none';
-                }
-            });
-
-            // Створюємо кнопку "Показати ще"
-            const showMoreBtn = document.createElement('button');
-            showMoreBtn.className = 'show-more-btn';
-            showMoreBtn.textContent = `Показати ще ${totalItems - showLimit}`;
-            showMoreBtn.onclick = function() {
-                const isExpanded = this.classList.contains('expanded');
-                items.forEach((item, index) => {
-                    if (index >= showLimit) {
-                        item.style.display = isExpanded ? 'none' : '';
-                    }
-                });
-                this.classList.toggle('expanded');
-                this.textContent = isExpanded ?
-                    `Показати ще ${totalItems - showLimit}` :
-                    'Згорнути';
-            };
-
-            filterList.appendChild(showMoreBtn);
-        }
-    });
-}
-
-// Викликаємо функцію при завантаженні сторінки
-document.addEventListener('DOMContentLoaded', function() {
-    // ...existing code...
-    initShowMoreFilters();
-});
