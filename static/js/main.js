@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initProductDescriptionToggle();
     initOptimizedCartLogic();
     initFavoritesLogic();
-    initCabinetModal(pageOverlay, closeAllSidebars); // [ЗМІНЕНО] Передаємо залежності
+    initCabinetModal(pageOverlay, closeAllSidebars); // [ЗМІНЕН��] Передаємо залежності
     initAutoApplyFilters();
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
@@ -96,7 +96,7 @@ function switchAuthTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
 }
 
-// [ЗМІНЕНО] Функція тепер приймає залежності
+// [ЗМІНЕНО] Функц��я тепер приймає залежності
 function initCabinetModal(pageOverlay, closeAllSidebars) {
     const cabinetModal = document.getElementById('cabinet-modal');
     if (!cabinetModal) return;
@@ -404,7 +404,7 @@ function renderFavoritesModal() {
                     <div class="product-image">
                         <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
                         ${stockStatus}
-                        <button class="favorite-btn active" title="Видалити з обраного"><i class="fas fa-star"></i></button>
+                        <button class="favorite-btn active" title="Видалити з обраног��"><i class="fas fa-star"></i></button>
                         ${adminActionsHtml}
                     </div>
                     <div class="product-info">
@@ -634,39 +634,50 @@ function initLoadMore() {
     const productsGrid = document.querySelector('.products-grid');
     const loadingSpinner = document.getElementById('loading-spinner');
 
-    if (!loadMoreBtn || !productsGrid) {
-        return;
-    }
+    if (!loadMoreBtn || !productsGrid) return;
 
     let currentPage = 1;
 
-    loadMoreBtn.addEventListener('click', () => {
+    loadMoreBtn.addEventListener('click', function() {
         currentPage++;
         loadMoreBtn.style.display = 'none';
         if (loadingSpinner) loadingSpinner.style.display = 'block';
 
-        const params = new URLSearchParams(window.location.search);
-        params.set('page', currentPage);
+        // Отримуємо поточні параметри URL
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('page', currentPage);
 
-        fetch(`/api/catalog/load_more?${params.toString()}`)
-            .then(response => {
-                const moreAvailable = response.headers.get('X-More-Available') === 'true';
-                return response.text().then(html => ({ html, moreAvailable }));
-            })
-            .then(({ html, moreAvailable }) => {
-                if (html.trim() !== "") {
-                    productsGrid.insertAdjacentHTML('beforeend', html);
-                }
+        fetch(`/api/catalog/load_more?${urlParams.toString()}`)
+            .then(response => response.text())
+            .then(html => {
+                // Створюємо тимчасовий контейнер для парсингу
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
 
-                if (moreAvailable) {
-                    loadMoreBtn.style.display = 'inline-block';
+                // Знаходимо тільки картки товарів
+                const newProducts = doc.querySelectorAll('.product-card');
+
+                if (newProducts.length > 0) {
+                    // Додаємо кожну картку до існуючої сітки
+                    newProducts.forEach(product => {
+                        productsGrid.appendChild(product);
+                    });
+
+                    // Оновлюємо стани кнопок та інтерактивних елементів
+                    updateCartView();
+                    updateFavoritesUI();
+                    initializeProductCards();
+
+                    // Перевіряємо чи є ще товари
+                    const hasMoreProducts = newProducts.length === 12; // Припустимо, що на сторінці 12 товарів
+                    loadMoreBtn.style.display = hasMoreProducts ? 'block' : 'none';
                 } else {
                     loadMoreBtn.style.display = 'none';
                 }
             })
             .catch(error => {
-                console.error('Error loading more products:', error);
-                loadMoreBtn.style.display = 'inline-block';
+                console.error('Помилка завантаження:', error);
+                loadMoreBtn.style.display = 'block';
             })
             .finally(() => {
                 if (loadingSpinner) loadingSpinner.style.display = 'none';

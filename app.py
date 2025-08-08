@@ -269,7 +269,7 @@ def get_category_hierarchy():
         "Запчастини": ["запчастин", "котел", "термопар"]
     }
 
-    # Отримуємо всі активні товар�� з категоріями та брендами
+    # Отримуємо всі активні тов��р�� з категоріями та брендами
     products = db.session.query(Product.category, Product.brand) \
         .filter(Product.category.isnot(None)) \
         .filter(Product.category != '') \
@@ -1068,7 +1068,7 @@ def bas_import():
                     'true', 'да', 'є', 'yes']:
                     in_stock = True
                 else:
-                    stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
+                    stock_prop_node_alt = product_node.find(".//Значен��яСвойства[Ид='ИД-Наличие']/Значення")
                     if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.lower() == 'true':
                         in_stock = True
 
@@ -1265,7 +1265,7 @@ def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
 
 
-# ────────────────────────────────
+# ───────────────────��────────────
 #  ЗАПУСК ДОДАТКУ
 # ────────────────────────────────
 if __name__ == "__main__":
@@ -1280,3 +1280,40 @@ if __name__ == "__main__":
             db.session.commit()
             print(">>> Адміністратора створено. Логін: admin, Пароль: admin123")
     app.run(debug=True, port=5000)
+
+@app.route('/api/catalog/load_more')
+def load_more_products():
+    page = request.args.get('page', 1, type=int)
+
+    # Копіюємо логіку фільтрації з функції catalog()
+    query = Product.query.filter(
+        Product.in_stock == True,
+        Product.description.isnot(None),
+        Product.description != '',
+        Product.image.notlike('default_tovar%')
+    )
+
+    # Отримуємо параметри фільтрації
+    category_slug = request.args.get('category_slug')
+    selected_brands = request.args.getlist('brand')
+    min_price = request.args.get('min_price', type=float)
+    max_price = request.args.get('max_price', type=float)
+
+    # Застосовуємо фільтри
+    if category_slug:
+        category_name = category_slug.replace('-', ' ')
+        query = query.filter(Product.category == category_name)
+    if selected_brands:
+        query = query.filter(Product.brand.in_(selected_brands))
+    if min_price:
+        query = query.filter(Product.price >= min_price)
+    if max_price:
+        query = query.filter(Product.price <= max_price)
+
+    # Отримуємо продукти для поточної сторінки
+    products = query.order_by(Product.id.desc()).paginate(
+        page=page, per_page=12, error_out=False
+    )
+
+    # Рендеримо тільки картки товарів
+    return render_template('_product_cards.html', products=products.items)
