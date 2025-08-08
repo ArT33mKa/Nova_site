@@ -1162,9 +1162,6 @@ def bas_import():
         return f"failure\nВнутрішня помилка сервера: {e}", 500
 
 
-# ... (ваш код після функції)
-
-
 def require_bot_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -1231,33 +1228,45 @@ def find_np_cities():
         print(f"Помилка API Нової Пошти (міста): {e}")
         return jsonify({"error": "Помилка зв'язку з сервером Нової Пошти."}), 503
 
+
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання ВІДДІЛЕНЬ ТА ПОШТОМАТІВ для населеного пункту."""
+    """Отримання відділень АБО поштоматів для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
+    warehouse_type = request.args.get('type', 'all')  # 'branch' або 'postomat'
 
     if not api_key:
         return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
     if not city_ref:
         return jsonify([])
 
+    # Словник з Ref ID для різних типів відділень
+    warehouse_type_refs = {
+        "postomat": "f9316480-5f2d-425d-bc2c-ac73a02de323",
+        # Поштове (до 30 кг) + Вантажне відділення
+        "branch": "9a6886f2-89b7-41b0-9b0c-e675a080cb28,6f8c7162-4b72-4b0a-88e5-906948c6a92f"
+    }
+
+    method_properties = {"SettlementRef": city_ref}
+
+    # Додаємо фільтр за типом, якщо він вказаний
+    if warehouse_type in warehouse_type_refs:
+        method_properties["TypeOfWarehouseRef"] = warehouse_type_refs[warehouse_type]
+
     payload = {
         "apiKey": api_key,
         "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
-        "methodProperties": {
-            "SettlementRef": city_ref
-            # >>> ВИДАЛІТЬ РЯДОК З "TypeOfWarehouseRef" ЗВІДСИ
-        }
+        "methodProperties": method_properties
     }
+
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
         response.raise_for_status()
         data = response.json()
         if data['success']:
             all_warehouses = data.get('data', [])
-            # Тепер ми просто повертаємо всі знайдені відділення/поштомати
             return jsonify([w['Description'] for w in all_warehouses])
         return jsonify([])
     except requests.exceptions.RequestException as e:
