@@ -258,27 +258,22 @@ def index():
 # [ВИПРАВЛЕНО] Повністю переписана, надійна та ефективна логіка побудови ієрархії категорій
 def get_category_hierarchy():
     """
-    [НОВА ВЕРСІЯ 2.0] Створює коректну ієрархічну структуру категорій.
+    [НОВА ВЕРСІЯ 3.0] Створює коректну ієрархічну структуру категорій.
     Ця версія є більш надійною: вона завжди знає про основну структуру магазину
     і правильно розподіляє по ній товари з бази даних.
     """
-
     # 1. Визначаємо основну структуру магазину та ключові слова для розподілу.
     # Це "джерело правди" про те, які категорії мають існувати.
     MAIN_CATEGORIES = {
-        "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
-        "Насоси": ["насос", "помпа", "гідрофор"],
-        "Бойлери": ["бойлер", "водонагрівач"],
-        "Змішувачі": ["змішувач", "кран", "сифон"],
-        "Витяжки": ["витяжк", "вентилятор"],
-        "Газові колонки": ["колонк", "газов"],
-        "Сушка для рушників": ["сушк", "рушник"],
-        # Резервна категорія, яка приймає все інше, включно з "Загальна" з 1С.
-        "Запчастини": ["запчастин", "котел", "термопар", "обладнання", "загальна"]
+        "Газові колонки": ["колонка газова", "газова колонка"],
+        "Запчастини до газ обладнання": ["запчастин", "автоматика", "термопар", "клапан", "блок", "датчик",
+                                          "мембрана", "редуктор", "пальник", "форсунк", "жиклер", "електрод"],
+        "Шланги та підводка": ["шланг", "підводка"],
+        # Резервна категорія, яка приймає все інше.
+        "Інше обладнання": ["насос", "бойлер", "змішувач", "витяжк", "сушк"]
     }
 
     # 2. Ініціалізуємо ієрархію з УСІМА головними категоріями і нульовими лічильниками.
-    # Це гарантує, що ми не втратимо структуру, навіть якщо якась категорія тимчасово порожня.
     hierarchy = {
         main_cat: {'count': 0, 'subcategories': {}}
         for main_cat in MAIN_CATEGORIES
@@ -301,18 +296,13 @@ def get_category_hierarchy():
 
         # Шукаємо, до якої головної категорії належить поточна категорія з БД
         for main_cat, keywords in MAIN_CATEGORIES.items():
-            # Перевіряємо, чи назва категорії з БД є однією з головних
-            if category_name.lower() == main_cat.lower():
-                main_category_found = main_cat
-                break
-            # Якщо ні, перевіряємо за ключовими словами
             if any(keyword in category_name.lower() for keyword in keywords):
                 main_category_found = main_cat
                 break
 
-        # Якщо категорія не підпадає під жодну з основних, відносимо її до "Запчастин"
+        # Якщо категорія не підпадає під жодну з основних, відносимо її до "Інше обладнання"
         if not main_category_found:
-            main_category_found = "Запчастини"
+            main_category_found = "Інше обладнання"
 
         # Оновлюємо загальний лічильник для головної категорії
         hierarchy[main_category_found]['count'] += count
@@ -323,7 +313,7 @@ def get_category_hierarchy():
             subcategories[category_name] = subcategories.get(category_name, 0) + count
 
     # 5. Фінальний крок: прибираємо з результату ті головні категорії,
-    # в яких в підсумку виявилось 0 товарів. Це робить фільтр чистим.
+    # в яких в підсумку виявилось 0 товарів.
     final_hierarchy = {cat: data for cat, data in hierarchy.items() if data['count'] > 0}
 
     return final_hierarchy
@@ -886,55 +876,112 @@ def bas_import():
     cml_file = request.files['file']
     if cml_file.filename == '':
         return "failure\nNo selected file.", 400
-    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку...")
+    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку з lxml...")
     try:
-        # ... (код для розбору XML залишається той самий) ...
         raw_data = cml_file.read()
         try:
             parser_utf8 = lxml_etree.XMLParser(recover=True, encoding='utf-8')
             root = lxml_etree.fromstring(raw_data, parser=parser_utf8)
+            print("Info: Файл успішно розібрано з кодуванням UTF-8.")
         except Exception:
             parser_win1251 = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
             root = lxml_etree.fromstring(raw_data, parser=parser_win1251)
+            print("Info: Файл успішно розібрано з кодуванням windows-1251.")
         for elem in root.getiterator():
             if '}' in elem.tag: elem.tag = elem.tag.split('}', 1)[1]
 
         catalog_node = root.find('.//Каталог')
         if catalog_node is None: return "failure\nНе знайдено тег <Каталог>.", 400
 
+        groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
         products_from_xml = catalog_node.findall('.//Товар')
-        print(f"В XML знайдено {len(products_from_xml)} товарів.")
+        print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю обробку...")
 
         existing_products_raw = db.session.query(Product.id, Product.name).all()
         existing_products_map = {name: pid for pid, name in existing_products_raw}
         print(f"Завантажено {len(existing_products_map)} існуючих товарів.")
-
         products_to_update, products_to_add = [], []
         default_image_url = _get_cloudinary_url(None)
 
-        for product_node in products_from_xml:
-            name = (product_node.findtext('Наименование') or 'Без назви').strip()
-            if not name: continue
+        # [ПОКРАЩЕНА ЛОГІКА v3.0] Оновлений та розширений словник ключових слів.
+        # Порядок важливий! Більш специфічні категорії мають бути вище.
+        CATEGORY_KEYWORDS = {
+            "Газові колонки": ["колонка газова", "газова колонка"],
+            "Шланги та підводка": ["шланг", "підводка"],
+            # Ця категорія тепер має пріоритет над загальною "Запчастини"
+            "Автоматика для котлів": ["автоматика", "блок sit", "блок мр-9", "блок honeywell", "блок мініsit"],
+            "Термопари": ["термопар"],
+            "Клапани та редуктори": ["клапан", "редуктор"],
+            "Пальники та форсунки": ["пальник", "форсунк", "жиклер", "інжектор"],
+            "Датчики та індикатори": ["датчик", "термометр", "термостат", "манометр"],
+            "Електричні компоненти": ["електрод", "свіча", "п'єзо", "пьезо", "блок розпалу", "мікровимикач"],
+            "Мембрани та прокладки": ["мембран", "прокладк", "сальник"],
+            "Інші запчастини": ["запчастин", "анод", "ізоляція", "кран-букса", "картридж", "сильфон", "трубка",
+                                "адаптер", "фіксатор", "коліно труби"],
+        }
 
-            # [КЛЮЧОВА ЗМІНА] Дані, які ми завжди оновлюємо
+        for product_node in products_from_xml:
+            product_id_from_xml = product_node.findtext('Ид')
+            if not product_id_from_xml: continue
+
+            name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
 
+            group_id_node = product_node.find('.//Групи/Ид')
+            group_id = group_id_node.text if group_id_node is not None else None
+            category_from_1c_group = groups.get(group_id, "")
+
+            # --- [НОВА ГІБРИДНА ЛОГІКА ВИЗНАЧЕННЯ КАТЕГОРІЇ v3.0] ---
+            final_category = None
+            product_name_lower = name.lower()
+            group_name_lower = category_from_1c_group.lower()
+
+            # 1. Пріоритетний пошук за назвою товару
+            for category, keywords in CATEGORY_KEYWORDS.items():
+                if any(keyword in product_name_lower for keyword in keywords):
+                    final_category = category
+                    break
+
+            # 2. Якщо за назвою не вдалося, шукаємо за назвою групи з BAS
+            if not final_category:
+                for category, keywords in CATEGORY_KEYWORDS.items():
+                    if any(keyword in group_name_lower for keyword in keywords):
+                        final_category = category
+                        break
+
+            # 3. Якщо категорія все ще не визначена, але в назві або групі є слово "запчастини",
+            # то відносимо до загальної категорії запчастин.
+            if not final_category and ("запчастин" in product_name_lower or "запчастин" in group_name_lower):
+                final_category = "Інші запчастини"
+
+            # 4. Якщо нічого не допомогло, це якась інша одиниця товару.
+            if not final_category:
+                final_category = "Інше обладнання"
+            # --- Кінець нової гібридної логіки ---
+
             image_tags = product_node.findall('Картинка')
-            image_filename_from_xml = (image_tags[0].text or '').strip() if image_tags else ''
+            image_filename_from_xml = ''
+            if image_tags:
+                main_image_tag = next((tag for tag in image_tags if tag.get('main_image') == '1'), None)
+                if main_image_tag is not None:
+                    image_filename_from_xml = (main_image_tag.text or '').strip()
+                else:
+                    image_filename_from_xml = (image_tags[0].text or '').strip()
+
             final_image_url = _get_cloudinary_url(image_filename_from_xml) or default_image_url
 
             price = 0.0
             in_stock = False
-            product_id_from_xml = product_node.findtext('Ид')
-            offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']") if product_id_from_xml else None
-            if offer_node:
+
+            offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
+            if offer_node is not None:
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
                     try:
-                        price = float(price_node.text.replace(',', '.').strip())
+                        price_text = price_node.text.replace(',', '.').replace('\xa0', '')
+                        price = float(re.match(r"[\d.]+", price_text).group(0))
                     except (ValueError, AttributeError):
                         pass
-
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
@@ -942,92 +989,70 @@ def bas_import():
                     except (ValueError, TypeError):
                         pass
 
-            # Базовий об'єкт з даними для оновлення
-            product_data = {
-                'name': name,
-                'price': price,
-                'description': description,
-                'image': final_image_url,
-                'in_stock': in_stock
-            }
+            if not in_stock:
+                stock_prop_node = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
+                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() == 'true':
+                    in_stock = True
 
+            brand = None
+            if description:
+                clean_description = description.replace('<br>', '\n').replace('<BR>', '\n')
+                brand_keywords = ['виробник:', 'бренд:', 'виробництво:', 'торгова марка:']
+                known_brands = ['Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap',
+                                'Immergas', 'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis',
+                                'Pedrollo', 'Pentax', 'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut',
+                                'Aquatica', 'Thermo Alliance', 'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor',
+                                'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення', 'Gerts',
+                                'SIT', 'Honeywell', 'Polidoro', 'Vaillant', 'Beretta', 'Demrad']
+                for keyword in brand_keywords:
+                    if keyword in clean_description.lower():
+                        start_index = clean_description.lower().find(keyword) + len(keyword)
+                        brand_candidate = clean_description[start_index:].strip().split('\n')[0].strip()
+                        if brand_candidate: brand = brand_candidate; break
+                if not brand:
+                    for known_brand in sorted(known_brands, key=len, reverse=True):
+                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description, re.IGNORECASE):
+                            brand = known_brand;
+                            break
+            if brand:
+                brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
+                brand = brand[:100] if brand else None
+
+            product_data = {'name': name, 'price': price, 'description': description, 'category': final_category,
+                            'brand': brand, 'image': final_image_url, 'in_stock': in_stock}
             if name in existing_products_map:
-                # Якщо товар існує - додаємо його в список на ОНОВЛЕННЯ
-                # Ми НЕ чіпаємо категорію!
                 product_data['id'] = existing_products_map[name]
                 products_to_update.append(product_data)
             else:
-                # Якщо товар НОВИЙ - додаємо його в список на СТВОРЕННЯ
-                # і присвоюємо йому категорію "Не відсортовано"
-                product_data['category'] = 'Не відсортовано'
                 products_to_add.append(product_data)
 
         updated_count = len(products_to_update)
         added_count = len(products_to_add)
-        print(f"Підготовлено до оновлення: {updated_count}, до додавання: {added_count}.")
+        print(f"Завершення циклу. Підготовлено до оновлення: {updated_count}, до додавання: {added_count}.")
 
         if products_to_add:
+            print("Виконую пакетне додавання нових товарів...")
             db.session.bulk_insert_mappings(Product, products_to_add)
+            print("Пакетне додавання завершено.")
         if products_to_update:
+            print("Виконую пакетне оновлення існуючих товарів...")
             db.session.bulk_update_mappings(Product, products_to_update)
-
+            print("Пакетне оновлення завершено.")
         if products_to_add or products_to_update:
+            print("Зберігаю зміни в базі даних (commit)...")
             db.session.commit()
-            print("Зміни успішно збережено в базі даних.")
-
+            print("Зміни успішно збережено.")
+        else:
+            print("Немає товарів для додавання або оновлення.")
+        message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
+        print(message)
         return "success"
     except Exception as e:
         db.session.rollback()
         import traceback
         error_details = traceback.format_exc()
-        print(f"КРИТИЧНА ПОМИЛКА під час імпорту: {e}\n{error_details}")
+        print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
-
-
-# Додайте ці дві нові функції в кінець файлу app.py (перед if __name__ == "__main__":)
-
-@app.route('/admin/uncategorized')
-@login_required
-@admin_required
-def admin_uncategorized():
-    page = request.args.get('page', 1, type=int)
-
-    # Запит для отримання невідсортованих товарів
-    uncategorized_products = Product.query.filter(
-        (Product.category == 'Не відсортовано') | (Product.category == None)
-    ).order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
-
-    # Список правильних категорій для випадаючого меню
-    main_categories = [
-        "Поливочна система", "Насоси", "Бойлери", "Змішувачі",
-        "Витяжки", "Газові колонки", "Сушка для рушників", "Запчастини"
-    ]
-
-    return render_template('admin_uncategorized.html',
-                           products=uncategorized_products,
-                           main_categories=sorted(main_categories))
-
-
-@app.route('/admin/categorize_products', methods=['POST'])
-@login_required
-@admin_required
-def categorize_products():
-    product_ids = request.form.getlist('product_ids')
-    new_category = request.form.get('new_category')
-
-    if not product_ids or not new_category:
-        flash('Не обрано товари або категорію для оновлення.', 'warning')
-        return redirect(url_for('admin_uncategorized'))
-
-    # Оновлюємо категорію для всіх обраних товарів
-    Product.query.filter(Product.id.in_(product_ids)).update(
-        {'category': new_category},
-        synchronize_session=False
-    )
-    db.session.commit()
-
-    flash(f'{len(product_ids)} товар(ів) успішно переміщено в категорію "{new_category}".', 'success')
-    return redirect(url_for('admin_uncategorized'))
 
 def require_bot_api_key(f):
     @wraps(f)
