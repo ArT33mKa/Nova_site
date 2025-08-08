@@ -49,13 +49,32 @@ app.secret_key = os.getenv("FLASK_SECRET", "nova-secret")
 database_url = os.getenv('DATABASE_URL', 'sqlite:///site.db')
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
+    # [КЛЮЧОВИЙ ФІКС №1] Примусово додаємо параметр для SSL, якщо його немає
+    if 'sslmode' not in database_url:
+        if '?' in database_url:
+            database_url += '&sslmode=require'
+        else:
+            database_url += '?sslmode=require'
+
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# [КЛЮЧОВИЙ ФІКС №2] Додаємо параметри для стабільного з'єднання з БД
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    # Перевіряє, чи з'єднання "живе", перед тим як його використати.
+    # Це головний фікс для помилки "connection has been closed".
+    'pool_pre_ping': True,
+    # Автоматично перестворює з'єднання, які були неактивні 280 секунд.
+    # Це запобігає таймаутам на Heroku.
+    'pool_recycle': 280,
+    # Встановлюємо розмір пулу з'єднань
+    'pool_size': 10,
+    'max_overflow': 20
+}
+
 app.config["GOOGLE_OAUTH_CLIENT_ID"] = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
-
-db = SQLAlchemy(app)
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'

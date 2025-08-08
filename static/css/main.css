@@ -567,8 +567,8 @@ img {
     top: 10px;
     right: 10px;
     z-index: 3;
-    width: 34px;  /* ОНОВЛЕНО: зменшений розмір */
-    height: 34px; /* ОНОВЛЕНО: зменшений розмір */
+    width: 28px;  /* ОНОВЛЕНО: зменшений розмір */
+    height: 28px; /* ОНОВЛЕНО: зменшений розмір */
     border: none;
     background-color: transparent;
     cursor: pointer;
