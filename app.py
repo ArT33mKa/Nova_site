@@ -255,9 +255,9 @@ def index():
 
 
 def get_category_hierarchy():
-    """Створює коректну ієрархічну структуру категорій."""
+    """Створює коректну ієрархічну структуру категорі��."""
 
-    # Основні категорії та їх ключові слова
+    # Основні категорії та їх ключ��ві слова
     MAIN_CATEGORIES = {
         "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
         "Насоси": ["насос", "помпа", "гідрофор"],
@@ -269,7 +269,7 @@ def get_category_hierarchy():
         "Запчастини": ["запчастин", "котел", "термопар"]
     }
 
-    # Отримуємо всі активні товари з категоріями та брендами
+    # Отримуємо всі активні товар�� з категоріями та брендами
     products = db.session.query(Product.category, Product.brand) \
         .filter(Product.category.isnot(None)) \
         .filter(Product.category != '') \
@@ -330,6 +330,22 @@ def catalog(category_slug):
     for main_cat, data in hierarchy.items():
         category_structure[main_cat] = list(data['subcategories'].keys())
 
+    # Define current_category first
+    current_category = None
+    if category_slug:
+        category_name = category_slug.replace('-', ' ')
+        # Search in main categories and subcategories
+        for main_cat, data in hierarchy.items():
+            if main_cat.lower() == category_name.lower():
+                current_category = main_cat
+                break
+            for subcat in data['subcategories']:
+                if subcat.lower() == category_name.lower():
+                    current_category = subcat
+                    break
+            if current_category:
+                break
+
     # Get subcategories with counts for current category
     subcategories_with_counts = {}
     if current_category and current_category in hierarchy:
@@ -345,7 +361,6 @@ def catalog(category_slug):
     max_price = request.args.get('max_price', type=float)
 
     # Визначаємо поточну категорію
-    current_category = None
     if category_slug:
         category_name = category_slug.replace('-', ' ')
 
@@ -618,7 +633,7 @@ def update_cart_quantity(product_id):
             del cart[product_id_str]
         session["cart"] = cart
         return jsonify(status="success")
-    return jsonify(status="error", message="Товар не знайдено"), 404
+    return jsonify(status="error", message="Товар не знайден��"), 404
 
 
 @app.route('/get_cart')
@@ -635,7 +650,7 @@ def get_cart():
                     "id": product.id,
                     "name": product.name,
                     "price": product.price,
-                    # [ВИПРАВЛЕННЯ] Просто беремо готовий URL з бази
+                    # [ВИ��РАВЛЕННЯ] Просто беремо готовий URL з бази
                     "image": product.image,
                     "quantity": quantity,
                     "in_stock": product.in_stock,
@@ -702,7 +717,7 @@ def checkout():
     return render_template('checkout.html')
 
 
-# ────────────────────────────────
+# ─────────────────────���──────────
 #  ПРОФІЛЬ КОРИСТУВАЧА
 # ────────────────────────────────
 @app.route('/profile/orders')
@@ -1000,7 +1015,7 @@ def bas_import():
         # ================================================================
         # [ОПТИМІЗАЦІЯ №1]: Отримуємо всі існуючі товари з бази ОДНИМ ЗАПИТОМ
         # ================================================================
-        print("Оптимізація: Завантажую існуючі товари з бази даних...")
+        print("Оптимізація: Завантажую ��снуючі товари з бази даних...")
         # Завантажуємо тільки ID та назву для економії пам'яті
         existing_products_raw = db.session.query(Product.id, Product.name).all()
         # Створюємо словник для миттєвого пошуку: { 'Назва товару': id }
@@ -1022,7 +1037,7 @@ def bas_import():
             # --- Ця логіка збору даних з XML залишається без змін ---
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
-            group_id_node = product_node.find('.//Группы/Ид')
+            group_id_node = product_node.find('.//Групи/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Загальна")
             image_filename_from_xml = (product_node.findtext('Картинка') or '').strip()
