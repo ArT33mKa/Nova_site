@@ -76,6 +76,8 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 app.config["GOOGLE_OAUTH_CLIENT_ID"] = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 
+db = SQLAlchemy(app)
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Будь ласка, увійдіть, щоб виконати цю дію."
