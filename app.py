@@ -1005,6 +1005,8 @@ def _get_cloudinary_url(image_filename):
         return None
 
 
+# --- ЗАМІНІТЬ ВСЮ ФУНКЦІЮ BAS_IMPORT НА ЦЮ ---
+
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
@@ -1039,29 +1041,24 @@ def bas_import():
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю обробку...")
 
-        # ================================================================
-        # [ОПТИМІЗАЦІЯ №1]: Отримуємо всі існуючі товари з бази ОДНИМ ЗАПИТОМ
-        # ================================================================
-        print("Оптимізація: Завантажую ��снуючі товари з бази даних...")
-        # Завантажуємо тільки ID та назву для економії пам'яті
+        print("Оптимізація: Завантажую існуючі товари з бази даних...")
         existing_products_raw = db.session.query(Product.id, Product.name).all()
-        # Створюємо словник для миттєвого пошуку: { 'Назва товару': id }
         existing_products_map = {name: pid for pid, name in existing_products_raw}
         print(f"Завантажено {len(existing_products_map)} існуючих товарів.")
 
-        # ================================================================
-        # [ОПТИМІЗАЦІЯ №2]: Готуємо списки для пакетної обробки
-        # ================================================================
         products_to_update = []
         products_to_add = []
         default_image_url = _get_cloudinary_url(None)
 
-        # Починаємо цикл обробки XML, але НЕ робимо запитів до бази всередині
         for product_node in products_from_xml:
+            # --- [КЛЮЧОВИЙ ФІКС] Ініціалізуємо змінні на початку КОЖНОЇ ітерації циклу ---
+            price = 0.0
+            in_stock = False
+            # ----------------------------------------------------------------------------
+
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
 
-            # --- Ця логіка збору даних з XML залишається без змін ---
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
             group_id_node = product_node.find('.//Групи/Ид')
@@ -1072,54 +1069,37 @@ def bas_import():
             if not final_image_url:
                 final_image_url = default_image_url
 
-                price = 0.0
-                in_stock = False
+            offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
+            if offer_node is not None:
+                price_node = offer_node.find('.//ЦенаЗаЕдиницу')
+                if price_node is not None and price_node.text:
+                    try:
+                        price_match = re.search(r"[\d.,]+", price_node.text)
+                        if price_match:
+                            price = float(price_match.group(0).replace(',', '.'))
+                    except (ValueError, AttributeError):
+                        price = 0.0
 
-                # 1. Основний спосіб: перевірка блоку <Предложение> на кількість та ціну
-                offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
-                if offer_node is not None:
-                    # Отримуємо ціну
-                    price_node = offer_node.find('.//ЦенаЗаЕдиницу')
-                    if price_node is not None and price_node.text:
-                        try:
-                            # Надійно парсимо число, навіть якщо там є зайві символи
-                            price_match = re.search(r"[\d.,]+", price_node.text)
-                            if price_match:
-                                price = float(price_match.group(0).replace(',', '.'))
-                        except (ValueError, AttributeError):
-                            price = 0.0
-
-                    # Отримуємо кількість
-                    quantity_node = offer_node.find('Количество')
-                    if quantity_node is not None and quantity_node.text:
-                        try:
-                            # Якщо кількість більше нуля, товар точно є в наявності
-                            if float(quantity_node.text.strip().replace(',', '.')) > 0:
-                                in_stock = True
-                        except (ValueError, TypeError):
-                            # Якщо не вдалося розпарсити кількість, просто ігноруємо
-                            pass
-
-                # 2. Додатковий (резервний) спосіб: перевірка властивості "Наличие"
-                # Цей блок спрацює, якщо кількість 0 або тег <Предложение> взагалі відсутній.
-                # Це дозволяє позначити товар як "в наявності" (напр. під замовлення), навіть якщо кількість 0.
-                if not in_stock:
-                    # Список можливих позитивних значень для властивості "Наличие"
-                    positive_stock_values = ['true', 'да', 'є', 'yes', 'в наличии']
-
-                    # Шукаємо властивість за назвою "Наличие"
-                    stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
-                    if stock_prop_node is not None and stock_prop_node.text and \
-                            stock_prop_node.text.strip().lower() in positive_stock_values:
-                        in_stock = True
-                    else:
-                        # Якщо не знайшли, шукаємо за загальновідомим ID "ИД-Наличие"
-                        stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
-                        if stock_prop_node_alt is not None and stock_prop_node_alt.text and \
-                                stock_prop_node_alt.text.strip().lower() == 'true':
+                quantity_node = offer_node.find('Количество')
+                if quantity_node is not None and quantity_node.text:
+                    try:
+                        if float(quantity_node.text.strip().replace(',', '.')) > 0:
                             in_stock = True
+                    except (ValueError, TypeError):
+                        pass
 
-            # --- Логіка визначення бренду також без змін ---
+            if not in_stock:
+                positive_stock_values = ['true', 'да', 'є', 'yes', 'в наличии']
+                stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
+                if stock_prop_node is not None and stock_prop_node.text and \
+                   stock_prop_node.text.strip().lower() in positive_stock_values:
+                    in_stock = True
+                else:
+                    stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
+                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and \
+                       stock_prop_node_alt.text.strip().lower() == 'true':
+                        in_stock = True
+
             brand = None
             if description:
                 clean_description = description.replace('<br>', '\n').replace('<BR>', '\n')
@@ -1144,24 +1124,20 @@ def bas_import():
                             brand = known_brand
                             break
             if brand:
-                # Спочатку видаляємо HTML-теги, потім замінюємо &nbsp; на звичайний пробіл,
-                # а потім прибираємо зайві пробіли на початку та в кінці.
                 brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
-                if brand:  # Перевіряємо, чи щось залишилось після очищення
-                    brand = brand[:100]  # Обрізаємо до 100 символів
+                if brand:
+                    brand = brand[:100]
                 else:
-                    brand = None  # Якщо нічого не залишилось, ставимо None
+                    brand = None
 
-            # Створюємо словник з даними товару
             product_data = {
                 'name': name, 'price': price, 'description': description,
                 'category': category, 'brand': brand, 'image': final_image_url,
                 'in_stock': in_stock
             }
 
-            # Розподіляємо товар у відповідний список: на оновлення або на додавання
             if name in existing_products_map:
-                product_data['id'] = existing_products_map[name]  # Додаємо ID для оновлення
+                product_data['id'] = existing_products_map[name]
                 products_to_update.append(product_data)
             else:
                 products_to_add.append(product_data)
@@ -1170,9 +1146,6 @@ def bas_import():
         added_count = len(products_to_add)
         print(f"Завершення циклу. Підготовлено до оновлення: {updated_count}, до додавання: {added_count}.")
 
-        # ================================================================
-        # [ОПТИМІЗАЦІЯ №3]: Виконуємо пакетні операції з базою
-        # ================================================================
         if products_to_add:
             print("Виконую пакетне додавання нових товарів...")
             db.session.bulk_insert_mappings(Product, products_to_add)
@@ -1183,7 +1156,6 @@ def bas_import():
             db.session.bulk_update_mappings(Product, products_to_update)
             print("Пакетне оновлення завершено.")
 
-        # Робимо commit тільки якщо були якісь зміни
         if products_to_add or products_to_update:
             print("Зберігаю зміни в базі даних (commit)...")
             db.session.commit()
