@@ -258,65 +258,25 @@ def index():
 # [ВИПРАВЛЕНО] Повністю переписана, надійна та ефективна логіка побудови ієрархії категорій
 def get_category_hierarchy():
     """
-    [НОВА ВЕРСІЯ 3.0] Створює коректну ієрархічну структуру категорій.
-    Ця версія є більш надійною: вона завжди знає про основну структуру магазину
-    і правильно розподіляє по ній товари з бази даних.
+    [НОВА ВЕРСІЯ 4.0] Більше не створює ієрархію.
+    Функція просто запитує з бази даних всі унікальні категорії товарів,
+    що є в наявності, та повертає їх як простий словник для зручного відображення.
     """
-    # 1. Визначаємо основну структуру магазину та ключові слова для розподілу.
-    # Це "джерело правди" про те, які категорії мають існувати.
-    MAIN_CATEGORIES = {
-        "Газові колонки": ["колонка газова", "газова колонка"],
-        "Запчастини до газ обладнання": ["запчастин", "автоматика", "термопар", "клапан", "блок", "датчик",
-                                          "мембрана", "редуктор", "пальник", "форсунк", "жиклер", "електрод"],
-        "Шланги та підводка": ["шланг", "підводка"],
-        # Резервна категорія, яка приймає все інше.
-        "Інше обладнання": ["насос", "бойлер", "змішувач", "витяжк", "сушк"]
-    }
-
-    # 2. Ініціалізуємо ієрархію з УСІМА головними категоріями і нульовими лічильниками.
-    hierarchy = {
-        main_cat: {'count': 0, 'subcategories': {}}
-        for main_cat in MAIN_CATEGORIES
-    }
-
-    # 3. Робимо ОДИН ефективний запит до БД, щоб отримати всі унікальні категорії
+    # Робимо ОДИН ефективний запит до БД, щоб отримати всі унікальні категорії
     # товарів, що є в наявності, та їх кількість.
-    product_counts = db.session.query(
+    product_counts_query = db.session.query(
         Product.category, func.count(Product.id)
     ).filter(
         Product.category.isnot(None),
         Product.category != '',
         Product.in_stock == True
-    ).group_by(Product.category).all()
+    ).group_by(Product.category).order_by(Product.category.asc()).all()
 
-    # 4. Розподіляємо реальні товари з БД по нашій визначеній структурі.
-    for category_name_from_db, count in product_counts:
-        category_name = category_name_from_db.strip()
-        main_category_found = None
+    # Перетворюємо результат у простий словник: {'Назва категорії': кількість}
+    flat_categories = {category: count for category, count in product_counts_query}
 
-        # Шукаємо, до якої головної категорії належить поточна категорія з БД
-        for main_cat, keywords in MAIN_CATEGORIES.items():
-            if any(keyword in category_name.lower() for keyword in keywords):
-                main_category_found = main_cat
-                break
-
-        # Якщо категорія не підпадає під жодну з основних, відносимо її до "Інше обладнання"
-        if not main_category_found:
-            main_category_found = "Інше обладнання"
-
-        # Оновлюємо загальний лічильник для головної категорії
-        hierarchy[main_category_found]['count'] += count
-
-        # Додаємо як підкатегорію, тільки якщо її назва не співпадає з головною
-        if category_name.lower() != main_category_found.lower():
-            subcategories = hierarchy[main_category_found]['subcategories']
-            subcategories[category_name] = subcategories.get(category_name, 0) + count
-
-    # 5. Фінальний крок: прибираємо з результату ті головні категорії,
-    # в яких в підсумку виявилось 0 товарів.
-    final_hierarchy = {cat: data for cat, data in hierarchy.items() if data['count'] > 0}
-
-    return final_hierarchy
+    # Повертаємо простий словник. Шаблон буде його напряму відображати.
+    return flat_categories
 
 
 # [ВИПРАВЛЕНО] Спрощено логіку маршруту та додано надійні перевірки
@@ -903,21 +863,27 @@ def bas_import():
         products_to_update, products_to_add = [], []
         default_image_url = _get_cloudinary_url(None)
 
-        # [ПОКРАЩЕНА ЛОГІКА v3.0] Оновлений та розширений словник ключових слів.
+        # [МАКСИМАЛЬНО ДЕТАЛЬНА ЛОГІКА v4.0] Словник для точної категоризації.
         # Порядок важливий! Більш специфічні категорії мають бути вище.
         CATEGORY_KEYWORDS = {
-            "Газові колонки": ["колонка газова", "газова колонка"],
-            "Шланги та підводка": ["шланг", "підводка"],
-            # Ця категорія тепер має пріоритет над загальною "Запчастини"
-            "Автоматика для котлів": ["автоматика", "блок sit", "блок мр-9", "блок honeywell", "блок мініsit"],
+            "Автоматика для котлів": ["автоматика"],
             "Термопари": ["термопар"],
-            "Клапани та редуктори": ["клапан", "редуктор"],
+            "Сигналізатори газу": ["сигналізатор"],
+            "Газові клапани та редуктори": ["клапан", "редуктор"],
+            "Блоки управління та розпалу": ["блок розпалу", "блок сіт", "блок мр-9", "блок honeywell", "блок мініsit",
+                                            "блок honneywell"],
             "Пальники та форсунки": ["пальник", "форсунк", "жиклер", "інжектор"],
             "Датчики та індикатори": ["датчик", "термометр", "термостат", "манометр"],
-            "Електричні компоненти": ["електрод", "свіча", "п'єзо", "пьезо", "блок розпалу", "мікровимикач"],
+            "Електричні компоненти": ["електрод", "свіча", "п'єзо", "пьезо", "мікровимикач", "кабель"],
             "Мембрани та прокладки": ["мембран", "прокладк", "сальник"],
-            "Інші запчастини": ["запчастин", "анод", "ізоляція", "кран-букса", "картридж", "сильфон", "трубка",
-                                "адаптер", "фіксатор", "коліно труби"],
+            "Крани та вентилі": ["кран", "вентиль"],
+            "Сильфони": ["сильфон"],
+            "Димоходи та комплектуючі": ["адаптер", "коліно труби", "вставка труби", "димоход"],
+            "Кришки та розсікачі": ["кришка розсікача"],
+            "Шланги та трубки": ["шланг", "трубка"],
+            "Теплообмінники та ізоляція": ["теплообмінник", "ізоляція", "радіатор колонки"],
+            "Кріплення та фіксатори": ["фіксатор", "скоба", "тримач"],
+            "Аноди": ["анод"],
         }
 
         for product_node in products_from_xml:
@@ -929,12 +895,10 @@ def bas_import():
 
             group_id_node = product_node.find('.//Групи/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
-            category_from_1c_group = groups.get(group_id, "")
 
-            # --- [НОВА ГІБРИДНА ЛОГІКА ВИЗНАЧЕННЯ КАТЕГОРІЇ v3.0] ---
+            # --- [НОВА ЛОГІКА КАТЕГОРИЗАЦІЇ v4.0] ---
             final_category = None
             product_name_lower = name.lower()
-            group_name_lower = category_from_1c_group.lower()
 
             # 1. Пріоритетний пошук за назвою товару
             for category, keywords in CATEGORY_KEYWORDS.items():
@@ -942,22 +906,17 @@ def bas_import():
                     final_category = category
                     break
 
-            # 2. Якщо за назвою не вдалося, шукаємо за назвою групи з BAS
+            # 2. Якщо категорія все ще не визначена, але в назві є слово "запчастини" або товар належить до групи запчастин
             if not final_category:
-                for category, keywords in CATEGORY_KEYWORDS.items():
-                    if any(keyword in group_name_lower for keyword in keywords):
-                        final_category = category
-                        break
+                # Беремо назву групи з BAS і перевіряємо
+                group_name_lower = groups.get(group_id, "").lower()
+                if "запчастин" in product_name_lower or "запчастин" in group_name_lower:
+                    final_category = "Інші запчастини"
 
-            # 3. Якщо категорія все ще не визначена, але в назві або групі є слово "запчастини",
-            # то відносимо до загальної категорії запчастин.
-            if not final_category and ("запчастин" in product_name_lower or "запчастин" in group_name_lower):
-                final_category = "Інші запчастини"
-
-            # 4. Якщо нічого не допомогло, це якась інша одиниця товару.
+            # 3. Резервна категорія для всього іншого
             if not final_category:
-                final_category = "Інше обладнання"
-            # --- Кінець нової гібридної логіки ---
+                final_category = "Різне"
+            # --- Кінець нової логіки ---
 
             image_tags = product_node.findall('Картинка')
             image_filename_from_xml = ''
@@ -998,12 +957,12 @@ def bas_import():
             if description:
                 clean_description = description.replace('<br>', '\n').replace('<BR>', '\n')
                 brand_keywords = ['виробник:', 'бренд:', 'виробництво:', 'торгова марка:']
-                known_brands = ['Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap',
+                known_brands = ['SIT', 'Honeywell', 'Polidoro', 'Vaillant', 'Beretta', 'Demrad', 'Ariston', 'Aquapulse',
+                                'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap',
                                 'Immergas', 'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis',
                                 'Pedrollo', 'Pentax', 'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut',
                                 'Aquatica', 'Thermo Alliance', 'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor',
-                                'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення', 'Gerts',
-                                'SIT', 'Honeywell', 'Polidoro', 'Vaillant', 'Beretta', 'Demrad']
+                                'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення', 'Gerts']
                 for keyword in brand_keywords:
                     if keyword in clean_description.lower():
                         start_index = clean_description.lower().find(keyword) + len(keyword)

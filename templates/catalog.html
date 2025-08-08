@@ -16,57 +16,26 @@
         <aside class="filters-sidebar sticky-sidebar">
             <form id="filters-form" method="GET" action="{{ url_for('catalog', category_slug=category_slug) }}">
 
-                <!-- [НОВА ВЕРСІЯ 3.0] Спрощена та логічна навігація по категоріях -->
+                <!-- [НОВА ВЕРСІЯ 4.0] Простий плаский список категорій -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Категорії</h4>
                     <div class="filter-options-list">
 
-                        <!-- Кнопка "Всі категорії", яка є завжди -->
+                        <!-- Кнопка "Всі категорії" -->
                         <a href="{{ url_for('catalog', **current_filters) }}"
                            class="filter-category-link {% if not category_slug %}active{% endif %}">
-                            <span>Всі категорії</span>
+                            <span>Всі товари</span>
                         </a>
 
-                        {% if current_category %}
-                            {# Якщо обрана якась категорія, показуємо посилання "Назад" на батьківську #}
-                            {% set back_link_text = 'Всі категорії' %}
-                            {% set back_link_url = url_for('catalog', **current_filters) %}
-
-                            {% if main_category_of_current and current_category != main_category_of_current %}
-                                {% set back_link_text = main_category_of_current %}
-                                {% set back_link_url = url_for('catalog', category_slug=main_category_of_current.lower().replace(' ', '-'), **current_filters) %}
-                            {% endif %}
-
-                            <a href="{{ back_link_url }}" class="back-to-categories-link" style="margin-top: 10px; margin-bottom: 10px;">
-                                <i class="fas fa-arrow-left"></i>
-                                <span>{{ back_link_text }}</span>
+                        <!-- Цикл для виводу всіх знайдених категорій -->
+                        {% for cat_name, count in hierarchy.items()|sort %}
+                            {% set slug = cat_name.lower().replace(' ', '-') %}
+                            <a href="{{ url_for('catalog', category_slug=slug, **current_filters) }}"
+                               class="filter-category-link {% if category_slug == slug %}active{% endif %}">
+                                <span>{{ cat_name }}</span>
+                                <span class="filter-count">{{ count }}</span>
                             </a>
-                        {% endif %}
-
-                        {# Показуємо головні категорії або підкатегорії залежно від вибору #}
-                        {% if not current_category %}
-                            {# Головна сторінка каталогу: показуємо головні категорії #}
-                            {% for cat_name, data in hierarchy.items()|sort %}
-                                <a href="{{ url_for('catalog', category_slug=cat_name.lower().replace(' ', '-'), **current_filters) }}" class="filter-category-link">
-                                    <span>{{ cat_name }}</span>
-                                    <span class="filter-count">{{ data.count }}</span>
-                                </a>
-                            {% endfor %}
-                        {% else %}
-                            {# Сторінка категорії: показуємо її підкатегорії (якщо є) #}
-                             {% set subcategories = hierarchy.get(main_category_of_current, {}).get('subcategories', {}) %}
-                             {% if subcategories and current_category == main_category_of_current %}
-                                <div class="subcategory-list">
-                                     {% for subcat_name, count in subcategories.items()|sort %}
-                                        <a href="{{ url_for('catalog', category_slug=subcat_name.lower().replace(' ', '-'), **current_filters) }}"
-                                           class="filter-category-link {% if subcat_name == current_category %}active{% endif %}">
-                                            <span>{{ subcat_name }}</span>
-                                            <span class="filter-count">{{ count }}</span>
-                                        </a>
-                                    {% endfor %}
-                                </div>
-                             {% endif %}
-                        {% endif %}
+                        {% endfor %}
                     </div>
                 </div>
 
