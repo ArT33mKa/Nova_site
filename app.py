@@ -366,12 +366,20 @@ def catalog(category_slug):
 
             # Якщо поточний slug не співпадає з slug'ом знайденого товару, робимо редірект
             if category_slug != new_slug:
+                # Створюємо копію аргументів для безпечної модифікації
                 redirect_args = request.args.copy()
-                redirect_args['category_slug'] = new_slug
-                # Видаляємо 'search' звідси, щоб не дублювався, і передамо його окремо
+
+                # [ГОЛОВНИЙ ФІКС] Видаляємо СТАРИЙ 'category_slug', якщо він там був.
+                # Це запобігає конфлікту в url_for.
+                if 'category_slug' in redirect_args:
+                    redirect_args.pop('category_slug')
+
+                # Також видаляємо 'search', бо ми передаємо його явно і хочемо, щоб він був "свіжим"
                 if 'search' in redirect_args:
                     redirect_args.pop('search')
 
+                # Тепер redirect_args містить тільки "чисті" фільтри (наприклад, ціну),
+                # і ми можемо безпечно робити редірект.
                 return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
 
     # --- 3. Формуємо базовий запит до БД (якщо не було редіректу) ---
