@@ -674,66 +674,69 @@ function initLoadMore() {
     });
 }
 
-function initShowMoreFilters() {
-    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
-        const limit = parseInt(list.dataset.showLimit, 10);
-        const items = Array.from(list.children);
+// Логіка для кнопки "Завантажити ще"
+document.addEventListener('DOMContentLoaded', function() {
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    const productsGrid = document.querySelector('.products-grid');
+    const loadingSpinner = document.getElementById('loading-spinner');
 
-        if (items.length > limit) {
-            // Ховаємо всі елементи, що перевищують ліміт
-            for (let i = limit; i < items.length; i++) {
-                items[i].style.display = 'none';
-            }
+    let currentPage = 1;
 
-            // Створюємо та додаємо кнопку
-            const remainingCount = items.length - limit;
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'show-more-filters-btn';
-            button.textContent = `Ще ${remainingCount}`;
-            list.insertAdjacentElement('afterend', button);
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', function() {
+            currentPage++;
+            loadMoreBtn.style.display = 'none';
+            loadingSpinner.style.display = 'block';
 
-            // Додаємо обробник події для кнопки
-            button.addEventListener('click', () => {
-                for (let i = limit; i < items.length; i++) {
-                    items[i].style.display = ''; // Повертаємо стандартне відображення
-                }
-                button.remove(); // Видаляємо кнопку після використання
-            });
-        }
-    });
+            // Отримуємо всі поточні параметри URL
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('page', currentPage);
+
+            // Формуємо URL для запиту
+            const fetchURL = `${window.location.pathname}?${urlParams.toString()}`;
+
+            fetch(fetchURL)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newProducts = doc.querySelector('.products-grid').children;
+
+                    // Додаємо нові товари
+                    Array.from(newProducts).forEach(product => {
+                        productsGrid.appendChild(product);
+                    });
+
+                    // Перевіряємо, чи є ще сторінки
+                    const hasNextPage = doc.getElementById('load-more-btn') !== null;
+
+                    loadingSpinner.style.display = 'none';
+                    if (hasNextPage) {
+                        loadMoreBtn.style.display = 'block';
+                    }
+
+                    // Ініціалізуємо функціональність для нових карток товарів
+                    initializeProductCards();
+                })
+                .catch(error => {
+                    console.error('Помилка завантаження:', error);
+                    loadingSpinner.style.display = 'none';
+                    loadMoreBtn.style.display = 'block';
+                });
+        });
+    }
+});
+
+// Функція ініціалізації карток товарів
+function initializeProductCards() {
+    // Додайте тут логіку ініціалізації нових карток товарів
+    // Наприклад, додавання в кошик, обробка кнопок тощо
+    // ...existing code for product card initialization...
 }
 
-function initShowMoreFilters() {
-    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
-        const limit = parseInt(list.dataset.showLimit, 10);
-        const items = Array.from(list.children);
-
-        if (items.length > limit) {
-            // Ховаємо всі елементи, що перевищують ліміт
-            for (let i = limit; i < items.length; i++) {
-                items[i].style.display = 'none';
-            }
-
-            // Створюємо та додаємо кнопку
-            const remainingCount = items.length - limit;
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'show-more-filters-btn';
-            button.textContent = `Показати ще ${remainingCount}`;
-            list.insertAdjacentElement('afterend', button);
-
-            // Додаємо обробник події для кнопки
-            button.addEventListener('click', () => {
-                for (let i = limit; i < items.length; i++) {
-                    items[i].style.display = ''; // Повертаємо стандартне відображення
-                }
-                button.remove(); // Видаляємо кнопку після використання
-            });
-        }
-    });
-}
-
+// ===================================================================
+//  ДОДАТКОВІ ФУНКЦІЇ
+// ===================================================================
 function initAutoApplyFilters() {
     const filtersForm = document.getElementById('auto-filters-form');
     if (!filtersForm) return;
