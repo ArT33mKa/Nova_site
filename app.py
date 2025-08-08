@@ -324,13 +324,57 @@ def catalog(category_slug):
     # --- 1. Отримуємо всі фільтри з URL ---
     min_price_str = request.args.get('min_price', '')
     max_price_str = request.args.get('max_price', '')
+    search_query = request.args.get('search', '').strip()
 
     min_price = float(min_price_str) if min_price_str.isdigit() else None
     max_price = float(max_price_str) if max_price_str.isdigit() else None
 
-    search_query = request.args.get('search', '').strip()
+    # --- 2. [НОВА ЛОГІКА] Автоматичне перенаправлення при пошуку ---
+    if search_query:
+        # Шукаємо перший товар, що відповідає запиту, незалежно від категорії
+        found_product = Product.query.filter(
+            Product.name.ilike(f'%{search_query}%'),
+            Product.in_stock == True,
+            Product.description.isnot(None),
+            Product.description != ''
+        ).first()
 
-    # --- 3. Формуємо базовий запит до БД ---
+        if found_product:
+            # Визначаємо головну категорію знайденого товару
+            product_main_category = None
+            MAIN_CATEGORIES = {
+                "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
+                "Насоси": ["насос", "помпа", "гідрофор"],
+                "Бойлери": ["бойлер", "водонагрівач"],
+                "Змішувачі": ["змішувач", "кран", "сифон"],
+                "Витяжки": ["витяжк", "вентилятор"],
+                "Газові колонки": ["колонк", "газов"],
+                "Сушка для рушників": ["сушк", "рушник"],
+                "Запчастини": ["запчастин", "котел", "термопар"]
+            }
+            if found_product.category in MAIN_CATEGORIES:
+                product_main_category = found_product.category
+            else:
+                for main_cat, keywords in MAIN_CATEGORIES.items():
+                    if any(keyword in found_product.category.lower() for keyword in keywords):
+                        product_main_category = main_cat
+                        break
+            if not product_main_category:
+                product_main_category = "Запчастини"
+
+            new_slug = product_main_category.lower().replace(' ', '-')
+
+            # Якщо поточний slug не співпадає з slug'ом знайденого товару, робимо редірект
+            if category_slug != new_slug:
+                redirect_args = request.args.copy()
+                redirect_args['category_slug'] = new_slug
+                # Видаляємо 'search' звідси, щоб не дублювався, і передамо його окремо
+                if 'search' in redirect_args:
+                    redirect_args.pop('search')
+
+                return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
+
+    # --- 3. Формуємо базовий запит до БД (якщо не було редіректу) ---
     query = Product.query.filter(
         Product.in_stock == True,
         Product.description.isnot(None),
@@ -338,7 +382,6 @@ def catalog(category_slug):
         Product.image.notlike('default_tovar%')
     )
 
-    # [НОВЕ] Застосовуємо фільтр пошуку, якщо він є
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
@@ -363,33 +406,28 @@ def catalog(category_slug):
                     break
             if current_category: break
 
-    # --- 5. Розраховуємо діапазон цін та кількість по брендах ---
-    # Створюємо запит для розрахунків, який включає фільтр по категорії, АЛЕ не по ціні/бренду
+    # --- 5. Розраховуємо діапазон цін ---
     query_for_counts = query
-
     price_range = db.session.query(func.floor(func.min(Product.price)), func.ceil(func.max(Product.price))) \
         .select_from(query_for_counts.subquery()).one()
     min_price_available = price_range[0] or 0
     max_price_available = price_range[1] or 10000
 
-    # app.py, функція catalog
-
-    # Застосовуємо фільтри ціни
+    # --- 6. Застосовуємо решту фільтрів ---
     if min_price:
         query = query.filter(Product.price >= min_price)
     if max_price:
         query = query.filter(Product.price <= max_price)
 
-    # Тепер query_for_counts просто дорівнює нашому відфільтрованому запиту
-    query_for_counts = query
-
-    # --- 7. Отримуємо фінальний список товарів з пагінацією ---
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
 
-    # --- 8. Готуємо всі дані для передачі в шаблон ---
+    # --- 7. [ВИПРАВЛЕННЯ] Готуємо фільтри для шаблону, видаляючи 'category_slug'
     current_filters = request.args.copy()
     if 'page' in current_filters:
         current_filters.pop('page')
+    # Ось головний фікс для шаблону, який ми робимо тут, щоб не ускладнювати Jinja
+    if 'category_slug' in current_filters:
+        current_filters.pop('category_slug')
 
     return render_template(
         'catalog.html',
@@ -397,11 +435,11 @@ def catalog(category_slug):
         hierarchy=hierarchy,
         current_category=current_category,
         main_category_of_current=main_category_of_current,
-        current_filters=current_filters,
+        current_filters=current_filters,  # Тепер ця змінна БЕЗ category_slug
         category_slug=category_slug,
         min_price_available=min_price_available,
         max_price_available=max_price_available,
-        search_query=search_query  # [НОВЕ]
+        search_query=search_query
     )
 
 @app.route("/product/<int:product_id>")
