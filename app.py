@@ -1269,6 +1269,7 @@ def page_not_found(e):
 
 
 
+@app.route('/api/catalog/load_more')
 def api_load_more():
     page = request.args.get('page', 1, type=int)
     # [ОНОВЛЕНО] Отримуємо ті ж фільтри, що й у catalog
