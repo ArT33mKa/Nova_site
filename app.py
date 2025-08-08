@@ -1089,15 +1089,19 @@ def bas_import():
                     except (ValueError, TypeError):
                         pass
 
-            if not in_stock:
-                stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
-                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
-                    'true', 'да', 'є', 'yes']:
-                    in_stock = True
-                else:
-                    stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
-                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.lower() == 'true':
-                        in_stock = True
+            # Перевіряємо додаткові поля наявності НЕЗАЛЕЖНО від того, що було в <Предложение>.
+            # Це виправляє помилку, коли кількість = 0, але є прапорець "Наличие: так".
+
+            # Перевірка №2: Основна властивість "Наличие"
+            stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
+            if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
+                'true', 'да', 'є', 'yes', 'так']:
+                in_stock = True
+
+            # Перевірка №3: Альтернативна властивість "Наличие"
+            stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
+            if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.strip().lower() == 'true':
+                in_stock = True
 
             # --- Логіка визначення бренду також без змін ---
             brand = None
