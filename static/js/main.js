@@ -96,7 +96,7 @@ function switchAuthTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
 }
 
-// [ЗМІНЕНО] Функц��я тепер приймає залежності
+// [ЗМІНЕНО] Фун��ц��я тепер приймає залежності
 function initCabinetModal(pageOverlay, closeAllSidebars) {
     const cabinetModal = document.getElementById('cabinet-modal');
     if (!cabinetModal) return;
@@ -452,29 +452,46 @@ function initContactForm() {
                 showToast(data.message, data.status === 'success' ? 'success' : 'error');
                 if (data.status === 'success') this.reset();
             }).catch(() => showToast('Сталася помилка при відправці.', 'error'));
-        });
     }
 }
 
 function initCatalogFilters() {
-    const showMoreBtn = document.getElementById('show-more-brands-btn');
-    if (showMoreBtn) {
-        showMoreBtn.addEventListener('click', function() {
-            const list = this.previousElementSibling;
-            const isExpanded = this.dataset.expanded === 'true';
-            if (isExpanded) {
-                list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
-                this.textContent = 'Показати більше';
-                this.dataset.expanded = 'false';
+    // Обробка кліків по категоріях
+    document.querySelectorAll('.radio-style-list .radio-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const currentHref = this.getAttribute('href');
+            if (this.classList.contains('active')) {
+                // Якщо категорія вже активна, перенаправляємо на каталог без категорії
+                window.location.href = '/catalog/';
             } else {
-                list.querySelectorAll('.brand-item.hidden').forEach(item => item.classList.remove('hidden'));
-                this.textContent = 'Приховати';
-                this.dataset.expanded = 'true';
+                // Інакше переходимо за посиланням категорії
+                window.location.href = currentHref;
             }
         });
-        const list = showMoreBtn.previousElementSibling;
-        list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
-    }
+    });
+
+    // Обробка кліків по чекбоксах брендів
+    document.querySelectorAll('.checkbox-item input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const form = this.closest('form');
+            const checkboxItem = this.closest('.checkbox-item');
+
+            if (this.checked) {
+                checkboxItem.classList.add('checked');
+            } else {
+                checkboxItem.classList.remove('checked');
+            }
+
+            // Відправляємо форму для оновлення фільтрів
+            form.submit();
+        });
+    });
+
+    // Додаємо клас checked для вже вибраних чекбоксів ��ри завантаженні
+    document.querySelectorAll('.checkbox-item input[type="checkbox"]:checked').forEach(checkbox => {
+        checkbox.closest('.checkbox-item').classList.add('checked');
+    });
 }
 
 function initReviewsPage() {
@@ -676,7 +693,7 @@ function initLoadMore() {
                 }
             })
             .catch(error => {
-                console.error('Помилка завантаження:', error);
+                console.error('Помилка за��антаження:', error);
                 loadMoreBtn.style.display = 'block';
             })
             .finally(() => {
@@ -730,7 +747,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         updateCartView();
                         updateFavoritesUI();
                     } else {
-                        console.error('Не вдалося знайти нові товари в відповіді');
+                        console.error('Не вдалося знайти нові товар�� в відповіді');
                         loadMoreBtn.style.display = 'none';
                     }
                 })
@@ -787,5 +804,45 @@ function initAutoApplyFilters() {
         if (e.target.type === 'number') {
             debouncedSubmit();
         }
+    });
+}
+
+function initShowMoreFilters() {
+    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
+        const showLimit = parseInt(list.dataset.showLimit);
+        const items = list.children;
+
+        if (items.length <= showLimit) return;
+
+        // Приховуємо елементи після ліміту
+        for (let i = showLimit; i < items.length; i++) {
+            items[i].style.display = 'none';
+        }
+
+        // Додаємо кнопку "Показати ще"
+        const showMoreBtn = document.createElement('button');
+        showMoreBtn.className = 'show-more-filters-btn';
+        showMoreBtn.textContent = 'Показати ще';
+        list.after(showMoreBtn);
+
+        showMoreBtn.addEventListener('click', function() {
+            const isExpanded = this.classList.contains('expanded');
+
+            if (!isExpanded) {
+                // Показуємо всі елементи
+                for (let i = showLimit; i < items.length; i++) {
+                    items[i].style.display = '';
+                }
+                this.textContent = 'Згорнути';
+            } else {
+                // Приховуємо елементи після ліміту
+                for (let i = showLimit; i < items.length; i++) {
+                    items[i].style.display = 'none';
+                }
+                this.textContent = 'Показати ще';
+            }
+
+            this.classList.toggle('expanded');
+        });
     });
 }

@@ -84,9 +84,19 @@
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
                     <div class="price-filter-wrapper">
-                        <input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}" class="price-input">
-                        <span class="price-divider">–</span>
-                        <input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}" class="price-input">
+                        <input type="number"
+                               name="min_price"
+                               class="price-input"
+                               placeholder="Від"
+                               value="{{ request.args.get('min_price', '') }}"
+                               min="0">
+                        <span class="price-divider">—</span>
+                        <input type="number"
+                               name="max_price"
+                               class="price-input"
+                               placeholder="До"
+                               value="{{ request.args.get('max_price', '') }}"
+                               min="0">
                         <button type="submit" class="price-ok-btn">OK</button>
                     </div>
                 </div>
@@ -160,7 +170,8 @@
                 </div>
                 {% if products.has_next %}
     <div class="load-more-container">
-        <button id="load-more-btn" class="btn btn-outline btn-lg">
+        <button id="load-more-btn" class="btn btn-outline btn-lg"
+                data-has-next="{{ products.has_next|tojson }}"> <!-- Виправлено: використовуємо |tojson -->
             <i class="fas fa-sync-alt"></i> Завантажити ще
         </button>
         <div id="loading-spinner" style="display: none;">

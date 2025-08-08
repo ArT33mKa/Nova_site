@@ -202,7 +202,7 @@ img {
     justify-content: flex-start; /* <-- ДОДАЙТЕ ЦЕЙ РЯДОК */
     gap: 12px;
     font-weight: 500;
-    padding: 10px 20px; /* Відступи по боках створюють простір зліва */
+    padding: 10px 20px; /* Ві��ступи по боках створюють простір зліва */
     transition: background-color 0.3s, border-color 0.3s;
     white-space: nowrap;
 }
@@ -636,7 +636,7 @@ img {
 }
 
 .product-card .add-to-cart-btn:disabled {
-    /* Стиль для неактивної кнопки */
+    /* Стиль для неактив����ої кнопки */
     background-color: var(--light-gray);
     border-color: var(--light-gray);
     color: var(--gray-color);
@@ -1011,7 +1011,7 @@ img {
 /* --- Carousel --- */
 .carousel-container {
     position: relative; /* Необхідно для позиціонування стрілок */
-    margin: 0 -15px; /* Компенсує відступи контейнера для повноекранних стрілок */
+    margin: 0 -15px; /* Компенсує відступи контейнера для повно��к��анних стрілок */
     padding: 0 15px;
 }
 
@@ -1337,1117 +1337,181 @@ img {
   -moz-appearance: textfield;
 }
 
-/* Кнопка "Ок" */
-.price-ok-btn {
-    padding: 12px 22px;
-    font-size: 1rem;
-    font-weight: 600;
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 0; /* Прибираємо власне заокруглення */
-    cursor: pointer;
-    transition: background-color 0.2s;
-    align-self: stretch; /* Розтягуємо кнопку на всю висоту контейнера */
-}
-
-.price-ok-btn:hover {
-    background-color: var(--secondary-color);
-}
-
-.price-inputs input {
-    text-align: center; /* Текст в інпутах буде по центру */
-}
-
-/* Прибираємо стандартні стрілочки у полів для чисел */
-.price-inputs input[type=number]::-webkit-inner-spin-button,
-.price-inputs input[type=number]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.price-inputs input[type=number] {
-  -moz-appearance: textfield; /* Для Firefox */
-}
-
-.price-inputs span {
-    font-size: 1.2rem;
-    color: var(--gray-color);
-    font-weight: 500;
-}
-
-.checkbox-item {
-    display: flex;         /* Вмикаємо Flexbox для вирівнювання */
-    align-items: center;   /* Вертикальне вирівнювання по центру */
-    gap: 12px;             /* Збільшуємо відступ між чекбоксом і текстом */
-    margin-bottom: 15px;   /* Відступ між рядками чекбоксів */
-    cursor: pointer;
-}
-
-.checkbox-item:last-child {
-    margin-bottom: 0;
-}
-
-.checkbox-item input[type="checkbox"] {
-    width: 18px;           /* Збільшуємо сам чекбокс */
-    height: 18px;
-    flex-shrink: 0;
-    accent-color: var(--primary-color); /* Робимо "галочку" в кольорах сайту */
-}
-
-/* Pagination */
-.pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 40px;
-}
-.pagination-controls {
-    display: flex;
-    gap: 5px;
-}
-.page-link {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 5px;
-    color: var(--dark-color);
-    border: 1px solid var(--light-gray);
-    transition: var(--transition);
-}
-.page-link:hover,
-.page-link.active {
-    background-color: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-}
-
-/* --- Product Detail Page --- */
-.product-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 50px;
-    align-items: start;
-}
-.product-image-main {
-    position: sticky;
-    top: 120px;
-    max-height: 80vh;
-    border: 1px solid var(--light-gray);
-    border-radius: var(--border-radius);
-    padding: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.product-image-main img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-}
-.product-info-main .product-title {
-    font-size: 2.2rem;
-    line-height: 1.2;
-    margin-bottom: 10px;
-}
-.product-price-detail {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--primary-color);
-    margin: 20px 0;
-}
-.product-meta {
-    margin-bottom: 30px;
-}
-.meta-item {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
-    align-items: center;
-}
-.meta-item dt {
-    font-weight: 600;
-    color: var(--gray-color);
-}
-.meta-item .stock-status {
-    position: static;
-    font-size: 1rem;
-    padding: 0;
-    background: none !important;
-}
-.meta-item .in-stock { color: var(--success-color); }
-.meta-item .out-of-stock { color: var(--danger-color); }
-
-.product-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
-}
-.buy-now-btn {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-    color: white;
-}
-.buy-now-btn:hover {
-    background-color: #e65c00;
-    border-color: #e65c00;
-}
-.description-text-wrapper {
-    position: relative;
-    max-height: 120px;
-    overflow: hidden;
-    transition: max-height 0.4s ease-out;
-}
-.description-text-wrapper::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 50px;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), white);
-    pointer-events: none;
-    transition: opacity 0.4s ease;
-}
-.description-text-wrapper.expanded {
-    max-height: 2000px;
-}
-.description-text-wrapper.expanded::after,
-.description-text-wrapper.no-fade::after {
-    opacity: 0;
-    display: none;
-}
-.similar-products-section {
-    margin-top: 60px;
-    padding-top: 40px;
-    border-top: 1px solid var(--light-gray);
-}
-.similar-products-section .section-title { text-align: left; padding-bottom: 20px; }
-
-
-/* --- Reviews & Questions Page --- */
-.reviews-page-grid {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 30px;
-    margin-top: 30px;
-}
-.reviews-summary .summary-box {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: var(--border-radius);
-    padding: 20px;
-    position: sticky;
-    top: 120px;
-}
-.overall-rating {
-    text-align: center;
-    padding-bottom: 20px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #e9ecef;
-}
-.overall-rating .rating-value {
-    font-size: 3rem;
-    font-weight: 700;
-}
-.overall-rating .rating-stars {
-    font-size: 1.5rem;
-    color: #ffc107;
-    margin: 5px 0;
-}
-.rating-stars span {
-    color: #e0e0e0;
-}
-.overall-rating .reviews-count {
-    color: var(--gray-color);
-}
-.rating-breakdown .breakdown-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-}
-.rating-breakdown .bar-container {
-    flex-grow: 1;
-    height: 8px;
-    background-color: #e9ecef;
-    border-radius: 4px;
-    overflow: hidden;
-}
-.rating-breakdown .bar {
-    height: 100%;
-    background-color: #ffc107;
-    border-radius: 4px;
-}
-.rating-input .stars { display: inline-flex; direction: ltr !important; flex-direction: row-reverse; justify-content: flex-end; }
-.rating-input .stars input { display: none; }
-.rating-input .stars label { font-size: 2.2rem; color: #ddd; cursor: pointer; transition: color 0.2s; }
-.rating-input .stars label:hover,
-.rating-input .stars label:hover ~ label,
-.rating-input .stars input:checked ~ label { color: #ffc107; }
-
-.reviews-list .review-item {
-    padding: 20px 0;
-    border-bottom: 1px solid #e9ecef;
-}
-.review-item:last-child {
-    border-bottom: none;
-}
-.review-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 10px;
-    position: relative;
-}
-.review-header .rating { font-size: 1.2rem; color: #ffc107; }
-.review-header .review-date { color: var(--gray-color); margin-left: auto; }
-.review-type-badge { background-color: var(--light-gray); color: var(--gray-color); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
-.owner-badge { background-color: var(--primary-color); color: white; font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; font-weight: 500; }
-.owner-badge i { margin-right: 4px; }
-.review-text { line-height: 1.7; }
-.review-item .reply-btn { margin-top: 10px; }
-.replies-container { margin-top: 15px; padding-left: 30px; border-left: 2px solid var(--light-gray); }
-.review-item.reply { padding: 15px 0; border-bottom: 1px dashed #eee; }
-.review-item.reply:last-child { border-bottom: none; padding-bottom: 0; }
-
-/* --- Checkout Page --- */
-.checkout-page-v2 {
-    padding: 40px 0;
-    background-color: var(--light-color);
-}
-.checkout-grid-v2 {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 30px;
-    align-items: flex-start;
-}
-.checkout-section {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-.checkout-section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.checkout-section-header .icon {
-    background-color: rgba(0, 102, 204, 0.1);
-    color: var(--primary-color);
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-}
-.checkout-section-header h4 { font-size: 1.25rem; font-weight: 600; margin: 0; }
-.radio-group .radio-option { display: flex; border: 1px solid #ddd; border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
-.radio-group .radio-option:last-child { margin-bottom: 0; }
-.radio-group .radio-option.active { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2); }
-.radio-group .radio-option input[type="radio"] { margin-top: 4px; margin-right: 15px; }
-.radio-group .radio-option p { margin: 5px 0 0 0; font-size: 0.9rem; color: var(--gray-color); }
-
-.order-summary-v2 { position: sticky; top: 120px; }
-#summary-item-list { max-height: 300px; overflow-y: auto; padding-right: 10px; }
-.summary-item { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; }
-.summary-item img { width: 50px; height: 50px; object-fit: contain; border-radius: 8px; border: 1px solid var(--light-gray); }
-.summary-item-details .name { font-weight: 500; font-size: 0.95rem; line-height: 1.3; }
-.summary-item-details .price { color: var(--gray-color); font-size: 0.9rem; }
-.summary-totals { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
-.summary-total-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 1rem; }
-.summary-total-row.grand-total { font-size: 1.2rem; font-weight: 700; color: var(--primary-color); margin-top: 10px; }
-
-.suggestions-dropdown { display: none; position: absolute; background-color: white; border: 1px solid #ddd; border-top: none; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-.suggestion-item { padding: 10px 12px; cursor: pointer; font-size: 15px; }
-.suggestion-item:hover { background-color: #f0f0f0; }
-.suggestion-item-loading { padding: 10px 12px; color: #888; font-style: italic; }
-
-/* --- Profile & Admin Pages --- */
-.profile-page-container {
-    padding-top: 40px;
-    padding-bottom: 60px;
-}
-.profile-card {
-    background-color: white;
-    padding: 25px;
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-    margin-bottom: 30px;
-}
-.profile-card h3 {
-    font-size: 1.5rem;
-    margin-bottom: 20px;
-}
-.order-card, .review-card {
-    border: 1px solid var(--light-gray);
-    border-radius: var(--border-radius);
-    margin-bottom: 20px;
-    overflow: hidden;
-}
-.order-card-header, .review-card-header {
-    background-color: var(--light-color);
-    padding: 15px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.9rem;
-    color: var(--gray-color);
-}
-.order-card-header strong, .review-card-header strong {
-    color: var(--dark-color);
-    font-size: 1.1rem;
-}
-.order-card-body, .review-card-body {
-    padding: 20px;
-}
-.order-item-in-profile { display: flex; align-items: center; gap: 15px; padding: 10px 0; border-bottom: 1px solid var(--light-gray); }
-.order-item-in-profile:last-child { border-bottom: none; }
-.order-item-in-profile img { width: 50px; height: 50px; object-fit: contain; }
-.order-card-footer { padding: 15px 20px; text-align: right; font-size: 1.2rem; font-weight: bold; background-color: var(--light-color); }
-.review-card-product-info { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
-.review-card-product-info img { width: 60px; height: 60px; object-fit: contain; }
-.review-card .rating { color: #ffc107; }
-.no-items-placeholder { text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius); color: var(--gray-color); }
-.no-items-placeholder i { font-size: 3rem; margin-bottom: 15px; }
-.no-items-placeholder a { color: var(--primary-color); font-weight: 500; }
-.admin-product-actions { position: absolute; bottom: 10px; right: 10px; z-index: 5; display: flex; gap: 8px; pointer-events: none; }
-.admin-product-actions .admin-action-btn,
-.admin-product-actions form { pointer-events: auto; }
-.admin-action-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: white; font-size: 0.9rem; text-decoration: none; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.2s ease; border: none; cursor: pointer; }
-.admin-action-btn.edit-btn { background-color: var(--primary-color); }
-.admin-action-btn.edit-btn:hover { background-color: var(--secondary-color); }
-.admin-action-btn.delete-btn { background-color: var(--danger-color); }
-.admin-action-btn.delete-btn:hover { background-color: #c82333; }
-
-.rating {
-    font-size: 1.2rem;
-    color: #ffc107; /* Колір для "золотих" зірок */
-}
-
-/* Робимо "порожні" зірки сірими */
-.rating span {
-    color: #e0e0e0;
-}
-
-/* 404 Page */
-.error-page-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 80px 20px;
-    min-height: 50vh;
-}
-.error-page-container .error-code {
-    font-size: 10rem;
-    font-weight: 700;
-    color: var(--primary-color);
-    line-height: 1;
-    margin-bottom: 20px;
-}
-.error-page-container h1 {
-    font-size: 2.5rem;
-    margin-bottom: 15px;
-}
-.error-page-container p {
-    font-size: 1.2rem;
-    color: var(--gray-color);
-    margin-bottom: 30px;
-    max-width: 500px;
-}
-
-
-/* ==============================================
-   8. OVERLAYS & BACKDROPS
-   ============================================== */
-
-#page-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 2050;
-    background-color: rgba(40, 40, 40, 0.4); /* Default for cart */
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.4s ease, visibility 0s 0.4s;
-    cursor: pointer;
-}
-#page-overlay.active {
-    opacity: 1;
-    visibility: visible;
-    transition: opacity 0.4s ease;
-}
-#page-overlay.dark {
-    background-color: rgba(0, 0, 0, 0.6); /* For cabinet */
-}
-
-
-/* ==============================================
-   9. RESPONSIVE STYLES
-   ============================================== */
-
-/* --- TABLETS (~769px - 1024px) --- */
-@media (max-width: 1024px) {
-    .main-nav ul { gap: 20px; }
-    .header-inner { gap: 15px; }
-    .card-slider { height: 50vh; min-height: 400px; }
-    .hero-slide { width: 80%; }
-    .hero-slide .hero-content h2 { font-size: 1.5rem; }
-    .hero-slide .hero-content p { font-size: 0.9rem; }
-}
-
-/* --- LARGE MOBILES & SMALL TABLETS (up to 900px) --- */
-@media (max-width: 900px) {
-    html { scroll-padding-top: 140px; } /* Reset padding for stacked header */
-    .main-header { height: auto; padding: 10px 0; }
-    .header-inner { flex-wrap: wrap; justify-content: space-between; row-gap: 15px; }
-    .logo { flex-basis: 50%; }
-    .header-actions { flex-basis: 50%; justify-content: flex-end; }
-    .main-nav { flex-basis: 100%; order: 3; border-top: 1px solid var(--light-gray); padding-top: 10px; justify-content: center; }
-    .main-nav ul { width: 100%; justify-content: space-around; }
-    .slider-nav { display: none; }
-    .about-content, .contacts-grid, .product-detail-grid, .checkout-grid-v2, .reviews-page-grid { grid-template-columns: 1fr; }
-    .catalog-content { display: flex; flex-direction: column; }
-    .filters-sidebar, .product-image-main, .order-summary-v2, .reviews-summary .summary-box {
-        position: static;
-        width: 100%;
-        margin-top: 30px;
-        max-height: none;
-    }
-    .about-image { order: -1; }
-    .carousel-container .product-card { flex-basis: calc(50% - 10px); }
-}
-
-/* --- SMALL MOBILES (up to 576px) --- */
-@media (max-width: 576px) {
-    .products-grid, .categories-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-    }
-    .logo-text h1 { font-size: 1.5rem; }
-    .logo-text p { display: none; }
-    .main-nav a { font-size: 0.9rem; }
-    .product-card .product-image { height: 160px; }
-    .product-card .product-info h3 { font-size: 0.9rem; line-height: 1.3; }
-    .product-card .price { font-size: 1rem; }
-    .product-card .product-footer .btn-sm { padding: 8px 12px; font-size: 0.8rem; }
-    .modal-content { width: 95%; }
-    .cart-sidebar { max-width: 90%; }
-    .carousel-container .product-card { flex-basis: 60%; }
-}
-
-.social-login-header {
-    text-align: center;
-    color: var(--gray-color);
-    margin: 1.5rem 0 1rem 0;
-    font-size: 0.9rem;
-}
-
-.social-login-container {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-}
-
-.social-login-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 50px;
-    height: 50px;
-    border: 1px solid #ddd;
-    border-radius: var(--border-radius);
-    transition: var(--transition);
-}
-
-.social-login-btn:hover {
-    background-color: #f8f9fa;
-    border-color: #ccc;
-}
-
-.social-login-btn img {
-    height: 24px;
-    width: 24px;
-    display: inline-block !important; /* Важливо, щоб перевизначити глобальний стиль */
-}
-
-.sticky-sidebar {
-    position: -webkit-sticky;
-    position: sticky;
-    top: 100px; /* Відстань від верху = висота хедера + відступ */
-    align-self: start;
-    max-height: calc(100vh - 120px);
-    overflow-y: auto; /* Скрол, якщо фільтрів забагато */
-}
-
-/* Ховаємо некрасивий скролбар, залишаючи можливість скролити */
-.sticky-sidebar::-webkit-scrollbar { width: 6px; }
-.sticky-sidebar::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 3px; }
-
-/* 2. Розтягуємо контейнер для кнопки "Показати ще" */
-.load-more-container {
-    /* Це правило застосовується до всього блоку, де лежить кнопка */
-    grid-column: 1 / -1; /* Головний фікс: розтягуємо на всі колонки grid-контейнера */
-    width: 100%;
-    text-align: center;
-    margin-top: 40px;
-    padding: 20px 0;
-}
-
-/* 3. Стилізуємо саму кнопку, щоб вона теж була широкою */
-#load-more-btn {
-    width: 100%; /* Кнопка займає всю ширину свого контейнера */
-    max-width: 400px; /* Але не стає надто широкою на великих екранах */
-    padding: 15px 30px;
-    font-size: 1.1rem;
-}
-
-/* [ДОДАТКОВО] Виправляємо поведінку на мобільних пристроях */
-@media (max-width: 900px) {
-    .sticky-sidebar {
-        position: static; /* Відключаємо "липкість" на мобільних, бо там інший макет */
-        max-height: none;
-        overflow-y: visible;
-    }
-
-    .load-more-container {
-        grid-column: auto; /* Скидаємо розтягування на мобільних */
-    }
-}
-
-.filters-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.filters-header .filter-section-title {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border: none;
-    text-align: left;
-}
-.filters-header .filter-section-title::after {
-    display: none;
-}
-
-.filter-group {
-    border-bottom: 1px solid var(--light-gray);
-    padding-bottom: 20px;
-    margin-bottom: 20px;
-}
-.filter-group:last-of-type {
-    border-bottom: none;
-    margin-bottom: 0;
-}
-
-details.filter-group {
-    padding-bottom: 0;
-}
-
-details > summary {
-    list-style: none; /* Прибирає стандартний маркер */
-    cursor: pointer;
-    padding: 10px 0;
-}
-summary::-webkit-details-marker {
-    display: none; /* Прибирає маркер в Chrome */
-}
-
-.filter-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Стрілочка для акордеону */
-.filter-title::after {
-    content: '▲';
-    font-size: 0.8rem;
-    transition: transform 0.2s ease-in-out;
-    transform: rotate(180deg);
-}
-
-details > summary.filter-title::after { /* Застосовуємо тільки для <summary> */
-    content: '▲';
-    font-size: 0.8rem;
-    transition: transform 0.2s ease-in-out;
-    transform: rotate(180deg);
-}
-
-.filter-options-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* Відступ між елементами списку */
-}
-
-.checkbox-item, .filter-category-link {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 10px;
-    border-radius: 6px;
-    transition: background-color 0.2s;
-    cursor: pointer;
-}
-.checkbox-item:hover, .filter-category-link:hover {
-    background-color: #e9eef1;
-    color: var(--primary-color);
-}
-.checkbox-item span:first-of-type {
-    margin-right: auto;
-    word-break: break-word;
-}
-
-.filter-count {
-    font-size: 0.85rem;
-    color: var(--gray-color);
-    background-color: var(--light-gray);
-    padding: 2px 6px;
-    border-radius: 4px;
-    flex-shrink: 0;
-}
-
-.filter-title.always-open::after {
-    display: none;
-}
-
-details > summary.filter-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    padding: 15px 10px;
-    margin: 0 -10px; /* Візуально розширюємо фон */
-    background-color: #f0f3f5;
-    border-radius: 6px;
-    position: relative;
-}
-
-details > summary.filter-title::after {
-    color: var(--primary-color);
-    font-weight: bold;
-}
-
-details[open] > summary.filter-title {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    background-color: #e9eef1;
-}
-
-/* Стилі для радіокнопок (кружечків) */
-.radio-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 15px;
-    cursor: pointer;
-    justify-content: space-between;
-}
-
-.radio-item span:first-of-type {
-    margin-right: auto;
-}
-
-.radio-item input[type="radio"] {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border: 2px solid #ccc;
-    border-radius: 50%;
-    flex-shrink: 0;
-    transition: all 0.2s;
-    position: relative;
-    display: grid;
-    place-content: center;
-}
-
-.radio-item input[type="radio"]::before {
-    content: '';
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: var(--primary-color);
-    transform: scale(0);
-    transition: transform 0.2s ease-in-out;
-}
-
-.radio-item input[type="radio"]:checked {
-    border-color: var(--primary-color);
-}
-.radio-item input[type="radio"]:checked::before {
-    transform: scale(1);
-}
-/* --- Стилі для логіки Prom.ua v2.0 --- */
-.filter-category-link {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 10px;
-    border-radius: 6px;
-    transition: background-color 0.2s;
-}
-.filter-category-link:hover {
-    background-color: #e9eef1;
-    color: var(--primary-color);
-}
-
-/* Кнопка "Показати ще" для фільтрів */
-.show-more-filters-btn {
-    background: none;
-    border: none;
-    color: var(--primary-color);
-    font-weight: 500;
-    cursor: pointer;
-    padding: 10px 5px;
-    margin-top: 10px;
-    display: block;
-}
-.show-more-filters-btn:hover {
-    text-decoration: underline;
-}
-
-.selected-filters-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    padding: 15px;
-    margin-bottom: 25px;
-    background-color: var(--light-color);
-    border: 1px solid var(--light-gray);
-    border-radius: var(--border-radius);
-}
-.selected-filters-bar span {
-    font-weight: 500;
-}
-.filter-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background-color: var(--primary-color);
-    color: white;
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 0.9rem;
-    transition: background-color 0.2s;
-}
-.filter-tag:hover {
-    background-color: var(--secondary-color);
-}
-.filter-tag-reset {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background-color: transparent;
-    color: var(--primary-color);
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    border: 1px solid var(--primary-color);
-    margin-left: auto; /* Притискає посилання вправо */
-    transition: all 0.2s;
-}
-
-.filter-tag-reset:hover {
-    background-color: var(--primary-color);
-    color: white;
-}
-.current-category-header {
-    margin-bottom: 20px;
-}
-
-.back-to-categories-link {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 15px;
-    background-color: #e9eef1;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: var(--primary-color);
-    border: 1px solid transparent;
-    transition: all 0.2s;
-}
-
-.back-to-categories-link:hover {
-    background-color: #dfe6eb;
-    border-color: #cdd5dc;
-}
-
-.back-to-categories-link i {
-    transition: transform 0.2s;
-}
-
-.back-to-categories-link:hover i {
-    transform: translateX(-3px);
-}
-
-.subcategory-list {
-    padding-left: 10px;
-    border-left: 2px solid var(--light-gray);
-}
-.subcategory-list .filter-category-link {
-    font-weight: 500;
-}
-
-/* [ДОДАЙТЕ] Стиль для тегу категорії */
-.filter-tag.category-tag {
-    background-color: #2c3e50; /* Темніший колір для виділення */
-    font-weight: 500;
-}
-
-.filter-tag.category-tag:hover {
-    background-color: #34495e;
-}
-
-.filter-category-link {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 10px;
-    border-radius: 6px;
-    transition: background-color 0.2s;
-}
-.filter-category-link:hover {
-    background-color: #e9eef1;
-    color: var(--primary-color);
-}
-
-.show-more-filters-btn {
-    background: none;
-    border: none;
-    color: var(--primary-color);
-    font-weight: 500;
-    cursor: pointer;
-    padding: 10px 5px;
-    margin-top: 10px;
-    display: block;
-}
-.show-more-filters-btn:hover {
-    text-decoration: underline;
-}
-
-.selected-filters-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    padding: 15px;
-    margin-bottom: 25px;
-    background-color: var(--light-color);
-    border: 1px solid var(--light-gray);
-    border-radius: var(--border-radius);
-}
-.selected-filters-bar span {
-    font-weight: 500;
-}
-.filter-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background-color: var(--primary-color);
-    color: white;
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 0.9rem;
-    transition: background-color 0.2s;
-}
-.filter-tag:hover {
-    background-color: var(--secondary-color);
-}
-.filter-tag-reset {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background-color: transparent;
-    color: var(--primary-color);
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    border: 1px solid var(--primary-color);
-    margin-left: auto; /* Притискає посилання вправо */
-    transition: all 0.2s;
-}
-
-.filter-tag-reset:hover {
-    background-color: var(--primary-color);
-    color: white;
-}
-
-.current-category-header {
-    margin-bottom: 20px;
-}
-
-.back-to-categories-link {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 15px;
-    background-color: #e9eef1;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: var(--primary-color);
-    border: 1px solid transparent;
-    transition: all 0.2s;
-}
-
-.back-to-categories-link:hover {
-    background-color: #dfe6eb;
-    border-color: #cdd5dc;
-}
-
-.back-to-categories-link i {
-    transition: transform 0.2s;
-}
-
-.back-to-categories-link:hover i {
-    transform: translateX(-3px);
-}
-
-.subcategory-list {
-    padding-left: 10px;
-    border-left: 2px solid var(--light-gray);
-}
-.subcategory-list .filter-category-link {
-    font-weight: 500;
-}
-
-.filter-tag.category-tag {
-    background-color: #2c3e50; /* Темніший колір для виділення */
-    font-weight: 500;
-}
-
-.filter-tag.category-tag:hover {
-    background-color: #34495e;
-}
-
-.load-more-container {
-    grid-column: 1 / -1;
-    width: 100%;
-    text-align: center;
-    margin-top: 40px;
-    padding: 20px 0;
-}
-
-.radio-style-list .radio-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 5px;
-    cursor: pointer;
-    border-radius: 6px;
-    transition: background-color 0.2s;
-}
-
-.radio-style-list .radio-item:hover {
-    background-color: #f0f3f5;
-}
-
-.radio-style-list .radio-item.active {
-    font-weight: 600;
-    color: var(--primary-color);
-}
-
-.radio-style-list .radio-item .radio-circle {
-    width: 18px;
-    height: 18px;
-    border: 2px solid #ccc;
-    border-radius: 50%;
-    flex-shrink: 0;
-    transition: all 0.2s;
-    position: relative;
-    display: grid;
-    place-content: center;
-}
-
-.radio-style-list .radio-item .radio-circle::before {
-    content: '';
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: var(--primary-color);
-    transform: scale(0);
-    transition: transform 0.2s ease-in-out;
-}
-
-.radio-style-list .radio-item.active .radio-circle {
-    border-color: var(--primary-color);
-}
-
-.radio-style-list .radio-item.active .radio-circle::before {
-    transform: scale(1);
-}
-
-.radio-style-list .radio-item span:nth-child(2) {
-    flex-grow: 1;
-}
-
-/* Стиль для батьківської категорії, щоб візуально виділити її */
-.radio-style-list .radio-item.is-parent {
-    font-size: 1.05rem;
-}
-
-/* Контейнер для вкладених підкатегорій */
-.subcategory-list-v2 {
-    padding-left: 25px;
-    margin-left: 9px; /* Вирівнювання по центру кружечка */
-    border-left: 2px solid var(--light-gray);
-    margin-top: 10px;
-    margin-bottom: 10px;
-}
-
 .price-filter-wrapper {
     display: flex;
     align-items: center;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
     overflow: hidden;
     margin-top: 10px;
 }
 
-.price-filter-wrapper .price-input {
-    width: 100%;
+.price-input {
+    flex: 1;
     border: none;
-    padding: 10px;
+    padding: 12px 15px;
+    width: 100%;
+    font-size: 0.95rem;
     text-align: center;
-    font-size: 1rem;
-    background-color: white;
+    outline: none;
+    border-right: 1px solid #ddd;
+}
+
+.price-input:last-of-type {
+    border-right: none;
+}
+
+.price-input::-webkit-outer-spin-button,
+.price-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.price-input[type=number] {
     -moz-appearance: textfield;
 }
 
-.price-filter-wrapper .price-input::-webkit-inner-spin-button,
-.price-filter-wrapper .price-input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
 .price-filter-wrapper .price-divider {
-    color: #ccc;
+    padding: 0 8px;
+    color: #999;
+    font-weight: 500;
+    background: #f8f9fa;
 }
 
 .price-filter-wrapper .price-ok-btn {
-    padding: 10px 18px;
-    border: none;
-    background-color: var(--primary-color);
+    padding: 12px 20px;
+    background: var(--primary-color);
     color: white;
+    border: none;
+    font-weight: 500;
     cursor: pointer;
-    font-weight: 600;
     transition: background-color 0.2s;
 }
 
 .price-filter-wrapper .price-ok-btn:hover {
-    background-color: var(--secondary-color);
+    background: var(--secondary-color);
 }
+
+/* Оновлені стилі для чекбоксів та категорій */
+.radio-style-list .radio-item,
+.checkbox-item {
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    color: var(--dark-color);
+}
+
+.radio-style-list .radio-item:hover,
+.checkbox-item:hover {
+    background-color: #f0f3f5;
+}
+
+.radio-style-list .radio-item.active,
+.checkbox-item.checked {
+    background-color: #e8f0fe;
+    color: var(--primary-color);
+}
+
+/* --- Checkout Page --- */
+.checkout-page {
+    padding: 40px 0;
+}
+
+.checkout-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 30px;
+}
+
+.checkout-form {
+    background: white;
+    padding: 30px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--light-gray);
+}
+
+.checkout-sidebar {
+    background: white;
+    padding: 25px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--light-gray);
+    position: sticky;
+    top: 100px;
+}
+
+.checkout-items {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.checkout-item {
+    display: flex;
+    gap: 15px;
+    padding: 10px 0;
+}
+
+.checkout-item-img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    border: 1px solid var(--light-gray);
+    border-radius: 4px;
+}
+
+.checkout-item-info {
+    flex-grow: 1;
+}
+
+.checkout-item-info h4 {
+    font-size: 0.9rem;
+    margin: 0 0 5px 0;
+}
+
+.checkout-item-price {
+    font-weight: 500;
+}
+
+.checkout-summary {
+    font-size: 1.1rem;
+}
+
+.checkout-total {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    font-size: 1.2rem;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 2px solid var(--light-gray);
+}
+
+/* --- Sidebar Styles --- */
+.sidebar {
+    background: white;
+    padding: 20px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--light-gray);
+}
+
+.sidebar-title {
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.sidebar-section {
+    margin-bottom: 25px;
+}
+
+.sidebar-section:last-child {
+    margin-bottom: 0;
+}
+
