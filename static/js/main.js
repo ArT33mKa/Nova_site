@@ -674,7 +674,7 @@ function initLoadMore() {
     });
 }
 
-// Логіка для кнопки "Завантажити ще"
+// Оновлена логіка для кнопки "Завантажити ще"
 document.addEventListener('DOMContentLoaded', function() {
     const loadMoreBtn = document.getElementById('load-more-btn');
     const productsGrid = document.querySelector('.products-grid');
@@ -698,30 +698,37 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch(fetchURL)
                 .then(response => response.text())
                 .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const newProducts = doc.querySelector('.products-grid').children;
+                    // Створюємо тимчасовий контейнер для парсингу HTML
+                    const tempContainer = document.createElement('div');
+                    tempContainer.innerHTML = html;
 
-                    // Додаємо нові товари
-                    Array.from(newProducts).forEach(product => {
-                        productsGrid.appendChild(product);
-                    });
+                    // Знаходимо нові товари в отриманому HTML
+                    const newProductsGrid = tempContainer.querySelector('.products-grid');
+                    if (newProductsGrid) {
+                        // Додаємо тільки картки товарів
+                        const newProducts = Array.from(newProductsGrid.children);
+                        newProducts.forEach(product => {
+                            productsGrid.appendChild(product);
+                        });
 
-                    // Перевіряємо, чи є ще сторінки
-                    const hasNextPage = doc.getElementById('load-more-btn') !== null;
+                        // Перевіряємо наявність кнопки "Завантажити ще" в новому контенті
+                        const hasMoreProducts = tempContainer.querySelector('#load-more-btn') !== null;
+                        loadMoreBtn.style.display = hasMoreProducts ? 'block' : 'none';
 
-                    loadingSpinner.style.display = 'none';
-                    if (hasNextPage) {
-                        loadMoreBtn.style.display = 'block';
+                        // Оновлюємо стани кнопок та інтерактивних елементів
+                        updateCartView();
+                        updateFavoritesUI();
+                    } else {
+                        console.error('Не вдалося знайти нові товари в відповіді');
+                        loadMoreBtn.style.display = 'none';
                     }
-
-                    // Ініціалізуємо функціональність для нових карток товарів
-                    initializeProductCards();
                 })
                 .catch(error => {
                     console.error('Помилка завантаження:', error);
-                    loadingSpinner.style.display = 'none';
                     loadMoreBtn.style.display = 'block';
+                })
+                .finally(() => {
+                    loadingSpinner.style.display = 'none';
                 });
         });
     }
