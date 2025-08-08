@@ -58,9 +58,10 @@
                             {% endif %}
                         </dd>
                     </div>
-                     <div class="meta-item">
-                        <dt>Категорія:</dt>
-                        <dd><a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a></dd>
+                    <div class="meta-item">
+                       <dt>Категорія:</dt>
+                       <!-- Посилання тепер веде просто в каталог -->
+                       <dd><a href="{{ url_for('catalog') }}">{{ product.category }}</a></dd>
                     </div>
                 </dl>
             </div>

@@ -268,8 +268,7 @@ def catalog():
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    # Видаляємо блок, пов'язаний з обробкою category_slug
-
+    # Визначаємо діапазон цін
     price_range_query = db.session.query(func.floor(func.min(Product.price)), func.ceil(func.max(Product.price)))
     if query.whereclause is not None:
         price_range_query = price_range_query.select_from(query.subquery())
@@ -291,7 +290,6 @@ def catalog():
     return render_template(
         'catalog.html',
         products=products,
-        # Видаляємо передачу категорій у шаблон
         current_filters=current_filters,
         min_price_available=min_price_available,
         max_price_available=max_price_available,
@@ -1001,30 +999,28 @@ def page_not_found(e):
 # API для динамічного завантаження, що враховує всі фільтри
 @app.route('/api/catalog/load_more')
 def api_load_more():
-   page = request.args.get('page', 1, type=int)
-   min_price = request.args.get('min_price', type=float)
-   max_price = request.args.get('max_price', type=float)
-   search_query = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    min_price = request.args.get('min_price', type=float)
+    max_price = request.args.get('max_price', type=float)
+    search_query = request.args.get('search', '').strip()
 
-   query = Product.query.filter(Product.in_stock == True)
+    query = Product.query.filter(Product.in_stock == True)
 
-   if search_query:
-       query = query.filter(Product.name.ilike(f'%{search_query}%'))
+    if search_query:
+        query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-   # Видаляємо блок, пов'язаний з обробкою category_slug
+    if min_price is not None:
+        query = query.filter(Product.price >= min_price)
+    if max_price is not None:
+        query = query.filter(Product.price <= max_price)
 
-   if min_price is not None:
-       query = query.filter(Product.price >= min_price)
-   if max_price is not None:
-       query = query.filter(Product.price <= max_price)
+    products_pagination = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
 
-   products_pagination = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
+    html = render_template('_products_grid_items.html', products=products_pagination.items)
 
-   html = render_template('_products_grid_items.html', products=products_pagination.items)
-
-   response = make_response(html)
-   response.headers['X-More-Available'] = 'true' if products_pagination.has_next else 'false'
-   return response
+    response = make_response(html)
+    response.headers['X-More-Available'] = 'true' if products_pagination.has_next else 'false'
+    return response
 
 if __name__ == "__main__":
     with app.app_context():
