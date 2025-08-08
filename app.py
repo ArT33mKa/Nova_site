@@ -1005,8 +1005,6 @@ def _get_cloudinary_url(image_filename):
         return None
 
 
-# --- ЗАМІНІТЬ ВСЮ ФУНКЦІЮ BAS_IMPORT НА ЦЮ ---
-
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
@@ -1016,7 +1014,7 @@ def bas_import():
     if cml_file.filename == '':
         return "failure\nNo selected file.", 400
 
-    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку...")
+    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку з lxml...")
 
     try:
         raw_data = cml_file.read()
@@ -1041,25 +1039,29 @@ def bas_import():
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю обробку...")
 
-        print("Оптимізація: Завантажую існуючі товари з бази даних...")
+        # ================================================================
+        # [ОПТИМІЗАЦІЯ №1]: Отримуємо всі існуючі товари з бази ОДНИМ ЗАПИТОМ
+        # ================================================================
+        print("Оптимізація: Завантажую ��снуючі товари з бази даних...")
+        # Завантажуємо тільки ID та назву для економії пам'яті
         existing_products_raw = db.session.query(Product.id, Product.name).all()
+        # Створюємо словник для миттєвого пошуку: { 'Назва товару': id }
         existing_products_map = {name: pid for pid, name in existing_products_raw}
         print(f"Завантажено {len(existing_products_map)} існуючих товарів.")
 
+        # ================================================================
+        # [ОПТИМІЗАЦІЯ №2]: Готуємо списки для пакетної обробки
+        # ================================================================
         products_to_update = []
         products_to_add = []
         default_image_url = _get_cloudinary_url(None)
 
-        processed_count = 0
-
+        # Починаємо цикл обробки XML, але НЕ робимо запитів до бази всередині
         for product_node in products_from_xml:
-            processed_count += 1
-            price = 0.0
-            in_stock = False
-
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
 
+            # --- Ця логіка збору даних з XML залишається без змін ---
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
             group_id_node = product_node.find('.//Групи/Ид')
@@ -1070,89 +1072,76 @@ def bas_import():
             if not final_image_url:
                 final_image_url = default_image_url
 
-            # --- [КЛЮЧОВИЙ ФІКС v3] Універсальна логіка наявності та діагностика ---
-
-            # 1. Перевірка кількості
+            price = 0.0
+            in_stock = False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
             if offer_node is not None:
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
                     try:
-                        price_match = re.search(r"[\d.,]+", price_node.text)
-                        if price_match: price = float(price_match.group(0).replace(',', '.'))
+                        price = float(re.match(r"[\d.]+", price_node.text.replace(',', '.')).group(0))
                     except (ValueError, AttributeError):
                         pass
-
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
-                        quantity_val = float(quantity_node.text.strip().replace(',', '.'))
-                        if quantity_val > 0:
-                            in_stock = True
-                        # [ДІАГНОСТИКА] Логуємо кількість
-                        if processed_count <= 5:  # Логуємо тільки для перших 5 товарів, щоб не засмічувати лог
-                            print(f"DEBUG: Товар '{name}', Кількість: {quantity_val}")
+                        if int(float(quantity_node.text.strip())) > 0: in_stock = True
                     except (ValueError, TypeError):
                         pass
 
-            # 2. Якщо кількість 0 або відсутня, перевіряємо властивості
             if not in_stock:
-                positive_stock_values = ['true', 'да', 'є', 'yes', 'в наличии', 'так', '1', 'есть в наличии']
+                stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
+                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
+                    'true', 'да', 'є', 'yes']:
+                    in_stock = True
+                else:
+                    stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
+                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.lower() == 'true':
+                        in_stock = True
 
-                # Шукаємо ВСІ властивості товару
-                all_properties = product_node.findall('.//ЗначениеРеквизита') + product_node.findall(
-                    './/ЗначенняСвойства')
-
-                for prop in all_properties:
-                    prop_name_node = prop.find('Наименование')
-                    prop_value_node = prop.find('Значение')
-
-                    if prop_name_node is not None and prop_name_node.text and prop_value_node is not None and prop_value_node.text:
-                        prop_name = prop_name_node.text.strip()
-                        prop_value = prop_value_node.text.strip()
-
-                        # [ДІАГНОСТИКА] Логуємо знайдені властивості для перших 5 товарів
-                        if processed_count <= 5:
-                            print(f"DEBUG: Товар '{name}', Властивість: '{prop_name}', Значення: '{prop_value}'")
-
-                        # Перевіряємо, чи назва властивості схожа на "Наявність"
-                        if 'налич' in prop_name.lower() or 'наявн' in prop_name.lower():
-                            if prop_value.lower() in positive_stock_values:
-                                in_stock = True
-                                break  # Знайшли, виходимо з циклу перевірки властивостей
-
-            # --------------------------------------------------------------------------
-
+            # --- Логіка визначення бренду також без змін ---
             brand = None
             if description:
                 clean_description = description.replace('<br>', '\n').replace('<BR>', '\n')
                 brand_keywords = ['виробник:', 'бренд:', 'виробництво:', 'торгова марка:']
-                known_brands = ['Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap', 'Immergas',
-                                'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis', 'Pedrollo', 'Pentax',
-                                'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut', 'Aquatica', 'Thermo Alliance',
-                                'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor', 'Aqua', 'Арма', 'Донтерм', 'Прометей',
-                                'Насоси плюс обладнання', 'Опалення', 'Gerts']
+                known_brands = [
+                    'Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap',
+                    'Immergas', 'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis',
+                    'Pedrollo', 'Pentax', 'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut',
+                    'Aquatica', 'Thermo Alliance', 'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor',
+                    'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення', 'Gerts'
+                ]
                 for keyword in brand_keywords:
                     if keyword in clean_description.lower():
                         start_index = clean_description.lower().find(keyword) + len(keyword)
                         brand_candidate = clean_description[start_index:].strip().split('\n')[0].strip()
-                        if brand_candidate: brand = brand_candidate; break
+                        if brand_candidate:
+                            brand = brand_candidate
+                            break
                 if not brand:
                     for known_brand in sorted(known_brands, key=len, reverse=True):
-                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description,
-                                     re.IGNORECASE): brand = known_brand; break
+                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description, re.IGNORECASE):
+                            brand = known_brand
+                            break
             if brand:
+                # Спочатку видаляємо HTML-теги, потім замінюємо &nbsp; на звичайний пробіл,
+                # а потім прибираємо зайві пробіли на початку та в кінці.
                 brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
-                if brand:
-                    brand = brand[:100]
+                if brand:  # Перевіряємо, чи щось залишилось після очищення
+                    brand = brand[:100]  # Обрізаємо до 100 символів
                 else:
-                    brand = None
+                    brand = None  # Якщо нічого не залишилось, ставимо None
 
-            product_data = {'name': name, 'price': price, 'description': description, 'category': category,
-                            'brand': brand, 'image': final_image_url, 'in_stock': in_stock}
+            # Створюємо словник з даними товару
+            product_data = {
+                'name': name, 'price': price, 'description': description,
+                'category': category, 'brand': brand, 'image': final_image_url,
+                'in_stock': in_stock
+            }
 
+            # Розподіляємо товар у відповідний список: на оновлення або на додавання
             if name in existing_products_map:
-                product_data['id'] = existing_products_map[name]
+                product_data['id'] = existing_products_map[name]  # Додаємо ID для оновлення
                 products_to_update.append(product_data)
             else:
                 products_to_add.append(product_data)
@@ -1161,6 +1150,9 @@ def bas_import():
         added_count = len(products_to_add)
         print(f"Завершення циклу. Підготовлено до оновлення: {updated_count}, до додавання: {added_count}.")
 
+        # ================================================================
+        # [ОПТИМІЗАЦІЯ №3]: Виконуємо пакетні операції з базою
+        # ================================================================
         if products_to_add:
             print("Виконую пакетне додавання нових товарів...")
             db.session.bulk_insert_mappings(Product, products_to_add)
@@ -1171,6 +1163,7 @@ def bas_import():
             db.session.bulk_update_mappings(Product, products_to_update)
             print("Пакетне оновлення завершено.")
 
+        # Робимо commit тільки якщо були якісь зміни
         if products_to_add or products_to_update:
             print("Зберігаю зміни в базі даних (commit)...")
             db.session.commit()
