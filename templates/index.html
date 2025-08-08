@@ -31,7 +31,7 @@
         <h2 class="section-title">Категорії товарів</h2>
         <div class="products-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
             {% for category in shop.categories %}
-            <a href="{{ url_for('catalog', category=category.name) }}" class="category-card">
+            <a href="{{ url_for('catalog', category_slug=category.name.lower().replace(' ', '-')) }}" class="category-card">
                 <div class="category-icon-wrapper">
                     <img src="{{ url_for('static', filename='img/' + category.icon) }}" alt="{{ category.name }}">
                 </div>

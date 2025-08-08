@@ -6,7 +6,7 @@
     <div class="container">
         <div class="breadcrumbs">
             <a href="{{ url_for('index') }}">Головна</a> /
-            <a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a> /
+            <a href="{{ url_for('catalog', category_slug=product.category.lower().replace(' ', '-')) }}">{{ product.category }}</a>
             <span>{{ product.name }}</span>
         </div>
     </div>
