@@ -256,6 +256,9 @@ def index():
 
 
 def get_category_hierarchy():
+    """Створює коректну ієрархічну структуру категорій."""
+
+    # Основні категорії тепер визначають структуру. Вони будуть показані ЗАВЖДИ.
     MAIN_CATEGORIES = {
         "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
         "Насоси": ["насос", "помпа", "гідрофор"],
@@ -266,29 +269,55 @@ def get_category_hierarchy():
         "Сушка для рушників": ["сушк", "рушник"],
         "Запчастини": ["запчастин", "котел", "термопар"]
     }
-    products = db.session.query(Product.category) \
-        .filter(Product.category.isnot(None), Product.category != '', Product.in_stock == True).all()
-    hierarchy = {}
-    for category, in products:
-        category = category.strip()
-        main_category = None
-        if category in MAIN_CATEGORIES:
-            main_category = category
+
+    # 1. Ініціалізуємо ієрархію з УСІМА головними категоріями і нульовими лічильниками.
+    hierarchy = {
+        main_cat: {'count': 0, 'subcategories': {}}
+        for main_cat in MAIN_CATEGORIES
+    }
+
+    # 2. Отримуємо всі унікальні категорії товарів, що є в наявності, та їх кількість.
+    # Це набагато ефективніше, ніж отримувати всі товари.
+    product_counts = db.session.query(
+        Product.category, func.count(Product.id)
+    ).filter(
+        Product.category.isnot(None),
+        Product.category != '',
+        Product.in_stock == True
+    ).group_by(Product.category).all()
+
+    # 3. Розподіляємо реальні товари по ієрархії
+    for category_name, count in product_counts:
+        category_name = category_name.strip()
+        main_category_found = None
+
+        # Шукаємо відповідну головну категорію
+        if category_name in MAIN_CATEGORIES:
+            main_category_found = category_name
         else:
             for main_cat, keywords in MAIN_CATEGORIES.items():
-                if any(keyword in category.lower() for keyword in keywords):
-                    main_category = main_cat
+                if any(keyword in category_name.lower() for keyword in keywords):
+                    main_category_found = main_cat
                     break
-        if not main_category:
-            main_category = "Запчастини"
-        if main_category not in hierarchy:
-            hierarchy[main_category] = {'count': 0, 'subcategories': {}}
-        hierarchy[main_category]['count'] += 1
-        if category != main_category:
-            if category not in hierarchy[main_category]['subcategories']:
-                hierarchy[main_category]['subcategories'][category] = 0
-            hierarchy[main_category]['subcategories'][category] += 1
-    return hierarchy
+
+        # Якщо категорія не підпадає під жодну з основних, відносимо її до "Запчастин"
+        if not main_category_found:
+            main_category_found = "Запчастини"
+
+        # Оновлюємо лічильники
+        hierarchy[main_category_found]['count'] += count
+
+        # Додаємо як підкатегорію, якщо це не головна категорія
+        if category_name != main_category_found:
+            if category_name not in hierarchy[main_category_found]['subcategories']:
+                hierarchy[main_category_found]['subcategories'][category_name] = 0
+            hierarchy[main_category_found]['subcategories'][category_name] += count
+
+    # 4. Видаляємо з фінального результату категорії, в яких 0 товарів,
+    #    щоб не показувати порожні розділи у фільтрі.
+    final_hierarchy = {cat: data for cat, data in hierarchy.items() if data['count'] > 0}
+
+    return final_hierarchy
 
 
 @app.route('/catalog/', defaults={'category_slug': None})
