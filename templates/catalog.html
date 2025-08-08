@@ -160,8 +160,8 @@
                 </div>
                  {% if products.has_next %}
                     <div class="load-more-container">
-                        <button id="load-more-btn" class="btn btn-outline btn-lg">Завантажити ще</button>
-                        <div id="loading-spinner" style="display: none;">За��антаження...</div>
+                        <button id="load-more-btn" class="btn btn-outline btn-lg" data-category-slug="{{ category_slug or '' }}">Завантажити ще</button>
+                        <div id="loading-spinner" style="display: none;">Завантаження...</div>
                     </div>
                 {% endif %}
             {% else %}

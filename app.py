@@ -1265,6 +1265,70 @@ def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
 
 
+@app.route('/api/catalog/load_more')
+def api_load_more():
+    page = request.args.get('page', 1, type=int)
+    # Отримуємо параметри фільтрів з запиту
+    category_slug = request.args.get('category_slug')
+    selected_brands = request.args.getlist('brand')
+    min_price = request.args.get('min_price', type=float)
+    max_price = request.args.get('max_price', type=float)
+
+    # Повторюємо логіку фільтрації з основної функції 'catalog'
+    hierarchy = get_category_hierarchy()
+    current_category = None
+    main_category = None
+    subcategories = []
+
+    if category_slug:
+        category_name = category_slug.replace('-', ' ')
+        for main_cat, data in hierarchy.items():
+            if main_cat.lower() == category_name.lower():
+                current_category = main_cat
+                main_category = main_cat
+                subcategories = list(hierarchy[main_category]['subcategories'].keys())
+                break
+            for subcat in data['subcategories']:
+                if subcat.lower() == category_name.lower():
+                    current_category = subcat
+                    main_category = main_cat # Зберігаємо батьківську категорію
+                    break
+            if current_category:
+                break
+
+    query = Product.query.filter(
+        Product.in_stock == True,
+        Product.description.isnot(None),
+        Product.description != '',
+        Product.image.notlike('default_tovar%')
+    )
+
+    if current_category:
+        if main_category == current_category: # Якщо вибрана основна категорія
+            query = query.filter(Product.category.in_([main_category] + subcategories))
+        else: # Якщо вибрана підкатегорія
+            query = query.filter(Product.category == current_category)
+
+    if selected_brands:
+        query = query.filter(Product.brand.in_(selected_brands))
+    if min_price:
+        query = query.filter(Product.price >= min_price)
+    if max_price:
+        query = query.filter(Product.price <= max_price)
+
+    products_pagination = query.order_by(Product.id.desc()).paginate(
+        page=page, per_page=12, error_out=False
+    )
+
+    # Рендеримо тільки картки товарів, використовуючи новий шаблон
+    html = render_template('_products_grid_items.html', products=products_pagination)
+
+    # Створюємо відповідь і додаємо спеціальний заголовок для JS
+    response = make_response(html)
+    response.headers['X-More-Available'] = 'true' if products_pagination.has_next else 'false'
+
+    return response
+
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
 # ────────────────────────────────

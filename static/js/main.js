@@ -638,26 +638,38 @@ function initLoadMore() {
         return;
     }
 
-    let currentPage = 1;
+    let currentPage = 1; // Починаємо з першої сторінки
 
     loadMoreBtn.addEventListener('click', () => {
         currentPage++;
         loadMoreBtn.style.display = 'none';
         if (loadingSpinner) loadingSpinner.style.display = 'block';
 
+        // Збираємо всі активні фільтри зі сторінки
         const params = new URLSearchParams(window.location.search);
         params.set('page', currentPage);
 
+        // [ВИПРАВЛЕНО] Додаємо slug категорії до параметрів запиту
+        const categorySlug = loadMoreBtn.dataset.categorySlug;
+        if (categorySlug) {
+            params.set('category_slug', categorySlug);
+        }
+
         fetch(`/api/catalog/load_more?${params.toString()}`)
             .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
                 const moreAvailable = response.headers.get('X-More-Available') === 'true';
                 return response.text().then(html => ({ html, moreAvailable }));
             })
             .then(({ html, moreAvailable }) => {
                 if (html.trim() !== "") {
+                    // Додаємо нові товари до сітки
                     productsGrid.insertAdjacentHTML('beforeend', html);
                 }
 
+                // Показуємо або ховаємо кнопку "Завантажити ще"
                 if (moreAvailable) {
                     loadMoreBtn.style.display = 'inline-block';
                 } else {
@@ -666,14 +678,13 @@ function initLoadMore() {
             })
             .catch(error => {
                 console.error('Error loading more products:', error);
-                loadMoreBtn.style.display = 'inline-block';
+                loadMoreBtn.style.display = 'inline-block'; // Показуємо кнопку знову в разі помилки
             })
             .finally(() => {
                 if (loadingSpinner) loadingSpinner.style.display = 'none';
             });
     });
 }
-
 function initShowMoreFilters() {
     document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
         const limit = parseInt(list.dataset.showLimit, 10);
