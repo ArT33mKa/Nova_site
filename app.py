@@ -273,7 +273,7 @@ def index():
                    {'image': 'hero-bg2.jpg', 'title': 'Надійні насоси для будь-яких потреб',
                     'subtitle': 'Від найкращих виробників'}, {'image': 'kotly.jpg', 'title': 'Все для систем опалення',
                                                               'subtitle': 'Котли, бойлери та комплектуючі'}]
-    products = Product.query.order_by(Product.id.desc()).limit(5).all()
+    products = Product.query.filter(Product.in_stock == True).order_by(Product.id.desc()).limit(5).all()
     return render_template("index.html", products=products, hero_slides=hero_slides)
 
 
@@ -476,10 +476,10 @@ def catalog(category_slug):
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
+    # --- НОВА ВЕРСІЯ ---
+    # [ВИПРАВЛЕНО] Показуємо схожі товари, якщо вони просто є в наявності.
     similar_products = Product.query.filter(Product.category == product.category, Product.id != product.id,
-                                            Product.in_stock == True,
-                                            and_(Product.description != None, Product.description != ''),
-                                            Product.image.notlike('default_tovar%')).limit(8).all()
+                                            Product.in_stock == True).limit(8).all()
     return render_template("product_detail.html", product=product, similar_products=similar_products)
 
 
@@ -1348,10 +1348,7 @@ def api_load_more():
                 break
 
     query = Product.query.filter(
-        Product.in_stock == True,
-        Product.description.isnot(None),
-        Product.description != '',
-        Product.image.notlike('default_tovar%')
+        Product.in_stock == True
     )
 
     # [ВАЖЛИВО] Застосовуємо фільтр пошуку, як і в основній функції
