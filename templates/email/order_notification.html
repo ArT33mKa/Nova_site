@@ -124,6 +124,14 @@
                                 <p><strong>Спосіб оплати:</strong> {{ order.payment_method }}</p>
                             </div>
 
+                            {% if order.comment %}
+                                <hr>
+                                <h2>Коментар клієнта</h2>
+                                <div class="info-block">
+                                    <p style="white-space: pre-wrap;">{{ order.comment }}</p>
+                                </div>
+                            {% endif %}
+
                             <hr>
 
                             <h2>Замовлені товари</h2>

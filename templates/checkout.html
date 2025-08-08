@@ -24,7 +24,8 @@
                     </div>
                     <div class="form-group">
                         <label for="customer_phone">Номер телефону</label>
-                        <input type="tel" name="customer_phone" id="customer_phone" required>
+                        <!-- >>> ЗМІНІТЬ ЦЕЙ INPUT -->
+                        <input type="tel" name="customer_phone" id="customer_phone" required placeholder="+380 (__) ___-__-__" value="{% if current_user.is_authenticated and current_user.phone %}{{ current_user.phone }}{% endif %}">
                     </div>
                 </section>
 
@@ -48,20 +49,25 @@
                             </div>
                         </label>
                     </div>
-                    <div id="nova-poshta-details" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; position: relative;">
-                        <div class="form-group">
+                    <!-- >>> ЗАМІНІТЬ ЦЕЙ БЛОК НА НОВИЙ -->
+                    <div id="nova-poshta-details" class="nova-poshta-container" style="display: none;">
+                        <div class="form-group" style="position: relative;">
                             <label for="delivery_city">Населений пункт</label>
                             <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста чи села" autocomplete="off">
                             <div id="city-suggestions" class="suggestions-dropdown"></div>
                         </div>
                         <div class="form-group">
                             <label for="delivery_warehouse">Відділення або поштомат</label>
-                            <select name="delivery_warehouse" id="delivery_warehouse" disabled>
-                                <option value="">Спочатку виберіть населений пункт</option>
-                            </select>
+                            <div class="custom-select-wrapper">
+                                <select name="delivery_warehouse" id="delivery_warehouse" disabled>
+                                    <option value="">Спочатку виберіть населений пункт</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </section>
+
+
 
                 <section class="checkout-section">
                     <div class="checkout-section-header">
@@ -84,7 +90,21 @@
                         </label>
                     </div>
                 </section>
+
+                <section class="checkout-section" id="comment-section">
+                    <div id="comment-toggle" class="comment-toggle">
+                        <span>Коментар до замовлення</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div id="comment-content" class="comment-content" style="display: none;">
+                        <textarea name="order_comment" id="order_comment" placeholder="Введіть коментар" maxlength="254"></textarea>
+                        <div id="comment-char-counter" class="char-counter">Залишилось символів: 254</div>
+                    </div>
+                </section>
+
             </div>
+
+
 
             <!-- Права колонка з підсумком замовлення -->
             <aside class="order-summary-v2">
@@ -115,20 +135,117 @@
 
 {% block extra_css %}
 <style>
-    .suggestions-dropdown { display: none; position: absolute; background-color: white; border: 1px solid #ddd; border-top: none; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .suggestion-item { padding: 10px 12px; cursor: pointer; font-size: 15px; }
+    /* Стилі для підказок міст */
+    .suggestions-dropdown { display: none; position: absolute; background-color: white; border: 1px solid #ddd; border-top: none; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 0 0 8px 8px;}
+    .suggestion-item { padding: 10px 15px; cursor: pointer; font-size: 15px; }
     .suggestion-item:hover { background-color: #f0f0f0; }
-    .suggestion-item-loading { padding: 10px 12px; color: #888; font-style: italic; }
+    .suggestion-item.active { background-color: var(--primary-color); color: white; }
+    .suggestion-item-loading { padding: 10px 15px; color: #888; font-style: italic; }
+
+    /* Стилі для поля вводу телефону */
+    #customer_phone { color: #333; }
+    #customer_phone::placeholder { color: #aaa; }
+
+    /* Стилі для блоку коментаря */
+    .comment-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; cursor: pointer; font-weight: 500; font-size: 1rem; }
+    .comment-toggle i { transition: transform 0.3s ease; }
+    .comment-toggle.active i { transform: rotate(180deg); }
+    .comment-content { padding-top: 15px; border-top: 1px solid var(--light-gray); margin-top: 10px;}
+    .comment-content textarea { width: 100%; min-height: 100px; resize: vertical; padding: 10px; border: 1px solid #ccc; border-radius: 4px;}
+    .char-counter { text-align: right; font-size: 0.85rem; color: var(--gray-color); margin-top: 5px; }
+
+    /* Новий стиль для контейнера Нової Пошти */
+    .nova-poshta-container { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
 </style>
 {% endblock %}
 
 {% block extra_js %}
+<!-- >>> ПОВНІСТЮ ЗАМІНІТЬ БЛОК extra_js НА ЦЕЙ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- ІНІЦІАЛІЗАЦІЯ ВСІХ КОМПОНЕНТІВ ---
     setupRadioGroups();
     loadCartSummary();
     setupDeliveryLogic();
     setupEnterKeyNavigation();
+    setupCommentField();
+
+    // Нова, покращена маска для телефону
+    const phoneInput = document.getElementById('customer_phone');
+    if (phoneInput) {
+        // Застосовуємо маску, якщо в полі вже є номер (наприклад, з профілю користувача)
+        if (phoneInput.value) {
+            phoneInput.value = formatPhoneNumber(phoneInput.value);
+        }
+        phoneInput.addEventListener('input', handlePhoneInput, false);
+        phoneInput.addEventListener('focus', handlePhoneInput, false);
+        phoneInput.addEventListener('blur', (e) => {
+            if (e.target.value === '+380') {
+                e.target.value = '';
+            }
+        });
+    }
+
+    // --- ФУНКЦІЇ ---
+
+    function formatPhoneNumber(value) {
+        if (!value) return value;
+        const phoneNumber = value.replace(/[^\d]/g, '');
+        // Нормалізація номера
+        let normalized = '';
+        if (phoneNumber.startsWith('380') && phoneNumber.length > 3) {
+            normalized = phoneNumber.substring(3);
+        } else if (phoneNumber.startsWith('0') && phoneNumber.length > 1) {
+            normalized = phoneNumber.substring(1);
+        } else {
+            normalized = phoneNumber;
+        }
+
+        const phoneNumberLength = normalized.length;
+        let formatted = '+380';
+
+        if (phoneNumberLength > 0) {
+            formatted += ' (' + normalized.substring(0, 2);
+        }
+        if (phoneNumberLength > 2) {
+            formatted += ') ' + normalized.substring(2, 5);
+        }
+        if (phoneNumberLength > 5) {
+            formatted += '-' + normalized.substring(5, 7);
+        }
+        if (phoneNumberLength > 7) {
+            formatted += '-' + normalized.substring(7, 9);
+        }
+        return formatted;
+    }
+
+    function handlePhoneInput(e) {
+        e.target.value = formatPhoneNumber(e.target.value);
+    }
+
+    function setupCommentField() {
+        const toggle = document.getElementById('comment-toggle');
+        const content = document.getElementById('comment-content');
+        const textarea = document.getElementById('order_comment');
+        const counter = document.getElementById('comment-char-counter');
+        const maxLength = 254;
+
+        if (!toggle || !content) return;
+
+        toggle.addEventListener('click', () => {
+            toggle.classList.toggle('active');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+            } else {
+                content.style.display = 'none';
+            }
+        });
+
+        textarea.addEventListener('input', () => {
+            const remaining = maxLength - textarea.value.length;
+            counter.textContent = `Залишилось символів: ${remaining}`;
+        });
+    }
 
     function setupDeliveryLogic() {
         const deliveryGroup = document.getElementById('delivery-method-group');
@@ -136,15 +253,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const cityInput = document.getElementById('delivery_city');
         const citySuggestions = document.getElementById('city-suggestions');
         const warehouseSelect = document.getElementById('delivery_warehouse');
-        const submitBtn = document.getElementById('submit-checkout-btn');
         let searchTimeout;
 
-        deliveryGroup.addEventListener('deliveryChange', (e) => {
+        deliveryGroup.addEventListener('change', (e) => {
             const isNovaPoshta = e.target.value === 'Нова Пошта';
             novaPoshtaDetails.style.display = isNovaPoshta ? 'block' : 'none';
             cityInput.required = isNovaPoshta;
             warehouseSelect.required = isNovaPoshta;
-            toggleSubmitButton();
         });
 
         cityInput.addEventListener('input', function() {
@@ -156,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Завантаження...</div>';
+            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Пошук...</div>';
             citySuggestions.style.display = 'block';
 
             searchTimeout = setTimeout(() => {
@@ -174,7 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 citySuggestions.appendChild(item);
                             });
                         } else {
-                            citySuggestions.style.display = 'none';
+                            citySuggestions.innerHTML = '<div class="suggestion-item-loading">Нічого не знайдено</div>';
                         }
                     });
             }, 300);
@@ -188,14 +303,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function fetchWarehouses(cityRef) {
             warehouseSelect.disabled = true;
-            warehouseSelect.innerHTML = '<option value="">Завантаження...</option>';
-            toggleSubmitButton();
+            warehouseSelect.innerHTML = '<option value="">Завантаження відділень...</option>';
 
             fetch(`/api/np/warehouses?city_ref=${cityRef}`)
                 .then(res => res.json())
                 .then(warehouses => {
+                    warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення або поштомат --</option>';
                     if (warehouses && warehouses.length > 0 && !warehouses.error) {
-                        warehouseSelect.innerHTML = '<option value="">-- Оберіть відділення --</option>';
                         warehouses.forEach(wh => {
                             const option = new Option(wh, wh);
                             warehouseSelect.add(option);
@@ -204,52 +318,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         warehouseSelect.innerHTML = `<option value="">${warehouses.error || 'Відділення не знайдені'}</option>`;
                     }
-                    toggleSubmitButton();
-                })
-                .catch(err => {
-                    console.error("Помилка завантаження відділень:", err);
-                    warehouseSelect.innerHTML = '<option value="">Помилка завантаження</option>';
-                    toggleSubmitButton();
                 });
         }
 
         document.addEventListener('click', (e) => {
-            if (!novaPoshtaDetails.contains(e.target)) {
+            if (!cityInput.contains(e.target) && !citySuggestions.contains(e.target)) {
                 citySuggestions.style.display = 'none';
             }
         });
-
-        // [НОВЕ] Логіка для кнопки "Підтвердити"
-        warehouseSelect.addEventListener('change', toggleSubmitButton);
-        function toggleSubmitButton() {
-            const isNovaPoshta = document.querySelector('input[name="delivery_method"]:checked').value === 'Нова Пошта';
-            if (isNovaPoshta) {
-                // Блокуємо, якщо обрано Нову Пошту, але не обрано відділення
-                submitBtn.disabled = !warehouseSelect.value;
-            } else {
-                // Розблоковуємо для самовивозу
-                submitBtn.disabled = false;
-            }
-        }
     }
 
     // Решта функцій без змін
     function setupRadioGroups() {
         document.querySelectorAll('.radio-group').forEach(group => {
-            group.addEventListener('click', e => {
-                const label = e.target.closest('.radio-option');
+            group.addEventListener('change', e => {
+                const radio = e.target;
+                const label = radio.closest('.radio-option');
                 if (!label) return;
                 group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
                 label.classList.add('active');
-                const radio = label.querySelector('input');
-                if (radio) {
-                    radio.checked = true;
-                    if (group.id === 'delivery-method-group') {
-                        const event = new Event('deliveryChange', { bubbles: true });
-                        radio.dispatchEvent(event);
-                    }
-                }
             });
+             // Initial active state
+            const checked = group.querySelector('input:checked');
+            if (checked) checked.closest('.radio-option').classList.add('active');
         });
     }
 

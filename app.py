@@ -184,6 +184,8 @@ class Order(db.Model):
     total_cost = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     items = db.relationship('OrderItem', backref='order', lazy='dynamic', cascade="all, delete-orphan")
+    # >>> ДОДАЙТЕ ЦЕЙ РЯДОК
+    comment = db.Column(db.Text, nullable=True)
 
 
 class OrderItem(db.Model):
@@ -696,6 +698,7 @@ def checkout():
                       delivery_city=request.form.get('delivery_city'),
                       delivery_warehouse=request.form.get('delivery_warehouse'),
                       payment_method=request.form.get('payment_method'), total_cost=total_cost,
+                      comment=request.form.get('order_comment'),
                       user_id=current_user.id if current_user.is_authenticated else None)
         db.session.add(order)
         db.session.flush()
@@ -1231,7 +1234,7 @@ def find_np_cities():
 
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання ТІЛЬКИ ВІДДІЛЕНЬ для населеного пу��кту."""
+    """Отримання ВІДДІЛЕНЬ ТА ПОШТОМАТІВ для населеного пункту.""" # <-- Змінив коментар для ясності
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
 
@@ -1244,19 +1247,21 @@ def get_np_warehouses():
         "apiKey": api_key,
         "modelName": "AddressGeneral",
         "calledMethod": "getWarehouses",
-        "methodProperties": {"SettlementRef": city_ref}
+        "methodProperties": {
+            "SettlementRef": city_ref,
+            # >>> ДОДАЙТЕ ЦЕЙ ПАРАМЕТР, щоб отримувати і поштомати теж
+            "TypeOfWarehouseRef": "841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28" # Ref для Поштоматів та Вантажно-пасажирських відділень
+        }
     }
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
         response.raise_for_status()
         data = response.json()
         if data['success']:
+            # >>> ЗАМІНІТЬ СТАРИЙ БЛОК ФІЛЬТРАЦІЇ НА ЦЕЙ
             all_warehouses = data.get('data', [])
-            filtered_warehouses = [
-                w['Description'] for w in all_warehouses
-                if w['Description'].startswith('Відділення')
-            ]
-            return jsonify(filtered_warehouses)
+            # Тепер просто повертаємо всі знайдені відділення/поштомати без фільтрації
+            return jsonify([w['Description'] for w in all_warehouses])
         return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
