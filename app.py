@@ -257,9 +257,14 @@ def index():
 
 # [ВИПРАВЛЕНО] Повністю переписана, надійна та ефективна логіка побудови ієрархії категорій
 def get_category_hierarchy():
-    """Створює коректну ієрархічну структуру категорій."""
+    """
+    [НОВА ВЕРСІЯ 2.0] Створює коректну ієрархічну структуру категорій.
+    Ця версія є більш надійною: вона завжди знає про основну структуру магазину
+    і правильно розподіляє по ній товари з бази даних.
+    """
 
-    # Основні категорії, які визначають структуру. Вони будуть показані ЗАВЖДИ (якщо в них є товари).
+    # 1. Визначаємо основну структуру магазину та ключові слова для розподілу.
+    # Це "джерело правди" про те, які категорії мають існувати.
     MAIN_CATEGORIES = {
         "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
         "Насоси": ["насос", "помпа", "гідрофор"],
@@ -268,17 +273,19 @@ def get_category_hierarchy():
         "Витяжки": ["витяжк", "вентилятор"],
         "Газові колонки": ["колонк", "газов"],
         "Сушка для рушників": ["сушк", "рушник"],
-        "Запчастини": ["запчастин", "котел", "термопар", "обладнання"]  # Резервна категорія
+        # Резервна категорія, яка приймає все інше, включно з "Загальна" з 1С.
+        "Запчастини": ["запчастин", "котел", "термопар", "обладнання", "загальна"]
     }
 
-    # 1. Ініціалізуємо ієрархію з УСІМА головними категоріями і нульовими лічильниками.
+    # 2. Ініціалізуємо ієрархію з УСІМА головними категоріями і нульовими лічильниками.
+    # Це гарантує, що ми не втратимо структуру, навіть якщо якась категорія тимчасово порожня.
     hierarchy = {
         main_cat: {'count': 0, 'subcategories': {}}
         for main_cat in MAIN_CATEGORIES
     }
 
-    # 2. Отримуємо всі унікальні категорії товарів, що є в наявності, та їх кількість.
-    # Це набагато ефективніше, ніж отримувати всі товари.
+    # 3. Робимо ОДИН ефективний запит до БД, щоб отримати всі унікальні категорії
+    # товарів, що є в наявності, та їх кількість.
     product_counts = db.session.query(
         Product.category, func.count(Product.id)
     ).filter(
@@ -287,35 +294,36 @@ def get_category_hierarchy():
         Product.in_stock == True
     ).group_by(Product.category).all()
 
-    # 3. Розподіляємо реальні товари по ієрархії
-    for category_name, count in product_counts:
-        category_name = category_name.strip()
+    # 4. Розподіляємо реальні товари з БД по нашій визначеній структурі.
+    for category_name_from_db, count in product_counts:
+        category_name = category_name_from_db.strip()
         main_category_found = None
 
-        # Шукаємо відповідну головну категорію
-        if category_name in MAIN_CATEGORIES:
-            main_category_found = category_name
-        else:
-            for main_cat, keywords in MAIN_CATEGORIES.items():
-                if any(keyword in category_name.lower() for keyword in keywords):
-                    main_category_found = main_cat
-                    break
+        # Шукаємо, до якої головної категорії належить поточна категорія з БД
+        for main_cat, keywords in MAIN_CATEGORIES.items():
+            # Перевіряємо, чи назва категорії з БД є однією з головних
+            if category_name.lower() == main_cat.lower():
+                main_category_found = main_cat
+                break
+            # Якщо ні, перевіряємо за ключовими словами
+            if any(keyword in category_name.lower() for keyword in keywords):
+                main_category_found = main_cat
+                break
 
         # Якщо категорія не підпадає під жодну з основних, відносимо її до "Запчастин"
         if not main_category_found:
             main_category_found = "Запчастини"
 
-        # Оновлюємо лічильники
+        # Оновлюємо загальний лічильник для головної категорії
         hierarchy[main_category_found]['count'] += count
 
-        # Додаємо як підкатегорію, якщо це не головна категорія
+        # Додаємо як підкатегорію, тільки якщо її назва не співпадає з головною
         if category_name.lower() != main_category_found.lower():
-            if category_name not in hierarchy[main_category_found]['subcategories']:
-                hierarchy[main_category_found]['subcategories'][category_name] = 0
-            hierarchy[main_category_found]['subcategories'][category_name] += count
+            subcategories = hierarchy[main_category_found]['subcategories']
+            subcategories[category_name] = subcategories.get(category_name, 0) + count
 
-    # 4. Видаляємо з фінального результату категорії, в яких 0 товарів,
-    #    щоб не показувати порожні розділи у фільтрі.
+    # 5. Фінальний крок: прибираємо з результату ті головні категорії,
+    # в яких в підсумку виявилось 0 товарів. Це робить фільтр чистим.
     final_hierarchy = {cat: data for cat, data in hierarchy.items() if data['count'] > 0}
 
     return final_hierarchy
