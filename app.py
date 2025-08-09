@@ -123,7 +123,7 @@ def send_telegram_notification(order, items):
         print(f">>> Make.com: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
 
 
-# ... (Ваші моделі User, Product, Review, Order, OrderItem, OAuth залишаються без змін) ...
+# ... (Ваші моделі User, Review, Order, OrderItem, OAuth залишаються без змін) ...
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(80), nullable=False)
@@ -149,7 +149,7 @@ class Product(db.Model):
     description = db.Column(db.Text)
     image = db.Column(db.String(255), nullable=True)
     category = db.Column(db.String(100))
-    brand = db.Column(db.String(100), index=True, nullable=True)
+    # Поле brand видалено
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
     reviews_count = db.Column(db.Integer, default=0)
@@ -798,7 +798,7 @@ def add_product():
             name=request.form['name'],
             price=float(request.form['price']),
             description=request.form['description'],
-            image=_get_cloudinary_url(request.form['image'].strip()),  # [ОНОВЛЕНО] Генеруємо повний URL
+            image=_get_cloudinary_url(request.form['image'].strip()),
             category=request.form['category'],
             in_stock='in_stock' in request.form
         )
@@ -818,7 +818,6 @@ def edit_product(product_id):
         product.name = request.form['name']
         product.price = float(request.form['price'])
         product.description = request.form['description']
-        # [ОНОВЛЕНО] Генеруємо повний URL при зміні
         product.image = _get_cloudinary_url(request.form['image'].strip())
         product.category = request.form['category']
         product.in_stock = 'in_stock' in request.form
@@ -827,16 +826,14 @@ def edit_product(product_id):
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
 
-    # [ОНОВЛЕНО] Витягуємо тільки назву файлу з URL для відображення в формі
     image_filename = ''
     if product.image:
         try:
-            # Спроба витягнути public_id (напр. 'products/products/some_image') з URL
             match = re.search(r'/products/products/([^/.]+)', product.image)
             if match:
-                image_filename = match.group(1) + '.jpg'  # Додаємо розширення для наочності
+                image_filename = match.group(1) + '.jpg'
         except Exception:
-            pass  # Якщо не вдалося, залишимо поле порожнім
+            pass
 
     return render_template("edit_product.html", product=product, image_to_display=image_filename)
 
@@ -961,7 +958,7 @@ def _get_cloudinary_url(image_filename):
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    """ [ПОВНІСТЮ ПЕРЕПИСАНА І ОПТИМІЗОВАНА ФУНКЦІЯ] """
+    """ [ВЕРСІЯ БЕЗ БРЕНДІВ + ПОРЦІЙНЕ ЗАВАНТАЖЕННЯ ДЛЯ HEROKU] """
     if 'file' not in request.files:
         return "failure\nFile part is missing in the request.", 400
     cml_file = request.files['file']
@@ -991,13 +988,23 @@ def bas_import():
         products_from_xml = catalog_node.findall('.//Товар')
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю оптимізовану обробку...")
 
-        existing_products_raw = db.session.query(Product.id, Product.name).all()
-        existing_products_map = {name: pid for pid, name in existing_products_raw}
-        print(f"Завантажено {len(existing_products_map)} існуючих товарів з бази даних для порівняння.")
+        print("Оптимізація: Завантажую існуючі товари з бази даних порціями...")
+        existing_products_map = {}
+        offset = 0
+        chunk_size = 500
+        while True:
+            chunk = db.session.query(Product.id, Product.name).offset(offset).limit(chunk_size).all()
+            if not chunk:
+                break
+            for pid, name in chunk:
+                existing_products_map[name] = pid
+            offset += chunk_size
+            print(f"  - завантажено {len(existing_products_map)} товарів...")
+
+        print(f"Успішно завантажено {len(existing_products_map)} існуючих товарів з бази даних.")
 
         products_to_update = []
         products_to_add = []
-        default_image_url = _get_cloudinary_url(None)
 
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
@@ -1005,9 +1012,10 @@ def bas_import():
 
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
-            group_id = product_node.find('.//Группы/Ид').text if product_node.find('.//Группы/Ид') is not None else None
+            group_id_node = product_node.find('.//Группы/Ид')
+            group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Різне")
-            image_filename = (product_node.findtext('Картинка') or '').strip()
+            image_filename_from_xml = (product_node.findtext('Картинка') or '').strip()
 
             price, in_stock = 0.0, False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
@@ -1027,36 +1035,12 @@ def bas_import():
                     except (ValueError, TypeError):
                         pass
 
-            # [НОВИЙ БЛОК] Визначення бренду.
-            brand = None
-            if description:
-                clean_description = re.sub('<[^<]+?>', '\n', description)
-                brand_keywords = ['виробник:', 'бренд:', 'виробництво:', 'торгова марка:']
-                known_brands = ['Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap', 'Immergas',
-                                'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis', 'Pedrollo', 'Pentax',
-                                'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut', 'Aquatica', 'Thermo Alliance',
-                                'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor', 'Aqua', 'Арма', 'Донтерм', 'Прометей',
-                                'Насоси плюс обладнання', 'Опалення', 'Gerts']
-
-                for keyword in brand_keywords:
-                    if keyword in clean_description.lower():
-                        start_index = clean_description.lower().find(keyword) + len(keyword)
-                        brand_candidate = clean_description[start_index:].split('\n')[0].strip()
-                        if brand_candidate: brand = brand_candidate; break
-
-                if not brand:
-                    for known_brand in sorted(known_brands, key=len, reverse=True):
-                        if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description, re.IGNORECASE):
-                            brand = known_brand;
-                            break
-            if brand:
-                brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
-                brand = brand[:100] if brand else None
+            # Логіку визначення бренду повністю видалено
 
             product_data = {
                 'name': name, 'price': price, 'description': description,
-                'category': category, 'brand': brand,
-                'image': _get_cloudinary_url(image_filename),  # Генеруємо повний URL тут
+                'category': category,
+                'image': _get_cloudinary_url(image_filename_from_xml),
                 'in_stock': in_stock
             }
 
@@ -1071,12 +1055,12 @@ def bas_import():
         print(f"Підготовлено до оновлення: {updated_count}. Підготовлено до додавання: {added_count}.")
 
         if products_to_add:
-            print("Виконую пакетне додавання нових товарів...")
+            print(f"Виконую пакетне додавання {len(products_to_add)} нових товарів...")
             db.session.bulk_insert_mappings(Product, products_to_add)
             print("Пакетне додавання завершено.")
 
         if products_to_update:
-            print("Виконую пакетне оновлення існуючих товарів...")
+            print(f"Виконую пакетне оновлення {len(products_to_update)} існуючих товарів...")
             db.session.bulk_update_mappings(Product, products_to_update)
             print("Пакетне оновлення завершено.")
 
