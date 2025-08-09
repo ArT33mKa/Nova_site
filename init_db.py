@@ -1,5 +1,3 @@
-# init_db.py (ВИПРАВЛЕНА ВЕРСІЯ)
-
 from app import app, db, User
 
 def initialize_database():
@@ -17,7 +15,7 @@ def initialize_database():
             admin = User(
                 username='admin',
                 first_name='Admin',
-                last_name='User',  # <-- ДОДАЙТЕ ЦЕЙ РЯДОК
+                last_name='User',  # <-- ДОДАНО ЦЕЙ РЯДОК
                 email='artemcool200911@gmail.com',
                 is_admin=True
             )

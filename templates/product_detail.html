@@ -6,42 +6,28 @@
     <div class="container">
         <div class="breadcrumbs">
             <a href="{{ url_for('index') }}">Головна</a> /
-            <a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a> /
+            <a href="{{ url_for('catalog', category_slug=product.category.replace(' ', '-').replace('/', '-')) }}">{{ product.category }}</a> /
             <span>{{ product.name }}</span>
         </div>
     </div>
 </header>
 
 <div class="container" style="padding-top: 40px; padding-bottom: 60px;">
-    <!-- Головний grid-контейнер сторінки -->
     <div class="product-detail-grid" data-id="{{ product.id }}">
-
-        <!-- Ліва колонка з зображенням товару -->
         <div class="product-image-main">
-            <!-- [ВИПРАВЛЕНО] Використовуємо фільтр для генерації URL -->
             <img src="{{ product.image }}" alt="{{ product.name }}">
         </div>
-
-        <!-- Права колонка з інформацією про товар -->
         <div class="product-info-main">
             <h1 class="product-title">{{ product.name }}</h1>
-
-            <!-- Посилання на відгуки з рейтингом -->
             <a href="{{ url_for('product_reviews', product_id=product.id) }}" class="reviews-summary-link">
                 <span class="rating">
                     {% set r = product.rating|round|int %}
-                    {# Малюємо золоті зірочки #}
                     {% for i in range(r) %}★{% endfor %}
-                    {# Малюємо сірі зірочки для решти #}
                     {% for i in range(5 - r) %}<span>★</span>{% endfor %}
                 </span>
                 <span class="reviews-count-text">{{ product.reviews_count }} відгуків</span>
             </a>
-
-            <!-- Ціна товару -->
             <div class="product-price-detail">{{ "%.2f"|format(product.price) }} ₴</div>
-
-            <!-- Мета-дані: наявність, бренд, категорія -->
             <div class="product-meta">
                 <dl>
                     <div class="meta-item">
@@ -60,12 +46,10 @@
                     </div>
                      <div class="meta-item">
                         <dt>Категорія:</dt>
-                        <dd><a href="{{ url_for('catalog', category=product.category) }}">{{ product.category }}</a></dd>
+                        <dd><a href="{{ url_for('catalog', category_slug=product.category.replace(' ', '-').replace('/', '-')) }}">{{ product.category }}</a></dd>
                     </div>
                 </dl>
             </div>
-
-            <!-- Кнопки "В кошик" та "Купити зараз" -->
             <div class="product-actions">
                 <button class="btn btn-primary btn-lg add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
                     <i class="fas fa-shopping-cart"></i> В кошик
@@ -74,8 +58,6 @@
                     Купити зараз
                 </button>
             </div>
-
-            <!-- Опис товару з функцією розгортання -->
             <div class="product-description" style="margin-top: 40px;">
                 <h3>Опис товару</h3>
                 <div id="description-wrapper" class="description-text-wrapper">
@@ -85,8 +67,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Секція "Схожі товари" з каруселлю -->
     <div class="similar-products-section" style="margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--light-gray);">
         <h2 class="section-title" style="text-align: left; padding-bottom: 20px;">Схожі товари</h2>
         <div class="carousel-container">

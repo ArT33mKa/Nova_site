@@ -184,7 +184,6 @@ class Order(db.Model):
     total_cost = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     items = db.relationship('OrderItem', backref='order', lazy='dynamic', cascade="all, delete-orphan")
-    # >>> ДОДАЙТЕ ЦЕЙ РЯДОК
     comment = db.Column(db.Text, nullable=True)
 
 
@@ -219,7 +218,7 @@ shop_info = {"name": "НОВА ХВИЛЯ",
                             {'name': 'Змішувач', 'image': 'faucets.jpg', 'icon': 'faucets.jpg'},
                             {'name': "Витяжки", 'image': 'hoods.jpg', 'icon': 'hoods.jpg'},
                             {'name': "Колонки", 'image': 'gas_parts.jpg', 'icon': 'gas_columns.jpg'},
-                            {'name': "Су��ка для рушників", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
+                            {'name': "Сушка для рушників", 'image': 'towel_dryers.jpg', 'icon': 'towel_dryers.jpg'},
                             {'name': "Запчастини до газ обладнання", 'image': 'gas_parts.jpg',
                              'icon': 'gas_parts.jpg'}], "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
              "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
@@ -257,73 +256,68 @@ def index():
 
 
 def get_category_hierarchy():
-    """Створює коректну ієрархічну структуру категорі��."""
-
-    # Основні категорії та їх ключ��ві слова
+    """
+    [НОВА ФУНКЦІЯ]
+    Створює динамічну ієрархічну структуру категорій на основі даних з БД.
+    """
     MAIN_CATEGORIES = {
-        "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
-        "Насоси": ["насос", "помпа", "гідрофор"],
-        "Бойлери": ["бойлер", "водонагрівач"],
-        "Змішувачі": ["змішувач", "кран", "сифон"],
-        "Витяжки": ["витяжк", "вентилятор"],
-        "Газові колонки": ["колонк", "газов"],
-        "Сушка для рушників": ["сушк", "рушник"],
-        "Запчастини": ["запчастин", "котел", "термопар"]
+        "Поливочна система": ["полив", "зрошення", "шланг", "конектор", "розпилювач", "краплинн", "дощувач"],
+        "Насоси та гідрофори": ["насос", "помпа", "гідрофор", "дренажн", "фекальн", "циркуляційн", "свердловин"],
+        "Водонагрівачі": ["бойлер", "водонагрівач", "тен"],
+        "Змішувачі та сифони": ["змішувач", "кран", "сифон", "душов", "лійка"],
+        "Вентиляція та витяжки": ["витяжк", "вентилятор", "решітка", "канал"],
+        "Газове обладнання": ["колонк", "газов", "конвектор"],
+        "Опалення та водопостачання": ["опален", "радіатор", "рушникосуш", "котел", "фітинг", "труба", "крани",
+                                       "тепла підлога"],
+        "Запчастини та комплектуючі": ["запчастин", "комплектуюч", "термопар", "автоматика", "реле", "мембрана"]
     }
 
     products = db.session.query(Product.category) \
-        .filter(Product.category.isnot(None)) \
-        .filter(Product.category != '') \
-        .filter(Product.in_stock == True) \
+        .filter(Product.category.isnot(None), Product.category != '', Product.in_stock == True) \
         .all()
 
-    # Створюємо структуру категорій з лічильниками
     hierarchy = {}
+    other_category_name = "Різне"
 
-    for category, in products:  # Зверніть увагу на кому в кінці!
-        category = category.strip()
-        # Визначаємо основну категорію
-        main_category = None
+    for category_tuple in products:
+        category_name = category_tuple[0].strip()
+        if not category_name:
+            continue
 
-        # Перевіряємо чи це основна категорія
-        if category in MAIN_CATEGORIES:
-            main_category = category
-        else:
-            # Шукаємо відповідну основну категорію за ключовими словами
-            for main_cat, keywords in MAIN_CATEGORIES.items():
-                if any(keyword in category.lower() for keyword in keywords):
-                    main_category = main_cat
-                    break
+        assigned_main_category = None
+        for main_cat, keywords in MAIN_CATEGORIES.items():
+            # Перевіряємо, чи назва категорії сама є однією з головних
+            if category_name.lower() == main_cat.lower():
+                assigned_main_category = main_cat
+                break
+            # Перевіряємо за ключовими словами
+            if any(keyword in category_name.lower() for keyword in keywords):
+                assigned_main_category = main_cat
+                break
 
-        # Якщо категорія не знайдена, додаємо до "Запчастини"
-        if not main_category:
-            main_category = "Запчастини"
+        if not assigned_main_category:
+            assigned_main_category = other_category_name
 
-        # Оновлюємо лічильники
-        if main_category not in hierarchy:
-            hierarchy[main_category] = {
-                'count': 0,
-                'subcategories': {}
-            }
+        if assigned_main_category not in hierarchy:
+            hierarchy[assigned_main_category] = {'count': 0, 'subcategories': {}}
 
-        hierarchy[main_category]['count'] += 1
+        hierarchy[assigned_main_category]['count'] += 1
 
-        # Якщо це підкатегорія
-        if category != main_category:
-            if category not in hierarchy[main_category]['subcategories']:
-                hierarchy[main_category]['subcategories'][category] = 0
-            hierarchy[main_category]['subcategories'][category] += 1
+        # Додаємо як підкатегорію, якщо вона не є головною
+        if category_name.lower() != assigned_main_category.lower():
+            if category_name not in hierarchy[assigned_main_category]['subcategories']:
+                hierarchy[assigned_main_category]['subcategories'][category_name] = 0
+            hierarchy[assigned_main_category]['subcategories'][category_name] += 1
 
     return hierarchy
 
 
 @app.route('/catalog/', defaults={'category_slug': None})
-@app.route('/catalog/<string:category_slug>/')
+@app.route('/catalog/<path:category_slug>/')
 def catalog(category_slug):
     page = request.args.get('page', 1, type=int)
     hierarchy = get_category_hierarchy()
 
-    # --- 1. Отримуємо всі фільтри з URL ---
     min_price_str = request.args.get('min_price', '')
     max_price_str = request.args.get('max_price', '')
     search_query = request.args.get('search', '').strip()
@@ -331,9 +325,8 @@ def catalog(category_slug):
     min_price = float(min_price_str) if min_price_str.isdigit() else None
     max_price = float(max_price_str) if max_price_str.isdigit() else None
 
-    # --- 2. [НОВА ЛОГІКА] Автоматичне перенаправлення при пошуку ---
-    if search_query:
-        # Шукаємо перший товар, що відповідає запиту, незалежно від категорії
+    # [НОВА ЛОГІКА] Автоматичне перенаправлення при пошуку з інших сторінок
+    if search_query and not category_slug:
         found_product = Product.query.filter(
             Product.name.ilike(f'%{search_query}%'),
             Product.in_stock == True,
@@ -341,50 +334,34 @@ def catalog(category_slug):
             Product.description != ''
         ).first()
 
-        if found_product:
-            # Визначаємо головну категорію знайденого товару
+        if found_product and found_product.category:
             product_main_category = None
-            MAIN_CATEGORIES = {
-                "Поливочна система": ["полив", "шланг", "конектор", "розпилювач"],
-                "Насоси": ["насос", "помпа", "гідрофор"],
-                "Бойлери": ["бойлер", "водонагрівач"],
-                "Змішувачі": ["змішувач", "кран", "сифон"],
-                "Витяжки": ["витяжк", "вентилятор"],
-                "Газові колонки": ["колонк", "газов"],
-                "Сушка для рушників": ["сушк", "рушник"],
-                "Запчастини": ["запчастин", "котел", "термопар"]
+            MAIN_CATEGORIES_FOR_REDIRECT = {
+                "Поливочна система": ["полив", "зрошення", "шланг", "конектор", "розпилювач", "краплинн", "дощувач"],
+                "Насоси та гідрофори": ["насос", "помпа", "гідрофор", "дренажн", "фекальн", "циркуляційн",
+                                        "свердловин"],
+                "Водонагрівачі": ["бойлер", "водонагрівач", "тен"],
+                "Змішувачі та сифони": ["змішувач", "кран", "сифон", "душов", "лійка"],
+                "Вентиляція та витяжки": ["витяжк", "вентилятор", "решітка", "канал"],
+                "Газове обладнання": ["колонк", "газов", "конвектор"],
+                "Опалення та водопостачання": ["опален", "радіатор", "рушникосуш", "котел", "фітинг", "труба", "крани",
+                                               "тепла підлога"],
+                "Запчастини та комплектуючі": ["запчастин", "комплектуюч", "термопар", "автоматика", "реле", "мембрана"]
             }
-            if found_product.category in MAIN_CATEGORIES:
-                product_main_category = found_product.category
-            else:
-                for main_cat, keywords in MAIN_CATEGORIES.items():
-                    if any(keyword in found_product.category.lower() for keyword in keywords):
-                        product_main_category = main_cat
-                        break
+
+            for main_cat, keywords in MAIN_CATEGORIES_FOR_REDIRECT.items():
+                if any(keyword in found_product.category.lower() for keyword in keywords):
+                    product_main_category = main_cat
+                    break
             if not product_main_category:
-                product_main_category = "Запчастини"
+                product_main_category = "Різне"
 
-            new_slug = product_main_category.lower().replace(' ', '-')
+            new_slug = product_main_category.replace(' ', '-').replace('/', '-')
 
-            # Якщо поточний slug не співпадає з slug'ом знайденого товару, робимо редірект
-            if category_slug != new_slug:
-                # Створюємо копію аргументів для безпечної модифікації
-                redirect_args = request.args.copy()
+            redirect_args = request.args.copy()
+            redirect_args.pop('search', None)  # Ми передамо його явно
+            return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
 
-                # [ГОЛОВНИЙ ФІКС] Видаляємо СТАРИЙ 'category_slug', якщо він там був.
-                # Це запобігає конфлікту в url_for.
-                if 'category_slug' in redirect_args:
-                    redirect_args.pop('category_slug')
-
-                # Також видаляємо 'search', бо ми передаємо його явно і хочемо, щоб він був "свіжим"
-                if 'search' in redirect_args:
-                    redirect_args.pop('search')
-
-                # Тепер redirect_args містить тільки "чисті" фільтри (наприклад, ціну),
-                # і ми можемо безпечно робити редірект.
-                return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
-
-    # --- 3. Формуємо базовий запит до БД (якщо не було редіректу) ---
     query = Product.query.filter(
         Product.in_stock == True,
         Product.description.isnot(None),
@@ -395,35 +372,34 @@ def catalog(category_slug):
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    # --- 4. Визначаємо поточну категорію та застосовуємо фільтр ---
     current_category = None
     main_category_of_current = None
     if category_slug:
-        category_name = category_slug.replace('-', ' ')
-        for m_cat, data in hierarchy.items():
-            if m_cat.lower() == category_name.lower():
-                current_category = m_cat
-                main_category_of_current = m_cat
+        category_name_from_slug = category_slug.replace('-', ' ').replace('/', ' ')
+        for main_cat, data in hierarchy.items():
+            if main_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
+                current_category = main_cat
+                main_category_of_current = main_cat
                 subcategories = list(data.get('subcategories', {}).keys())
-                query = query.filter(Product.category.in_([current_category] + subcategories))
+                all_cats_for_filter = [current_category] + subcategories
+                query = query.filter(Product.category.in_(all_cats_for_filter))
                 break
-            if current_category: break
+
             for sub_cat in data.get('subcategories', {}):
-                if sub_cat.lower() == category_name.lower():
+                if sub_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
                     current_category = sub_cat
-                    main_category_of_current = m_cat
+                    main_category_of_current = main_cat
                     query = query.filter(Product.category == current_category)
                     break
-            if current_category: break
+            if current_category:
+                break
 
-    # --- 5. Розраховуємо діапазон цін ---
     query_for_counts = query
     price_range = db.session.query(func.floor(func.min(Product.price)), func.ceil(func.max(Product.price))) \
         .select_from(query_for_counts.subquery()).one()
     min_price_available = price_range[0] or 0
     max_price_available = price_range[1] or 10000
 
-    # --- 6. Застосовуємо решту фільтрів ---
     if min_price:
         query = query.filter(Product.price >= min_price)
     if max_price:
@@ -431,13 +407,8 @@ def catalog(category_slug):
 
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
 
-    # --- 7. [ВИПРАВЛЕННЯ] Готуємо фільтри для шаблону, видаляючи 'category_slug'
     current_filters = request.args.copy()
-    if 'page' in current_filters:
-        current_filters.pop('page')
-    # Ось головний фікс для шаблону, який ми робимо тут, щоб не ускладнювати Jinja
-    if 'category_slug' in current_filters:
-        current_filters.pop('category_slug')
+    current_filters.pop('page', None)
 
     return render_template(
         'catalog.html',
@@ -445,12 +416,13 @@ def catalog(category_slug):
         hierarchy=hierarchy,
         current_category=current_category,
         main_category_of_current=main_category_of_current,
-        current_filters=current_filters,  # Тепер ця змінна БЕЗ category_slug
+        current_filters=current_filters,
         category_slug=category_slug,
         min_price_available=min_price_available,
         max_price_available=max_price_available,
         search_query=search_query
     )
+
 
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
@@ -472,7 +444,6 @@ def get_products_by_ids():
         return jsonify({'error': 'Invalid IDs provided'}), 400
     products = Product.query.filter(Product.id.in_(safe_product_ids)).all()
 
-    # [ВИПРАВЛЕННЯ] Просто беремо готовий URL з бази
     products_data = [
         {'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'in_stock': p.in_stock,
          'url': url_for('product_detail', product_id=p.id)} for p in products]
@@ -638,7 +609,7 @@ def update_cart_quantity(product_id):
             del cart[product_id_str]
         session["cart"] = cart
         return jsonify(status="success")
-    return jsonify(status="error", message="Товар не знайден��"), 404
+    return jsonify(status="error", message="Товар не знайдено"), 404
 
 
 @app.route('/get_cart')
@@ -655,7 +626,6 @@ def get_cart():
                     "id": product.id,
                     "name": product.name,
                     "price": product.price,
-                    # [ВИ��РАВЛЕННЯ] Просто беремо готовий URL з бази
                     "image": product.image,
                     "quantity": quantity,
                     "in_stock": product.in_stock,
@@ -723,7 +693,7 @@ def checkout():
     return render_template('checkout.html')
 
 
-# ─────────────────────���──────────
+# ────────────────────────────────
 #  ПРОФІЛЬ КОРИСТУВАЧА
 # ────────────────────────────────
 @app.route('/profile/orders')
@@ -828,8 +798,7 @@ def add_product():
             name=request.form['name'],
             price=float(request.form['price']),
             description=request.form['description'],
-            # [ВИПРАВЛЕНО] Зберігаємо тільки ім'я файлу
-            image=request.form['image'].strip() or 'default_tovar.png',
+            image=_get_cloudinary_url(request.form['image'].strip()),  # [ОНОВЛЕНО] Генеруємо повний URL
             category=request.form['category'],
             in_stock='in_stock' in request.form
         )
@@ -849,8 +818,8 @@ def edit_product(product_id):
         product.name = request.form['name']
         product.price = float(request.form['price'])
         product.description = request.form['description']
-        # [ВИПРАВЛЕНО] Зберігаємо тільки ім'я файлу
-        product.image = request.form['image'].strip() or 'default_tovar.png'
+        # [ОНОВЛЕНО] Генеруємо повний URL при зміні
+        product.image = _get_cloudinary_url(request.form['image'].strip())
         product.category = request.form['category']
         product.in_stock = 'in_stock' in request.form
 
@@ -858,9 +827,18 @@ def edit_product(product_id):
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
 
-    # [ДОДАНО] Логіка для коректного відображення імені файлу в формі
-    image_to_display = product.image if product.image and 'default_tovar' not in product.image else ''
-    return render_template("edit_product.html", product=product, image_to_display=image_to_display)
+    # [ОНОВЛЕНО] Витягуємо тільки назву файлу з URL для відображення в формі
+    image_filename = ''
+    if product.image:
+        try:
+            # Спроба витягнути public_id (напр. 'products/products/some_image') з URL
+            match = re.search(r'/products/products/([^/.]+)', product.image)
+            if match:
+                image_filename = match.group(1) + '.jpg'  # Додаємо розширення для наочності
+        except Exception:
+            pass  # Якщо не вдалося, залишимо поле порожнім
+
+    return render_template("edit_product.html", product=product, image_to_display=image_filename)
 
 
 @app.route("/admin/delete_review/<int:review_id>", methods=["POST"])
@@ -870,7 +848,7 @@ def delete_review(review_id):
     review = Review.query.get_or_404(review_id)
     db.session.delete(review);
     db.session.commit()
-    flash("Запис вид��лено.", "success")
+    flash("Запис видалено.", "success")
     return redirect(request.referrer or url_for('admin_reviews'))
 
 
@@ -930,7 +908,7 @@ def send_message():
 
 # ────────────────────────────────
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - НАДІЙНА ВЕРСІЯ
-# ───────────────────���───────────
+# ────────────────────────────────
 
 
 def require_api_key(f):
@@ -953,58 +931,53 @@ def handle_bas_handshake():
 
 def _get_cloudinary_url(image_filename):
     """
-    Внутрішня функція для генерації повного URL зображення з Cloudinary.
-    Використовується тільки всередині app.py під час імпорту.
+    [ОНОВЛЕНО] Внутрішня функція для генерації повного URL зображення з Cloudinary.
     """
-    # ID для зображення за замовчуванням (заглушки)
-    DEFAULT_IMAGE_PUBLIC_ID = "default_tovar_dw8qbz"
+    DEFAULT_IMAGE_PUBLIC_ID = "products/products/default_tovar"
 
     public_id = ""
     try:
         if image_filename and image_filename.strip():
-            # Логіка для реальних товарів
             filename_without_extension = os.path.splitext(image_filename)[0]
             public_id = f"products/products/{filename_without_extension}"
         else:
-            # Логіка для товарів без картинки
             public_id = DEFAULT_IMAGE_PUBLIC_ID
 
-        # Генеруємо URL
         url, _ = cloudinary.utils.cloudinary_url(
             public_id,
             secure=True,
             fetch_format="auto",
-            quality="auto"
+            quality="auto",
+            transformation=[{'dpr': "auto"}]
         )
         return url
     except Exception as e:
-        # Якщо сталася помилка, виводимо її в лог
         print(f"!!! ПОМИЛКА генерації Cloudinary URL для ID '{public_id}': {e}")
-        # Повертаємо None, щоб в базу не записалося нічого або помилкове значення
-        return None
+        # Повертаємо URL для заглушки за замовчуванням у разі помилки
+        url, _ = cloudinary.utils.cloudinary_url(DEFAULT_IMAGE_PUBLIC_ID, secure=True)
+        return url
 
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
+    """ [ПОВНІСТЮ ПЕРЕПИСАНА І ОПТИМІЗОВАНА ФУНКЦІЯ] """
     if 'file' not in request.files:
         return "failure\nFile part is missing in the request.", 400
     cml_file = request.files['file']
     if cml_file.filename == '':
         return "failure\nNo selected file.", 400
 
-    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку з lxml...")
+    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку...")
 
     try:
         raw_data = cml_file.read()
         try:
-            parser_utf8 = lxml_etree.XMLParser(recover=True, encoding='utf-8')
-            root = lxml_etree.fromstring(raw_data, parser=parser_utf8)
-            print("Info: Файл успішно розібрано з кодуванням UTF-8.")
+            parser = lxml_etree.XMLParser(recover=True, encoding='utf-8')
+            root = lxml_etree.fromstring(raw_data, parser=parser)
         except Exception:
-            parser_win1251 = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
-            root = lxml_etree.fromstring(raw_data, parser=parser_win1251)
-            print("Info: Файл успішно розібрано з кодуванням windows-1251.")
+            parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
+            root = lxml_etree.fromstring(raw_data, parser=parser)
 
         for elem in root.getiterator():
             if '}' in elem.tag:
@@ -1016,122 +989,87 @@ def bas_import():
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
         products_from_xml = catalog_node.findall('.//Товар')
-        print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю обробку...")
+        print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю оптимізовану обробку...")
 
-        # ================================================================
-        # [ОПТИМІЗАЦІЯ №1]: Отримуємо всі існуючі товари з бази ОДНИМ ЗАПИТОМ
-        # ================================================================
-        print("Оптимізація: Завантажую ��снуючі товари з бази даних...")
-        # Завантажуємо тільки ID та назву для економії пам'яті
         existing_products_raw = db.session.query(Product.id, Product.name).all()
-        # Створюємо словник для миттєвого пошуку: { 'Назва товару': id }
         existing_products_map = {name: pid for pid, name in existing_products_raw}
-        print(f"Завантажено {len(existing_products_map)} існуючих товарів.")
+        print(f"Завантажено {len(existing_products_map)} існуючих товарів з бази даних для порівняння.")
 
-        # ================================================================
-        # [ОПТИМІЗАЦІЯ №2]: Готуємо списки для пакетної обробки
-        # ================================================================
         products_to_update = []
         products_to_add = []
         default_image_url = _get_cloudinary_url(None)
 
-        # Починаємо цикл обробки XML, але НЕ робимо запитів до бази всередині
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
             if not product_id_from_xml: continue
 
-            # --- Ця логіка збору даних з XML залишається без змін ---
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
-            group_id_node = product_node.find('.//Групи/Ид')
-            group_id = group_id_node.text if group_id_node is not None else None
-            category = groups.get(group_id, "Загальна")
-            image_filename_from_xml = (product_node.findtext('Картинка') or '').strip()
-            final_image_url = _get_cloudinary_url(image_filename_from_xml)
-            if not final_image_url:
-                final_image_url = default_image_url
+            group_id = product_node.find('.//Группы/Ид').text if product_node.find('.//Группы/Ид') is not None else None
+            category = groups.get(group_id, "Різне")
+            image_filename = (product_node.findtext('Картинка') or '').strip()
 
-            price = 0.0
-            in_stock = False
+            price, in_stock = 0.0, False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
             if offer_node is not None:
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
                     try:
-                        price = float(re.match(r"[\d.]+", price_node.text.replace(',', '.')).group(0))
+                        price = float(re.sub(r'[^\d.]', '', price_node.text.replace(',', '.')))
                     except (ValueError, AttributeError):
                         pass
+
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
-                        if int(float(quantity_node.text.strip())) > 0: in_stock = True
+                        if int(float(quantity_node.text.strip())) > 0:
+                            in_stock = True
                     except (ValueError, TypeError):
                         pass
 
-            if not in_stock:
-                stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
-                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
-                    'true', 'да', 'є', 'yes']:
-                    in_stock = True
-                else:
-                    stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
-                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.lower() == 'true':
-                        in_stock = True
-
-            # --- Логіка визначення бренду також без змін ---
+            # [НОВИЙ БЛОК] Визначення бренду.
             brand = None
             if description:
-                clean_description = description.replace('<br>', '\n').replace('<BR>', '\n')
+                clean_description = re.sub('<[^<]+?>', '\n', description)
                 brand_keywords = ['виробник:', 'бренд:', 'виробництво:', 'торгова марка:']
-                known_brands = [
-                    'Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap',
-                    'Immergas', 'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis',
-                    'Pedrollo', 'Pentax', 'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut',
-                    'Aquatica', 'Thermo Alliance', 'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor',
-                    'Aqua', 'Арма', 'Донтерм', 'Прометей', 'Насоси плюс обладнання', 'Опалення', 'Gerts'
-                ]
+                known_brands = ['Ariston', 'Aquapulse', 'Atlantic', 'Gorenje', 'Eldom', 'Forwater', 'Frap', 'Immergas',
+                                'Itap', 'KRAZ', 'Lidz', 'Modus', 'Novatec', 'Optima', 'Oasis', 'Pedrollo', 'Pentax',
+                                'Purflux', 'Q-tap', 'Rudis', 'Santehplast', 'Sprut', 'Aquatica', 'Thermo Alliance',
+                                'Vents', 'Vital', 'Wilo', 'Zanussi', 'Zegor', 'Aqua', 'Арма', 'Донтерм', 'Прометей',
+                                'Насоси плюс обладнання', 'Опалення', 'Gerts']
+
                 for keyword in brand_keywords:
                     if keyword in clean_description.lower():
                         start_index = clean_description.lower().find(keyword) + len(keyword)
-                        brand_candidate = clean_description[start_index:].strip().split('\n')[0].strip()
-                        if brand_candidate:
-                            brand = brand_candidate
-                            break
+                        brand_candidate = clean_description[start_index:].split('\n')[0].strip()
+                        if brand_candidate: brand = brand_candidate; break
+
                 if not brand:
                     for known_brand in sorted(known_brands, key=len, reverse=True):
                         if re.search(r'\b' + re.escape(known_brand) + r'\b', clean_description, re.IGNORECASE):
-                            brand = known_brand
+                            brand = known_brand;
                             break
             if brand:
-                # Спочатку видаляємо HTML-теги, потім замінюємо &nbsp; на звичайний пробіл,
-                # а потім прибираємо зайві пробіли на початку та в кінці.
                 brand = re.sub(r'<[^>]+>', '', brand).replace('&nbsp;', ' ').strip()
-                if brand:  # Перевіряємо, чи щось залишилось після очищення
-                    brand = brand[:100]  # Обрізаємо до 100 символів
-                else:
-                    brand = None  # Якщо нічого не залишилось, ставимо None
+                brand = brand[:100] if brand else None
 
-            # Створюємо словник з даними товару
             product_data = {
                 'name': name, 'price': price, 'description': description,
-                'category': category, 'brand': brand, 'image': final_image_url,
+                'category': category, 'brand': brand,
+                'image': _get_cloudinary_url(image_filename),  # Генеруємо повний URL тут
                 'in_stock': in_stock
             }
 
-            # Розподіляємо товар у відповідний список: на оновлення або на додавання
             if name in existing_products_map:
-                product_data['id'] = existing_products_map[name]  # Додаємо ID для оновлення
+                product_data['id'] = existing_products_map[name]
                 products_to_update.append(product_data)
             else:
                 products_to_add.append(product_data)
 
         updated_count = len(products_to_update)
         added_count = len(products_to_add)
-        print(f"Завершення циклу. Підготовлено до оновлення: {updated_count}, до додавання: {added_count}.")
+        print(f"Підготовлено до оновлення: {updated_count}. Підготовлено до додавання: {added_count}.")
 
-        # ================================================================
-        # [ОПТИМІЗАЦІЯ №3]: Виконуємо пакетні операції з базою
-        # ================================================================
         if products_to_add:
             print("Виконую пакетне додавання нових товарів...")
             db.session.bulk_insert_mappings(Product, products_to_add)
@@ -1142,7 +1080,6 @@ def bas_import():
             db.session.bulk_update_mappings(Product, products_to_update)
             print("Пакетне оновлення завершено.")
 
-        # Робимо commit тільки якщо були якісь зміни
         if products_to_add or products_to_update:
             print("Зберігаю зміни в базі даних (commit)...")
             db.session.commit()
@@ -1160,9 +1097,6 @@ def bas_import():
         error_details = traceback.format_exc()
         print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
-
-
-# ... (ваш код після функції)
 
 
 def require_bot_api_key(f):
@@ -1234,7 +1168,7 @@ def find_np_cities():
 
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання ВІДДІЛЕНЬ ТА ПОШТОМАТІВ для населеного пункту.""" # <-- Змінив коментар для ясності
+    """Отримання ВІДДІЛЕНЬ ТА ПОШТОМАТІВ для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
 
@@ -1249,8 +1183,7 @@ def get_np_warehouses():
         "calledMethod": "getWarehouses",
         "methodProperties": {
             "SettlementRef": city_ref,
-            # >>> ДОДАЙТЕ ЦЕЙ ПАРАМЕТР, щоб отримувати і поштомати теж
-            "TypeOfWarehouseRef": "841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28" # Ref для Поштоматів та Вантажно-пасажирських відділень
+            "TypeOfWarehouseRef": "841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28"
         }
     }
     try:
@@ -1258,9 +1191,7 @@ def get_np_warehouses():
         response.raise_for_status()
         data = response.json()
         if data['success']:
-            # >>> ЗАМІНІТЬ СТАРИЙ БЛОК ФІЛЬТРАЦІЇ НА ЦЕЙ
             all_warehouses = data.get('data', [])
-            # Тепер просто повертаємо всі знайдені відділення/поштомати без фільтрації
             return jsonify([w['Description'] for w in all_warehouses])
         return jsonify([])
     except requests.exceptions.RequestException as e:
@@ -1279,30 +1210,9 @@ def api_load_more():
     category_slug = request.args.get('category_slug')
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
-    # [ВАЖЛИВО] Додаємо отримання пошукового запиту
     search_query = request.args.get('search', '').strip()
 
     hierarchy = get_category_hierarchy()
-    current_category = None
-    main_category = None
-    subcategories = []
-
-    if category_slug:
-        category_name = category_slug.replace('-', ' ')
-        for main_cat, data in hierarchy.items():
-            if main_cat.lower() == category_name.lower():
-                current_category = main_cat
-                main_category = main_cat
-                subcategories = list(data.get('subcategories', {}).keys())
-                break
-            for subcat in data.get('subcategories', {}):
-                if subcat.lower() == category_name.lower():
-                    current_category = subcat
-                    main_category = main_cat
-                    break
-            if current_category:
-                break
-
     query = Product.query.filter(
         Product.in_stock == True,
         Product.description.isnot(None),
@@ -1310,15 +1220,27 @@ def api_load_more():
         Product.image.notlike('default_tovar%')
     )
 
-    # [ВАЖЛИВО] Застосовуємо фільтр пошуку, як і в основній функції
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    if current_category:
-        if main_category == current_category:
-            query = query.filter(Product.category.in_([main_category] + subcategories))
-        else:
-            query = query.filter(Product.category == current_category)
+    if category_slug:
+        category_name_from_slug = category_slug.replace('-', ' ').replace('/', ' ')
+        current_category = None
+        for main_cat, data in hierarchy.items():
+            if main_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
+                current_category = main_cat
+                subcategories = list(data.get('subcategories', {}).keys())
+                all_cats_for_filter = [current_category] + subcategories
+                query = query.filter(Product.category.in_(all_cats_for_filter))
+                break
+
+            for sub_cat in data.get('subcategories', {}):
+                if sub_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
+                    current_category = sub_cat
+                    query = query.filter(Product.category == current_category)
+                    break
+            if current_category:
+                break
 
     if min_price:
         query = query.filter(Product.price >= min_price)
@@ -1329,13 +1251,11 @@ def api_load_more():
         page=page, per_page=12, error_out=False
     )
 
-    # [ВАЖЛИВО] Рендеримо ТІЛЬКИ картки товарів, використовуючи спеціальний шаблон
     html = render_template('_products_grid_items.html', products=products_pagination.items)
-
     response = make_response(html)
     response.headers['X-More-Available'] = 'true' if products_pagination.has_next else 'false'
-
     return response
+
 
 # ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
