@@ -2696,3 +2696,79 @@ details[open] > summary.filter-title {
 #clear-history-btn:hover {
     text-decoration: underline;
 }
+
+.search-suggestions-dropdown {
+    display: none;
+    position: absolute;
+    top: 105%;
+    left: 0;
+    right: 0;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    z-index: 100;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.search-suggestions-dropdown.active {
+    display: block;
+}
+
+.search-suggestions-dropdown ul {
+    list-style: none;
+    padding: 8px 0;
+    margin: 0;
+}
+
+.search-suggestions-dropdown li a {
+    display: block;
+    padding: 10px 20px;
+    color: var(--dark-color);
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.search-suggestions-dropdown li a:hover {
+    background-color: var(--light-color);
+    color: var(--primary-color);
+}
+
+
+/* --- Стилі для спінера на кнопці "Завантажити ще" --- */
+#load-more-btn {
+    position: relative;
+    user-select: none; /* Забороняємо виділення тексту */
+    -webkit-user-select: none;
+}
+
+.btn-spinner {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin-top: -12px;
+    margin-left: -12px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+#load-more-btn.loading .btn-text {
+    visibility: hidden; /* Ховаємо текст */
+}
+
+#load-more-btn.loading .btn-spinner {
+    display: block; /* Показуємо спінер */
+}
+
+/* Анімація обертання */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

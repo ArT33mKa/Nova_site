@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initAuth();
     initHeaderActions(pageOverlay, closeAllSidebars); // [ЗМІНЕНО] Передаємо залежності
     initContactForm();
-    initCatalogFilters();
     initReviewsPage();
     initHeroSlider();
     initSimilarProductsCarousel();
@@ -29,11 +28,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initAutoApplyFilters();
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
-    initLoadMore();
-    initShowMoreFilters();
+
+    // [ОНОВЛЕНО] Запуск нових функцій
+    initLiveSearch();
+    initInfiniteScroll();
+
     updateCartView();
     updateFavoritesUI();
-    initSearchLogic();
 
     // [НОВЕ] Обробник кліку на саме затемнення для закриття панелей
     if (pageOverlay) {
@@ -97,7 +98,6 @@ function switchAuthTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
 }
 
-// [ЗМІНЕНО] Функція тепер приймає залежності
 function initCabinetModal(pageOverlay, closeAllSidebars) {
     const cabinetModal = document.getElementById('cabinet-modal');
     if (!cabinetModal) return;
@@ -106,11 +106,10 @@ function initCabinetModal(pageOverlay, closeAllSidebars) {
         cabinetModal.classList.add('active');
         if (pageOverlay) {
             pageOverlay.classList.add('active');
-            pageOverlay.classList.add('dark'); // Темне затемнення для кабінету
+            pageOverlay.classList.add('dark');
         }
     });
 
-    // [ЗМІНЕНО] Використовуємо універсальну функцію закриття
     cabinetModal.addEventListener('click', e => {
         if (e.target.classList.contains('cabinet-close') || e.target.id === 'cabinet-modal') {
             closeAllSidebars();
@@ -127,7 +126,6 @@ function initCabinetModal(pageOverlay, closeAllSidebars) {
     });
 }
 
-// [ЗМІНЕНО] Функція тепер приймає залежності
 function initHeaderActions(pageOverlay, closeAllSidebars) {
     const cartModal = document.getElementById('cart-modal');
     if(!cartModal) return;
@@ -136,11 +134,10 @@ function initHeaderActions(pageOverlay, closeAllSidebars) {
         updateCartView();
         cartModal.classList.add('active');
         if (pageOverlay) {
-            pageOverlay.classList.add('active'); // Сіре затемнення (за замовчуванням)
+            pageOverlay.classList.add('active');
         }
     });
 
-    // [ЗМІНЕНО] Використовуємо універсальну функцію закриття
     cartModal.addEventListener('click', e => {
         if (e.target.matches('.close-modal') || e.target.id === 'cart-modal') {
             closeAllSidebars();
@@ -149,8 +146,115 @@ function initHeaderActions(pageOverlay, closeAllSidebars) {
 }
 
 // ===================================================================
-//  ІНША ЛОГІКА (без змін, просто залишаємо як є)
+//  НОВІ ТА ОНОВЛЕНІ ФУНКЦІЇ
 // ===================================================================
+
+function initLiveSearch() {
+    const searchInput = document.getElementById('search-input');
+    const suggestionsDropdown = document.getElementById('search-suggestions-dropdown');
+
+    if (!searchInput || !suggestionsDropdown) return;
+
+    let searchTimeout;
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        const query = searchInput.value.trim();
+
+        if (query.length < 2) {
+            suggestionsDropdown.innerHTML = '';
+            suggestionsDropdown.classList.remove('active');
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            fetch(`/api/search_suggestions?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(suggestions => {
+                    suggestionsDropdown.innerHTML = '';
+                    if (suggestions.length > 0) {
+                        const list = document.createElement('ul');
+                        suggestions.forEach(item => {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<a href="${item.url}">${item.name}</a>`;
+                            list.appendChild(li);
+                        });
+                        suggestionsDropdown.appendChild(list);
+                        suggestionsDropdown.classList.add('active');
+                    } else {
+                        suggestionsDropdown.classList.remove('active');
+                    }
+                });
+        }, 300);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !suggestionsDropdown.contains(e.target)) {
+            suggestionsDropdown.classList.remove('active');
+        }
+    });
+}
+
+function initInfiniteScroll() {
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    const productsGrid = document.getElementById('products-grid-container');
+
+    if (!loadMoreBtn || !productsGrid) return;
+
+    let currentPage = 1;
+    let isLoading = false;
+    let infiniteScrollEnabled = false;
+
+    const loadMoreProducts = () => {
+        if (isLoading) return;
+        isLoading = true;
+        currentPage++;
+
+        loadMoreBtn.classList.add('loading');
+
+        const params = new URLSearchParams();
+        params.set('page', currentPage);
+        if (loadMoreBtn.dataset.categorySlug) params.set('category_slug', loadMoreBtn.dataset.categorySlug);
+        if (loadMoreBtn.dataset.search) params.set('search', loadMoreBtn.dataset.search);
+        if (loadMoreBtn.dataset.minPrice) params.set('min_price', loadMoreBtn.dataset.minPrice);
+        if (loadMoreBtn.dataset.maxPrice) params.set('max_price', loadMoreBtn.dataset.maxPrice);
+
+        fetch(`/api/catalog/load_more?${params.toString()}`)
+            .then(response => {
+                const moreAvailable = response.headers.get('X-More-Available') === 'true';
+                if (!moreAvailable) {
+                    loadMoreBtn.style.display = 'none';
+                    window.removeEventListener('scroll', handleScroll);
+                }
+                return response.text();
+            })
+            .then(html => {
+                if (html.trim() !== "") {
+                    productsGrid.insertAdjacentHTML('beforeend', html);
+                }
+            })
+            .catch(error => console.error('Error loading more products:', error))
+            .finally(() => {
+                isLoading = false;
+                loadMoreBtn.classList.remove('loading');
+            });
+    };
+
+    const handleScroll = () => {
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 500) {
+            loadMoreProducts();
+        }
+    };
+
+    loadMoreBtn.addEventListener('click', () => {
+        if (!infiniteScrollEnabled) {
+            infiniteScrollEnabled = true;
+            window.addEventListener('scroll', handleScroll);
+        }
+        loadMoreProducts();
+    });
+}
+
 function initOptimizedCartLogic() {
     document.body.addEventListener('click', e => {
         const button = e.target.closest('button');

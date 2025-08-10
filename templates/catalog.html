@@ -16,51 +16,35 @@
         <aside class="filters-sidebar sticky-sidebar">
             <form id="filters-form" method="GET" action="{{ url_for('catalog', category_slug=category_slug) }}">
 
-                <!-- ФІЛЬТР КАТЕГОРІЙ -->
                 <div class="filter-group">
                     {% if current_category %}
-                        {% set reset_params = current_filters.copy() %}
-                        {% do reset_params.pop('search', None) %}
-
-                        {% set back_link_text = 'Всі категорії' %}
-                        {% set back_link_url = url_for('catalog', **reset_params) %}
-
+                        {% set reset_params = current_filters.copy() %}{% do reset_params.pop('search', None) %}
+                        {% set back_link_text = 'Всі категорії' %}{% set back_link_url = url_for('catalog', **reset_params) %}
                         {% if main_category_of_current and current_category != main_category_of_current %}
                             {% set back_link_text = main_category_of_current %}
                             {% set back_link_url = url_for('catalog', category_slug=main_category_of_current.replace(' ', '-').replace('/', '-'), **reset_params) %}
                         {% endif %}
-
-                        <a href="{{ back_link_url }}" class="back-to-categories-link">
-                            <i class="fas fa-arrow-left"></i>
-                            <span>{{ back_link_text }}</span>
-                        </a>
-
+                        <a href="{{ back_link_url }}" class="back-to-categories-link"><i class="fas fa-arrow-left"></i><span>{{ back_link_text }}</span></a>
                         {% set subcategories = hierarchy.get(main_category_of_current, {}).get('subcategories', {}) %}
                         {% if subcategories and current_category == main_category_of_current %}
                         <div class="subcategory-list">
                             {% for subcat_name, count in subcategories.items()|sort %}
                                 <a href="{{ url_for('catalog', category_slug=subcat_name.replace(' ', '-').replace('/', '-'), **current_filters) }}" class="filter-category-link">
-                                    <span>{{ subcat_name }}</span>
-                                    <span class="filter-count">{{ count }}</span>
-                                </a>
+                                    <span>{{ subcat_name }}</span><span class="filter-count">{{ count }}</span></a>
                             {% endfor %}
                         </div>
                         {% endif %}
-
                     {% else %}
                         <h4 class="filter-title always-open">Категорії</h4>
                         <div class="filter-options-list">
                             {% for cat_name, data in hierarchy.items()|sort %}
                                 <a href="{{ url_for('catalog', category_slug=cat_name.replace(' ', '-').replace('/', '-'), **current_filters) }}" class="filter-category-link">
-                                    <span>{{ cat_name }}</span>
-                                    <span class="filter-count">{{ data.count }}</span>
-                                </a>
+                                    <span>{{ cat_name }}</span><span class="filter-count">{{ data.count }}</span></a>
                             {% endfor %}
                         </div>
                     {% endif %}
                 </div>
 
-                <!-- ФІЛЬТР ЦІНИ -->
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
                     <div class="price-inputs">
@@ -72,7 +56,6 @@
             </form>
         </aside>
 
-        <!-- Основний контент з товарами -->
         <div class="products-container">
             <div class="search-bar-container">
                 <form id="search-form" method="GET" action="{{ url_for('catalog') }}" class="search-form">
@@ -80,7 +63,8 @@
                     <div class="search-input-wrapper">
                         <input type="search" name="search" id="search-input" value="{{ search_query or '' }}" placeholder="Я шукаю..." autocomplete="off">
                         <button type="submit" class="search-btn" title="Знайти"><i class="fas fa-search"></i></button>
-                        <div id="search-history-dropdown" class="search-history-dropdown"></div>
+                        <!-- [ДОДАНО] Контейнер для пошукових підказок -->
+                        <div id="search-suggestions-dropdown" class="search-suggestions-dropdown"></div>
                     </div>
                 </form>
             </div>
@@ -112,15 +96,15 @@
                 </div>
                  {% if products.has_next %}
                     <div class="load-more-container">
-                        <button id="load-more-btn"
-                                class="btn btn-outline btn-lg"
+                        <button id="load-more-btn" class="btn btn-outline btn-lg"
                                 data-category-slug="{{ category_slug or '' }}"
                                 data-search="{{ search_query or '' }}"
                                 data-min-price="{{ request.args.get('min_price', '') }}"
                                 data-max-price="{{ request.args.get('max_price', '') }}">
-                            Завантажити ще
+                            <!-- [ОНОВЛЕНО] Додано span для тексту та для спінера -->
+                            <span class="btn-text">Завантажити ще</span>
+                            <span class="btn-spinner"></span>
                         </button>
-                        <div id="loading-spinner" style="display: none;">Завантаження...</div>
                     </div>
                 {% endif %}
             {% else %}

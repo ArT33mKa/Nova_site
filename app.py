@@ -62,8 +62,6 @@ login_manager.login_view = 'login'
 login_manager.login_message = "Будь ласка, увійдіть, щоб виконати цю дію."
 login_manager.login_message_category = "info"
 
-
-# ... (Ваші функції send_email, send_telegram_notification залишаються без змін) ...
 def send_email(to_address, subject, html_body):
     smtp_user = os.getenv("SMTP_USER", "artemcool200911@gmail.com")
     app_pass = os.getenv("EMAIL_PASS")
@@ -111,7 +109,6 @@ def send_telegram_notification(order, items):
         print(f">>> Make.com: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
 
 
-# ... (Ваші моделі User, Product, Review, Order, OrderItem, OAuth залишаються без змін) ...
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(80), nullable=False)
