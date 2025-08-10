@@ -157,35 +157,82 @@ function initLiveSearch() {
 
     let searchTimeout;
 
+    const renderSuggestions = (data) => {
+        const history = JSON.parse(localStorage.getItem('searchHistory')) || [];
+
+        suggestionsDropdown.innerHTML = `
+            <div class="rich-search-dropdown">
+                ${history.length > 0 ? `
+                <div class="search-history-section">
+                    <div class="section-header">
+                        <h4>Історія пошуку</h4>
+                        <button id="clear-history-btn">Очистити все</button>
+                    </div>
+                    <ul class="history-list">
+                        ${history.map(term => `
+                            <li>
+                                <a href="/catalog?search=${encodeURIComponent(term)}">
+                                    <i class="fas fa-history"></i>
+                                    <span>${term}</span>
+                                </a>
+                                <button class="remove-history-item" data-term="${term}">&times;</button>
+                            </li>`).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+
+                ${data.products.length > 0 ? `
+                <div class="search-products-section">
+                    <div class="section-header"><h4>Товари</h4></div>
+                    <div class="products-carousel-wrapper">
+                        <button class="carousel-nav-btn prev" disabled>&lt;</button>
+                        <div class="products-carousel-container">
+                            <div class="products-carousel-track">
+                                ${data.products.map(p => `
+                                    <a href="${p.url}" class="product-suggestion-card">
+                                        <img src="${p.image}" alt="${p.name}">
+                                        <p class="name">${p.name}</p>
+                                        <p class="price">${p.price.toFixed(2)} ₴</p>
+                                    </a>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <button class="carousel-nav-btn next">&gt;</button>
+                    </div>
+                </div>
+                ` : ''}
+
+                ${data.categories.length > 0 ? `
+                <div class="search-categories-section">
+                    <div class="section-header"><h4>Категорії</h4></div>
+                    <ul class="categories-list">
+                        ${data.categories.map(cat => `
+                            <li><a href="${cat.url}">${cat.name}</a></li>
+                        `).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+            </div>
+        `;
+        suggestionsDropdown.classList.add('active');
+        initSuggestionCarousel();
+    };
+
+    const fetchAndRender = (query) => {
+        fetch(`/api/search_suggestions?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(renderSuggestions)
+            .catch(err => console.error("Search suggestion fetch error:", err));
+    };
+
     searchInput.addEventListener('input', () => {
         clearTimeout(searchTimeout);
         const query = searchInput.value.trim();
+        searchTimeout = setTimeout(() => fetchAndRender(query), 300);
+    });
 
-        if (query.length < 2) {
-            suggestionsDropdown.innerHTML = '';
-            suggestionsDropdown.classList.remove('active');
-            return;
-        }
-
-        searchTimeout = setTimeout(() => {
-            fetch(`/api/search_suggestions?q=${encodeURIComponent(query)}`)
-                .then(res => res.json())
-                .then(suggestions => {
-                    suggestionsDropdown.innerHTML = '';
-                    if (suggestions.length > 0) {
-                        const list = document.createElement('ul');
-                        suggestions.forEach(item => {
-                            const li = document.createElement('li');
-                            li.innerHTML = `<a href="${item.url}">${item.name}</a>`;
-                            list.appendChild(li);
-                        });
-                        suggestionsDropdown.appendChild(list);
-                        suggestionsDropdown.classList.add('active');
-                    } else {
-                        suggestionsDropdown.classList.remove('active');
-                    }
-                });
-        }, 300);
+    searchInput.addEventListener('focus', () => {
+        fetchAndRender(searchInput.value.trim());
     });
 
     document.addEventListener('click', (e) => {
@@ -193,6 +240,79 @@ function initLiveSearch() {
             suggestionsDropdown.classList.remove('active');
         }
     });
+
+    // Обробка історії
+    document.getElementById('search-form').addEventListener('submit', (e) => {
+        const searchTerm = searchInput.value.trim();
+        if (searchTerm) {
+            let history = JSON.parse(localStorage.getItem('searchHistory')) || [];
+            history = history.filter(item => item.toLowerCase() !== searchTerm.toLowerCase());
+            history.unshift(searchTerm);
+            if (history.length > 5) history.pop();
+            localStorage.setItem('searchHistory', JSON.stringify(history));
+        }
+    });
+
+    suggestionsDropdown.addEventListener('click', (e) => {
+        if (e.target.id === 'clear-history-btn') {
+            e.preventDefault();
+            localStorage.removeItem('searchHistory');
+            fetchAndRender(searchInput.value.trim());
+        }
+        if (e.target.classList.contains('remove-history-item')) {
+            e.preventDefault();
+            const term = e.target.dataset.term;
+            let history = JSON.parse(localStorage.getItem('searchHistory')) || [];
+            history = history.filter(item => item !== term);
+            localStorage.setItem('searchHistory', JSON.stringify(history));
+            fetchAndRender(searchInput.value.trim());
+        }
+    });
+
+    function initSuggestionCarousel() {
+        const wrapper = suggestionsDropdown.querySelector('.products-carousel-wrapper');
+        if (!wrapper) return;
+
+        const track = wrapper.querySelector('.products-carousel-track');
+        const prevBtn = wrapper.querySelector('.prev');
+        const nextBtn = wrapper.querySelector('.next');
+        const items = track.querySelectorAll('.product-suggestion-card');
+        if (items.length <= 3) { // Показуємо 3 товари без прокрутки
+            prevBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
+            return;
+        }
+
+        let currentIndex = 0;
+        const itemWidth = items[0].offsetWidth + 10; // ширина картки + відступ
+        const trackWidth = items.length * itemWidth;
+        track.style.width = `${trackWidth}px`;
+
+        const updateButtons = () => {
+            prevBtn.disabled = currentIndex === 0;
+            // Показуємо 3 елементи, тому прокрутка можлива до items.length - 3
+            nextBtn.disabled = currentIndex >= items.length - 3;
+        };
+
+        nextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (currentIndex < items.length - 3) {
+                currentIndex++;
+                track.style.transform = `translateX(-${currentIndex * itemWidth}px)`;
+            }
+            updateButtons();
+        });
+
+        prevBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (currentIndex > 0) {
+                currentIndex--;
+                track.style.transform = `translateX(-${currentIndex * itemWidth}px)`;
+            }
+            updateButtons();
+        });
+        updateButtons();
+    }
 }
 
 function initInfiniteScroll() {

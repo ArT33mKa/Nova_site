@@ -863,50 +863,47 @@ def send_message():
 @app.route('/api/search_suggestions')
 def api_search_suggestions():
     query = request.args.get('q', '').strip()
-    if len(query) < 2:
-        return jsonify([])
 
-    suggestions = []
-
-    # Пошук товарів (до 5 результатів)
-    products = Product.query.filter(
-        Product.name.ilike(f'%{query}%'),
-        Product.in_stock == True
-    ).limit(5).all()
-    for p in products:
-        suggestions.append({
-            "name": p.name,
-            "url": url_for('product_detail', product_id=p.id),
-            "type": "product"
-        })
-
-    # Пошук категорій (до 3 результатів)
-    if len(suggestions) < 8: # Додаємо категорії, якщо ще є місце
+    # Якщо запит порожній, все одно повернемо найпопулярніші товари та категорії для початкового стану
+    if not query:
+        products = Product.query.filter(Product.in_stock == True).order_by(Product.reviews_count.desc(),
+                                                                           Product.id.desc()).limit(10).all()
         hierarchy = get_category_hierarchy()
-        found_categories = 0
+        # Сортуємо категорії за кількістю товарів і беремо топ-10
+        sorted_categories = sorted(hierarchy.items(), key=lambda item: item[1]['count'], reverse=True)[:10]
+        categories = [{"name": name, "url": url_for('catalog', category_slug=name.replace(' ', '-').replace('/', '-'))}
+                      for name, data in sorted_categories]
+    else:
+        # Пошук товарів, якщо є запит
+        products = Product.query.filter(
+            Product.name.ilike(f'%{query}%'),
+            Product.in_stock == True
+        ).limit(10).all()
+        # Пошук категорій
+        hierarchy = get_category_hierarchy()
+        found_categories = []
         for main_cat, data in hierarchy.items():
             if query.lower() in main_cat.lower():
-                if found_categories < 3:
-                    suggestions.append({
-                        "name": main_cat,
-                        "url": url_for('catalog', category_slug=main_cat.replace(' ', '-').replace('/', '-')),
-                        "type": "category"
-                    })
-                    found_categories += 1
+                found_categories.append({"name": main_cat, "url": url_for('catalog', category_slug=main_cat.replace(' ',
+                                                                                                                    '-').replace(
+                    '/', '-'))})
             for sub_cat in data.get('subcategories', {}):
-                 if query.lower() in sub_cat.lower():
-                     if found_categories < 3:
-                        suggestions.append({
-                            "name": sub_cat,
-                            "url": url_for('catalog', category_slug=sub_cat.replace(' ', '-').replace('/', '-')),
-                            "type": "category"
-                        })
-                        found_categories += 1
+                if query.lower() in sub_cat.lower():
+                    found_categories.append({"name": sub_cat, "url": url_for('catalog',
+                                                                             category_slug=sub_cat.replace(' ',
+                                                                                                           '-').replace(
+                                                                                 '/', '-'))})
+        categories = found_categories[:10]
 
-    # Видаляємо дублікати, якщо такі є
-    unique_suggestions = {s['url']: s for s in suggestions}.values()
+    products_data = [{
+        "id": p.id,
+        "name": p.name,
+        "price": p.price,
+        "image": p.image,
+        "url": url_for('product_detail', product_id=p.id)
+    } for p in products]
 
-    return jsonify(list(unique_suggestions)[:8]) # Повертаємо не більше 8 підказок
+    return jsonify({"products": products_data, "categories": categories})
 
 def require_api_key(f):
     @wraps(f)
