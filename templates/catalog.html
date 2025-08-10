@@ -71,23 +71,6 @@
 
             <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
 
-            {% if search_query or request.args.get('min_price') or request.args.get('max_price') %}
-            <div class="selected-filters-bar">
-                <span>Обрані фільтри:</span>
-                {% if search_query %}
-                    {% set reset_params = current_filters.copy() %}{% do reset_params.pop('search', None) %}
-                    <a href="{{ url_for('catalog', category_slug=category_slug, **reset_params) }}" class="filter-tag">{{ search_query }} ×</a>
-                {% endif %}
-                 {% if request.args.get('min_price') or request.args.get('max_price') %}
-                    {% set reset_params = current_filters.copy() %}{% do reset_params.pop('min_price', None) %}{% do reset_params.pop('max_price', None) %}
-                    <a href="{{ url_for('catalog', category_slug=category_slug, **reset_params) }}" class="filter-tag">
-                        Ціна: {{ request.args.get('min_price', '...') }} - {{ request.args.get('max_price', '...') }} ₴ ×
-                    </a>
-                {% endif %}
-                <a href="{{ url_for('catalog', category_slug=category_slug) }}" class="filter-tag-reset">Скинути фільтри</a>
-            </div>
-            {% endif %}
-
             {% if products.items %}
                 <div class="products-grid" id="products-grid-container">
                     {% for product in products.items %}

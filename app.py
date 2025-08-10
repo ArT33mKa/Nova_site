@@ -860,6 +860,53 @@ def send_message():
 #  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - НАДІЙНА ВЕРСІЯ
 # ────────────────────────────────
 
+@app.route('/api/search_suggestions')
+def api_search_suggestions():
+    query = request.args.get('q', '').strip()
+    if len(query) < 2:
+        return jsonify([])
+
+    suggestions = []
+
+    # Пошук товарів (до 5 результатів)
+    products = Product.query.filter(
+        Product.name.ilike(f'%{query}%'),
+        Product.in_stock == True
+    ).limit(5).all()
+    for p in products:
+        suggestions.append({
+            "name": p.name,
+            "url": url_for('product_detail', product_id=p.id),
+            "type": "product"
+        })
+
+    # Пошук категорій (до 3 результатів)
+    if len(suggestions) < 8: # Додаємо категорії, якщо ще є місце
+        hierarchy = get_category_hierarchy()
+        found_categories = 0
+        for main_cat, data in hierarchy.items():
+            if query.lower() in main_cat.lower():
+                if found_categories < 3:
+                    suggestions.append({
+                        "name": main_cat,
+                        "url": url_for('catalog', category_slug=main_cat.replace(' ', '-').replace('/', '-')),
+                        "type": "category"
+                    })
+                    found_categories += 1
+            for sub_cat in data.get('subcategories', {}):
+                 if query.lower() in sub_cat.lower():
+                     if found_categories < 3:
+                        suggestions.append({
+                            "name": sub_cat,
+                            "url": url_for('catalog', category_slug=sub_cat.replace(' ', '-').replace('/', '-')),
+                            "type": "category"
+                        })
+                        found_categories += 1
+
+    # Видаляємо дублікати, якщо такі є
+    unique_suggestions = {s['url']: s for s in suggestions}.values()
+
+    return jsonify(list(unique_suggestions)[:8]) # Повертаємо не більше 8 підказок
 
 def require_api_key(f):
     @wraps(f)
