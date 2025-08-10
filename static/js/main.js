@@ -144,6 +144,7 @@ function initHeaderActions(pageOverlay, closeAllSidebars) {
 }
 
 function initLiveSearch() {
+    // [ПОВНІСТЮ ПЕРЕРОБЛЕНО] Нова, надійна логіка живого пошуку
     const searchInput = document.getElementById('search-input');
     const suggestionsDropdown = document.getElementById('search-suggestions-dropdown');
 
@@ -151,65 +152,88 @@ function initLiveSearch() {
 
     let searchTimeout;
 
-    const renderSuggestions = (data) => {
-        const history = JSON.parse(localStorage.getItem('searchHistory')) || [];
+    // --- Функції рендерингу для чистоти коду ---
 
-        suggestionsDropdown.innerHTML = `
-            <div class="rich-search-dropdown">
-                ${history.length > 0 ? `
-                <div class="search-history-section">
-                    <div class="section-header">
-                        <h4>Історія пошуку</h4>
-                        <button id="clear-history-btn">Очистити все</button>
-                    </div>
-                    <ul class="history-list">
-                        ${history.map(term => `
-                            <li>
-                                <a href="/catalog?search=${encodeURIComponent(term)}">
-                                    <i class="fas fa-history"></i>
-                                    <span>${term}</span>
-                                </a>
-                                <button class="remove-history-item" data-term="${term}">&times;</button>
-                            </li>`).join('')}
-                    </ul>
+    const renderHistory = (history) => {
+        if (history.length === 0) return '';
+        return `
+            <div class="search-history-section">
+                <div class="section-header">
+                    <h4>Історія пошуку</h4>
+                    <button id="clear-history-btn">Очистити</button>
                 </div>
-                ` : ''}
-
-                ${data.products.length > 0 ? `
-                <div class="search-products-section">
-                    <div class="section-header"><h4>Товари</h4></div>
-                    <div class="products-carousel-wrapper">
-                        <button class="carousel-nav-btn prev" disabled>&lt;</button>
-                        <div class="products-carousel-container">
-                            <div class="products-carousel-track">
-                                {/* [ЗМІНЕНО] Додано перевірку p.in_stock та відповідний клас */}
-                                ${data.products.map(p => `
-                                    <a href="${p.url}" class="product-suggestion-card">
-                                        <img src="${p.image}" alt="${p.name}">
-                                        <p class="name">${p.name}</p>
-                                        <p class="price">${p.price.toFixed(2)} ₴</p>
-                                        ${!p.in_stock ? '<p class="out-of-stock-suggestion">Немає в наявності</p>' : ''}
-                                    </a>
-                                `).join('')}
-                            </div>
-                        </div>
-                        <button class="carousel-nav-btn next">&gt;</button>
-                    </div>
-                </div>
-                ` : ''}
-
-                ${data.categories.length > 0 ? `
-                <div class="search-categories-section">
-                    <div class="section-header"><h4>Категорії</h4></div>
-                    <ul class="categories-list">
-                        ${data.categories.map(cat => `
-                            <li><a href="${cat.url}">${cat.name}</a></li>
-                        `).join('')}
-                    </ul>
-                </div>
-                ` : ''}
+                <ul class="history-list">
+                    ${history.map(term => `
+                        <li>
+                            <a href="/catalog?search=${encodeURIComponent(term)}">
+                                <i class="fas fa-history"></i>
+                                <span>${term}</span>
+                            </a>
+                            <button class="remove-history-item" data-term="${term}">&times;</button>
+                        </li>`).join('')}
+                </ul>
             </div>
         `;
+    };
+
+    const renderProducts = (products) => {
+        if (products.length === 0) return '';
+        return `
+            <div class="search-products-section">
+                <div class="section-header"><h4>Товари</h4></div>
+                <div class="products-carousel-wrapper">
+                    <button class="carousel-nav-btn prev" disabled>&lt;</button>
+                    <div class="products-carousel-container">
+                        <div class="products-carousel-track">
+                            ${products.map(p => `
+                                <a href="${p.url}" class="product-suggestion-card">
+                                    <img src="${p.image}" alt="${p.name}">
+                                    <p class="name">${p.name}</p>
+                                    <p class="price">${p.price.toFixed(2)} ₴</p>
+                                    ${!p.in_stock ? '<p class="out-of-stock-suggestion">Немає в наявності</p>' : ''}
+                                </a>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <button class="carousel-nav-btn next">&gt;</button>
+                </div>
+            </div>
+        `;
+    };
+
+    const renderCategories = (categories) => {
+        if (categories.length === 0) return '';
+        return `
+            <div class="search-categories-section">
+                <div class="section-header"><h4>Категорії</h4></div>
+                <ul class="categories-list">
+                    ${categories.map(cat => `<li><a href="${cat.url}">${cat.name}</a></li>`).join('')}
+                </ul>
+            </div>
+        `;
+    };
+
+    const renderNoResults = () => {
+        return `<div class="search-no-results">За вашим запитом нічого не знайдено</div>`;
+    };
+
+
+    // --- Основна логіка ---
+
+    const renderSuggestions = (data, query) => {
+        suggestionsDropdown.innerHTML = ''; // Очищуємо попередні результати
+        const history = JSON.parse(localStorage.getItem('searchHistory')) || [];
+
+        // Якщо є введений запит і результатів немає
+        if (query.length > 0 && data.products.length === 0 && data.categories.length === 0) {
+            suggestionsDropdown.innerHTML = renderNoResults();
+        } else {
+            const historyHtml = (query.length === 0) ? renderHistory(history) : '';
+            const productsHtml = renderProducts(data.products);
+            const categoriesHtml = renderCategories(data.categories);
+            suggestionsDropdown.innerHTML = `<div class="rich-search-dropdown">${historyHtml}${productsHtml}${categoriesHtml}</div>`;
+        }
+
         suggestionsDropdown.classList.add('active');
         initSuggestionCarousel();
     };
@@ -217,7 +241,9 @@ function initLiveSearch() {
     const fetchAndRender = (query) => {
         fetch(`/api/search_suggestions?q=${encodeURIComponent(query)}`)
             .then(res => res.json())
-            .then(renderSuggestions)
+            .then(data => {
+                renderSuggestions(data, query);
+            })
             .catch(err => console.error("Search suggestion fetch error:", err));
     };
 
@@ -238,7 +264,7 @@ function initLiveSearch() {
     });
 
     // Обробка історії
-    document.getElementById('search-form').addEventListener('submit', (e) => {
+    document.getElementById('search-form').addEventListener('submit', () => {
         const searchTerm = searchInput.value.trim();
         if (searchTerm) {
             let history = JSON.parse(localStorage.getItem('searchHistory')) || [];
@@ -250,18 +276,19 @@ function initLiveSearch() {
     });
 
     suggestionsDropdown.addEventListener('click', (e) => {
+        const query = searchInput.value.trim();
         if (e.target.id === 'clear-history-btn') {
             e.preventDefault();
             localStorage.removeItem('searchHistory');
-            fetchAndRender(searchInput.value.trim());
+            fetchAndRender(query);
         }
-        if (e.target.classList.contains('remove-history-item')) {
+        if (e.target.closest('.remove-history-item')) {
             e.preventDefault();
-            const term = e.target.dataset.term;
+            const term = e.target.closest('.remove-history-item').dataset.term;
             let history = JSON.parse(localStorage.getItem('searchHistory')) || [];
             history = history.filter(item => item !== term);
             localStorage.setItem('searchHistory', JSON.stringify(history));
-            fetchAndRender(searchInput.value.trim());
+            fetchAndRender(query);
         }
     });
 
@@ -273,20 +300,19 @@ function initLiveSearch() {
         const prevBtn = wrapper.querySelector('.prev');
         const nextBtn = wrapper.querySelector('.next');
         const items = track.querySelectorAll('.product-suggestion-card');
-        if (items.length <= 3) { // Показуємо 3 товари без прокрутки
+
+        if (items.length <= 3) {
             prevBtn.style.display = 'none';
             nextBtn.style.display = 'none';
             return;
         }
 
         let currentIndex = 0;
-        const itemWidth = items[0].offsetWidth + 10; // ширина картки + відступ
-        const trackWidth = items.length * itemWidth;
-        track.style.width = `${trackWidth}px`;
+        const itemWidth = items[0].offsetWidth + 10;
+        track.style.width = `${items.length * itemWidth}px`;
 
         const updateButtons = () => {
             prevBtn.disabled = currentIndex === 0;
-            // Показуємо 3 елементи, тому прокрутка можлива до items.length - 3
             nextBtn.disabled = currentIndex >= items.length - 3;
         };
 

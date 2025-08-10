@@ -862,50 +862,55 @@ def send_message():
 
 @app.route('/api/search_suggestions')
 def api_search_suggestions():
-    query = request.args.get('q', '').strip()
+    """ [ПОВНІСТЮ ПЕРЕРОБЛЕНА ВЕРСІЯ] API для пошукових підказок. """
+    query = request.args.get('q', '').strip().lower()
+    products_data = []
+    categories_data = []
 
-    # Якщо запит порожній, все одно повернемо найпопулярніші товари та категорії для початкового стану
+    # Логіка для порожнього запиту (показуємо популярне)
     if not query:
-        products = Product.query.filter(Product.in_stock == True).order_by(Product.reviews_count.desc(),
-                                                                           Product.id.desc()).limit(10).all()
+        # Популярні продукти (на основі відгуків)
+        popular_products = Product.query.filter(Product.in_stock == True) \
+            .order_by(Product.reviews_count.desc(), Product.id.desc()).limit(10).all()
+
+        products_data = [{
+            "id": p.id, "name": p.name, "price": p.price, "image": p.image,
+            "url": url_for('product_detail', product_id=p.id), "in_stock": p.in_stock
+        } for p in popular_products]
+
+        # Популярні категорії (на основі кількості товарів)
         hierarchy = get_category_hierarchy()
-        # Сортуємо категорії за кількістю товарів і беремо топ-10
         sorted_categories = sorted(hierarchy.items(), key=lambda item: item[1]['count'], reverse=True)[:10]
-        categories = [{"name": name, "url": url_for('catalog', category_slug=name.replace(' ', '-').replace('/', '-'))}
-                      for name, data in sorted_categories]
-    else:
-        # [ЗМІНЕНО] Пошук товарів, якщо є запит. ВИДАЛЕНО ФІЛЬТР Product.in_stock == True
-        products = Product.query.filter(
-            Product.name.ilike(f'%{query}%')
-        ).limit(10).all()
+        categories_data = [
+            {"name": name, "url": url_for('catalog', category_slug=name.replace(' ', '-').replace('/', '-'))}
+            for name, data in sorted_categories]
+
+    # Логіка для запиту, що ввів користувач
+    elif len(query) > 1:
+        # Пошук товарів
+        found_products = Product.query.filter(Product.name.ilike(f'%{query}%')).limit(10).all()
+        products_data = [{
+            "id": p.id, "name": p.name, "price": p.price, "image": p.image,
+            "url": url_for('product_detail', product_id=p.id), "in_stock": p.in_stock
+        } for p in found_products]
 
         # Пошук категорій
         hierarchy = get_category_hierarchy()
-        found_categories = []
         for main_cat, data in hierarchy.items():
-            if query.lower() in main_cat.lower():
-                found_categories.append({"name": main_cat, "url": url_for('catalog', category_slug=main_cat.replace(' ',
-                                                                                                                    '-').replace(
+            if query in main_cat.lower():
+                categories_data.append({"name": main_cat, "url": url_for('catalog', category_slug=main_cat.replace(' ',
+                                                                                                                   '-').replace(
                     '/', '-'))})
             for sub_cat in data.get('subcategories', {}):
-                if query.lower() in sub_cat.lower():
-                    found_categories.append({"name": sub_cat, "url": url_for('catalog',
-                                                                             category_slug=sub_cat.replace(' ',
-                                                                                                           '-').replace(
-                                                                                 '/', '-'))})
-        categories = found_categories[:10]
+                if query in sub_cat.lower():
+                    categories_data.append({"name": sub_cat, "url": url_for('catalog',
+                                                                            category_slug=sub_cat.replace(' ',
+                                                                                                          '-').replace(
+                                                                                '/', '-'))})
+        categories_data = categories_data[:10]
 
-    # [ЗМІНЕНО] Додано поле "in_stock" до відповіді, щоб JS знав про наявність
-    products_data = [{
-        "id": p.id,
-        "name": p.name,
-        "price": p.price,
-        "image": p.image,
-        "url": url_for('product_detail', product_id=p.id),
-        "in_stock": p.in_stock
-    } for p in products]
+    return jsonify({"products": products_data, "categories": categories_data})
 
-    return jsonify({"products": products_data, "categories": categories})
 
 def require_api_key(f):
     @wraps(f)
