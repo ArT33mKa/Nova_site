@@ -143,10 +143,6 @@ function initHeaderActions(pageOverlay, closeAllSidebars) {
     });
 }
 
-// ===================================================================
-//  НОВІ ТА ОНОВЛЕНІ ФУНКЦІЇ
-// ===================================================================
-
 function initLiveSearch() {
     const searchInput = document.getElementById('search-input');
     const suggestionsDropdown = document.getElementById('search-suggestions-dropdown');
@@ -186,11 +182,13 @@ function initLiveSearch() {
                         <button class="carousel-nav-btn prev" disabled>&lt;</button>
                         <div class="products-carousel-container">
                             <div class="products-carousel-track">
+                                {/* [ЗМІНЕНО] Додано перевірку p.in_stock та відповідний клас */}
                                 ${data.products.map(p => `
                                     <a href="${p.url}" class="product-suggestion-card">
                                         <img src="${p.image}" alt="${p.name}">
                                         <p class="name">${p.name}</p>
                                         <p class="price">${p.price.toFixed(2)} ₴</p>
+                                        ${!p.in_stock ? '<p class="out-of-stock-suggestion">Немає в наявності</p>' : ''}
                                     </a>
                                 `).join('')}
                             </div>

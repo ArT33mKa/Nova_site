@@ -2056,3 +2056,9 @@ img {
          margin-right: 0;
     }
 }
+.product-suggestion-card .out-of-stock-suggestion {
+    font-size: 0.8rem;
+    color: var(--danger-color);
+    font-weight: 500;
+    margin: 5px 0 0 0;
+}

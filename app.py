@@ -874,11 +874,11 @@ def api_search_suggestions():
         categories = [{"name": name, "url": url_for('catalog', category_slug=name.replace(' ', '-').replace('/', '-'))}
                       for name, data in sorted_categories]
     else:
-        # Пошук товарів, якщо є запит
+        # [ЗМІНЕНО] Пошук товарів, якщо є запит. ВИДАЛЕНО ФІЛЬТР Product.in_stock == True
         products = Product.query.filter(
-            Product.name.ilike(f'%{query}%'),
-            Product.in_stock == True
+            Product.name.ilike(f'%{query}%')
         ).limit(10).all()
+
         # Пошук категорій
         hierarchy = get_category_hierarchy()
         found_categories = []
@@ -895,12 +895,14 @@ def api_search_suggestions():
                                                                                  '/', '-'))})
         categories = found_categories[:10]
 
+    # [ЗМІНЕНО] Додано поле "in_stock" до відповіді, щоб JS знав про наявність
     products_data = [{
         "id": p.id,
         "name": p.name,
         "price": p.price,
         "image": p.image,
-        "url": url_for('product_detail', product_id=p.id)
+        "url": url_for('product_detail', product_id=p.id),
+        "in_stock": p.in_stock
     } for p in products]
 
     return jsonify({"products": products_data, "categories": categories})
