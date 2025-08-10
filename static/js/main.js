@@ -1,5 +1,3 @@
-// static/js/main.js
-
 document.addEventListener('DOMContentLoaded', function() {
     // [НОВЕ] Отримуємо елемент затемнення один раз при завантаженні
     const pageOverlay = document.getElementById('page-overlay');
@@ -854,169 +852,8 @@ function initSimilarProductsCarousel() {
     updateButtons();
 }
 
-function initLoadMore() {
-    const loadMoreBtn = document.getElementById('load-more-btn');
-    const productsGrid = document.getElementById('products-grid-container'); // [ЗМІНА] Краще використовувати ID
-    const loadingSpinner = document.getElementById('loading-spinner');
-
-    if (!loadMoreBtn || !productsGrid) {
-        return;
-    }
-
-    let currentPage = 1;
-
-    loadMoreBtn.addEventListener('click', () => {
-        currentPage++;
-        loadMoreBtn.style.display = 'none';
-        if (loadingSpinner) loadingSpinner.style.display = 'block';
-
-        // [НОВЕ] Збираємо всі активні фільтри з data-атрибутів кнопки
-        const params = new URLSearchParams();
-        params.set('page', currentPage);
-        if (loadMoreBtn.dataset.categorySlug) {
-            params.set('category_slug', loadMoreBtn.dataset.categorySlug);
-        }
-        if (loadMoreBtn.dataset.search) {
-            params.set('search', loadMoreBtn.dataset.search);
-        }
-        if (loadMoreBtn.dataset.minPrice) {
-            params.set('min_price', loadMoreBtn.dataset.minPrice);
-        }
-        if (loadMoreBtn.dataset.maxPrice) {
-            params.set('max_price', loadMoreBtn.dataset.maxPrice);
-        }
-
-
-        fetch(`/api/catalog/load_more?${params.toString()}`)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                const moreAvailable = response.headers.get('X-More-Available') === 'true';
-                return response.text().then(html => ({ html, moreAvailable }));
-            })
-            .then(({ html, moreAvailable }) => {
-                if (html.trim() !== "") {
-                    productsGrid.insertAdjacentHTML('beforeend', html);
-                }
-                if (moreAvailable) {
-                    loadMoreBtn.style.display = 'inline-block';
-                } else {
-                    loadMoreBtn.style.display = 'none';
-                }
-            })
-            .catch(error => {
-                console.error('Error loading more products:', error);
-                loadMoreBtn.style.display = 'inline-block';
-            })
-            .finally(() => {
-                if (loadingSpinner) loadingSpinner.style.display = 'none';
-            });
-    });
-}
-
-function initSearchLogic() {
-    const searchForm = document.getElementById('search-form');
-    const searchInput = document.getElementById('search-input');
-    const historyDropdown = document.getElementById('search-history-dropdown');
-
-    if (!searchForm || !searchInput || !historyDropdown) return;
-
-    const getHistory = () => JSON.parse(localStorage.getItem('searchHistory')) || [];
-    const saveHistory = (history) => localStorage.setItem('searchHistory', JSON.stringify(history));
-
-    const renderHistory = () => {
-        historyDropdown.innerHTML = '';
-        const history = getHistory();
-        if (history.length > 0) {
-            const list = document.createElement('ul');
-            history.forEach(term => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <span class="history-term">${term}</span>
-                    <button class="remove-history-item" data-term="${term}" title="Видалити">&times;</button>
-                `;
-                li.querySelector('.history-term').addEventListener('click', () => {
-                    searchInput.value = term;
-                    searchForm.submit();
-                });
-                list.appendChild(li);
-            });
-            const clearBtnItem = document.createElement('li');
-            clearBtnItem.className = 'history-clear-item';
-            clearBtnItem.innerHTML = '<button id="clear-history-btn">Очистити історію</button>';
-            list.appendChild(clearBtnItem);
-            historyDropdown.appendChild(list);
-            historyDropdown.style.display = 'block';
-        } else {
-            historyDropdown.style.display = 'none';
-        }
-    };
-
-    searchInput.addEventListener('focus', renderHistory);
-
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !historyDropdown.contains(e.target)) {
-            historyDropdown.style.display = 'none';
-        }
-    });
-
-    searchForm.addEventListener('submit', (e) => {
-        const searchTerm = searchInput.value.trim();
-        if (searchTerm) {
-            let history = getHistory();
-            history = history.filter(item => item.toLowerCase() !== searchTerm.toLowerCase());
-            history.unshift(searchTerm);
-            if (history.length > 5) history.pop();
-            saveHistory(history);
-        }
-    });
-
-    historyDropdown.addEventListener('click', (e) => {
-        if (e.target.id === 'clear-history-btn') {
-            localStorage.removeItem('searchHistory');
-            historyDropdown.style.display = 'none';
-        }
-        if (e.target.classList.contains('remove-history-item')) {
-            const termToRemove = e.target.dataset.term;
-            let history = getHistory();
-            history = history.filter(item => item !== termToRemove);
-            saveHistory(history);
-            renderHistory(); // Re-render to show changes
-        }
-    });
-}
-
-function initShowMoreFilters() {
-    document.querySelectorAll('.filter-options-list[data-show-limit]').forEach(list => {
-        const limit = parseInt(list.dataset.showLimit, 10);
-        const items = Array.from(list.children);
-
-        if (items.length > limit) {
-            // Ховаємо всі елементи, що перевищують ліміт
-            for (let i = limit; i < items.length; i++) {
-                items[i].style.display = 'none';
-            }
-
-            // Створюємо та додаємо кнопку
-            const remainingCount = items.length - limit;
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'show-more-filters-btn';
-            button.textContent = `Показати ще ${remainingCount}`;
-            list.insertAdjacentElement('afterend', button);
-
-            // Додаємо обробник події для кнопки
-            button.addEventListener('click', () => {
-                for (let i = limit; i < items.length; i++) {
-                    items[i].style.display = ''; // Повертаємо стандартне відображення
-                }
-                button.remove(); // Видаляємо кнопку після використання
-            });
-        }
-    });
-}
-
 function initAutoApplyFilters() {
-    const filtersForm = document.getElementById('auto-filters-form');
+    const filtersForm = document.getElementById('filters-form');
     if (!filtersForm) return;
 
     // Функція-затримувач, щоб не відправляти запит на кожне натискання клавіші
@@ -1029,6 +866,18 @@ function initAutoApplyFilters() {
     };
 
     const submitForm = () => {
+        // Додаємо search query до форми, щоб не втратити його при фільтрації
+        const searchInput = document.getElementById('search-input');
+        if (searchInput && searchInput.value) {
+            let hiddenSearch = filtersForm.querySelector('input[name="search"]');
+            if (!hiddenSearch) {
+                hiddenSearch = document.createElement('input');
+                hiddenSearch.type = 'hidden';
+                hiddenSearch.name = 'search';
+                filtersForm.appendChild(hiddenSearch);
+            }
+            hiddenSearch.value = searchInput.value;
+        }
         filtersForm.submit();
     };
 
