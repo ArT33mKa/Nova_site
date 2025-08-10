@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // [ОНОВЛЕНО] Запуск нових функцій
     initInfiniteScroll();
+    initSearchSuggestions();
 
     updateCartView();
     updateFavoritesUI();
@@ -727,3 +728,75 @@ function initAutoApplyFilters() {
         }
     });
 }
+
+function initSearchSuggestions() {
+    const searchInput = document.getElementById('search-input');
+    const suggestionsContainer = document.getElementById('search-suggestions-container');
+
+    if (!searchInput || !suggestionsContainer) return;
+
+    let searchTimeout;
+
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim();
+
+        clearTimeout(searchTimeout);
+
+        if (query.length < 2) {
+            suggestionsContainer.style.display = 'none';
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            fetch(`/api/search_suggestions?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    suggestionsContainer.innerHTML = '';
+
+                    if (data.products.length === 0 && data.categories.length === 0) {
+                        suggestionsContainer.style.display = 'none';
+                        return;
+                    }
+
+                    let html = '';
+
+                    if (data.products.length > 0) {
+                        html += '<div class="search-suggestions-header">Товари</div>';
+                        data.products.forEach(p => {
+                            html += `<a href="${p.url}" class="search-suggestions-item">
+                                        <i class="fas fa-box-open"></i>
+                                        <span>${p.name}</span>
+                                     </a>`;
+                        });
+                    }
+
+                    if (data.categories.length > 0) {
+                        html += '<div class="search-suggestions-header">Категорії</div>';
+                        data.categories.forEach(c => {
+                             html += `<a href="${c.url}" class="search-suggestions-item">
+                                        <i class="fas fa-list"></i>
+                                        <span>${c.name}</span>
+                                      </a>`;
+                        });
+                    }
+
+                    suggestionsContainer.innerHTML = html;
+                    suggestionsContainer.style.display = 'block';
+                })
+                .catch(err => {
+                    console.error("Помилка пошуку:", err);
+                    suggestionsContainer.style.display = 'none';
+                });
+        }, 250); // Невелика затримка, щоб не надсилати запит на кожну літеру
+    });
+
+    // Ховаємо підказки, якщо клікнули поза зоною пошуку
+    document.addEventListener('click', (e) => {
+        if (!searchInput.parentElement.contains(e.target)) {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
+}
+
+// Запускаємо нашу нову функцію при завантаженні сторінки
+document.addEventListener('DOMContentLoaded', initSearchSuggestions);

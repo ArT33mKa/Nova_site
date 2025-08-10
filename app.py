@@ -1216,6 +1216,47 @@ def api_load_more():
 
 
 # ────────────────────────────────
+#  API ДЛЯ ПОШУКОВИХ ПІДКАЗОК
+# ────────────────────────────────
+@app.route('/api/search_suggestions')
+def search_suggestions():
+    query = request.args.get('q', '').strip()
+
+    if len(query) < 2:
+        return jsonify({'products': [], 'categories': []})
+
+    # Пошук товарів (до 5 штук)
+    products_result = Product.query.filter(
+        Product.name.ilike(f'%{query}%'),
+        Product.in_stock == True,
+        Product.description.isnot(None),
+        Product.description != ''
+    ).limit(5).all()
+
+    # Пошук унікальних категорій (до 3 штук)
+    categories_result = db.session.query(Product.category).filter(
+        Product.category.ilike(f'%{query}%')
+    ).distinct().limit(3).all()
+
+    # Форматуємо результати для JSON
+    products = [
+        {'name': p.name, 'url': url_for('product_detail', product_id=p.id)}
+        for p in products_result
+    ]
+
+    categories = []
+    for cat_tuple in categories_result:
+        cat_name = cat_tuple[0]
+        # Створюємо URL-безпечну версію назви категорії (slug)
+        cat_slug = cat_name.lower().replace(' ', '-').replace('/', '-')
+        categories.append({
+            'name': cat_name,
+            'url': url_for('catalog', category_slug=cat_slug)
+        })
+
+    return jsonify({'products': products, 'categories': categories})
+
+# ────────────────────────────────
 #  ЗАПУСК ДОДАТКУ
 # ────────────────────────────────
 if __name__ == "__main__":
