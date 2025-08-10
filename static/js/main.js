@@ -144,7 +144,7 @@ function initHeaderActions(pageOverlay, closeAllSidebars) {
 }
 
 function initLiveSearch() {
-    // [ПОВНІСТЮ ПЕРЕРОБЛЕНО] Нова, надійна логіка живого пошуку
+    // [ПОВНІСТЮ ПЕРЕРОБЛЕНО] Додано індикатор завантаження та покращено логіку
     const searchInput = document.getElementById('search-input');
     const suggestionsDropdown = document.getElementById('search-suggestions-dropdown');
 
@@ -153,6 +153,15 @@ function initLiveSearch() {
     let searchTimeout;
 
     // --- Функції рендерингу для чистоти коду ---
+
+    const showLoader = () => {
+        suggestionsDropdown.innerHTML = `
+            <div class="search-loading-container">
+                <div class="search-loading-spinner"></div>
+            </div>
+        `;
+        suggestionsDropdown.classList.add('active');
+    };
 
     const renderHistory = (history) => {
         if (history.length === 0) return '';
@@ -217,14 +226,12 @@ function initLiveSearch() {
         return `<div class="search-no-results">За вашим запитом нічого не знайдено</div>`;
     };
 
-
     // --- Основна логіка ---
 
     const renderSuggestions = (data, query) => {
-        suggestionsDropdown.innerHTML = ''; // Очищуємо попередні результати
+        suggestionsDropdown.innerHTML = ''; // Очищуємо спінер або попередні результати
         const history = JSON.parse(localStorage.getItem('searchHistory')) || [];
 
-        // Якщо є введений запит і результатів немає
         if (query.length > 0 && data.products.length === 0 && data.categories.length === 0) {
             suggestionsDropdown.innerHTML = renderNoResults();
         } else {
@@ -244,16 +251,33 @@ function initLiveSearch() {
             .then(data => {
                 renderSuggestions(data, query);
             })
-            .catch(err => console.error("Search suggestion fetch error:", err));
+            .catch(err => {
+                console.error("Search suggestion fetch error:", err);
+                suggestionsDropdown.innerHTML = renderNoResults();
+            });
     };
 
     searchInput.addEventListener('input', () => {
         clearTimeout(searchTimeout);
         const query = searchInput.value.trim();
-        searchTimeout = setTimeout(() => fetchAndRender(query), 300);
+
+        if (query.length === 0) {
+            // Якщо поле очистили, показуємо історію без затримки
+            fetchAndRender('');
+            return;
+        }
+
+        // Запускаємо таймер для пошуку
+        searchTimeout = setTimeout(() => {
+            // [НОВЕ] Показуємо спінер негайно перед запитом
+            showLoader();
+            // Запускаємо пошук
+            fetchAndRender(query);
+        }, 300); // Затримка 300 мс
     });
 
     searchInput.addEventListener('focus', () => {
+        // При фокусі показуємо початковий стан (історія/популярне)
         fetchAndRender(searchInput.value.trim());
     });
 
@@ -263,7 +287,7 @@ function initLiveSearch() {
         }
     });
 
-    // Обробка історії
+    // Обробка історії (без змін)
     document.getElementById('search-form').addEventListener('submit', () => {
         const searchTerm = searchInput.value.trim();
         if (searchTerm) {
@@ -292,30 +316,26 @@ function initLiveSearch() {
         }
     });
 
+    // Карусель для товарів у підказках (без змін)
     function initSuggestionCarousel() {
         const wrapper = suggestionsDropdown.querySelector('.products-carousel-wrapper');
         if (!wrapper) return;
-
         const track = wrapper.querySelector('.products-carousel-track');
         const prevBtn = wrapper.querySelector('.prev');
         const nextBtn = wrapper.querySelector('.next');
         const items = track.querySelectorAll('.product-suggestion-card');
-
         if (items.length <= 3) {
             prevBtn.style.display = 'none';
             nextBtn.style.display = 'none';
             return;
         }
-
         let currentIndex = 0;
         const itemWidth = items[0].offsetWidth + 10;
         track.style.width = `${items.length * itemWidth}px`;
-
         const updateButtons = () => {
             prevBtn.disabled = currentIndex === 0;
             nextBtn.disabled = currentIndex >= items.length - 3;
         };
-
         nextBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (currentIndex < items.length - 3) {
@@ -324,7 +344,6 @@ function initLiveSearch() {
             }
             updateButtons();
         });
-
         prevBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (currentIndex > 0) {

@@ -2076,3 +2076,26 @@ img {
     color: var(--gray-color);
     font-style: italic;
 }
+.search-loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px 20px;
+    min-height: 100px;
+}
+
+.search-loading-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(0, 102, 204, 0.2);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Переконайтесь, що у вас є анімація spin, якщо немає - додайте */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
