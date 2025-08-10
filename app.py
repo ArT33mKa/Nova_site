@@ -957,7 +957,7 @@ def _get_cloudinary_url(image_filename):
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    """ [ВЕРСІЯ З ВИПРАВЛЕНОЮ ЛОГІКОЮ НАЯВНОСТІ] """
+    """ [ВЕРСІЯ З ВИПРАВЛЕНОЮ ЛОГІКОЮ НАЯВНОСТІ ТА ЗОБРАЖЕНЬ] """
     if 'file' not in request.files:
         return "failure\nFile part is missing in the request.", 400
     cml_file = request.files['file']
@@ -1014,12 +1014,20 @@ def bas_import():
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Різне")
-            image_filename_from_xml = (product_node.findtext('Картинка') or '').strip()
+
+            # [ПОКРАЩЕНО] Логіка вибору зображення
+            main_image_node = product_node.find(".//Картинка[@main_image='1']")
+            if main_image_node is not None:
+                image_filename_from_xml = main_image_node.text
+            else:
+                # Якщо головного немає, беремо перше-ліпше
+                image_filename_from_xml = product_node.findtext('Картинка') or ''
+            image_filename_from_xml = image_filename_from_xml.strip()
+
 
             price = 0.0
-            in_stock = False  # За замовчуванням товару немає
+            in_stock = False
 
-            # 1. Перевіряємо наявність через кількість в <Предложение>
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
             if offer_node is not None:
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
@@ -1037,19 +1045,16 @@ def bas_import():
                     except (ValueError, TypeError):
                         pass
 
-            # 2. [ПОВЕРНЕНО] Додаткова перевірка через властивість "Наличие"
-            #    Це спрацює, якщо кількість 0, але товар доступний для замовлення.
             if not in_stock:
-                # Шукаємо реквізит за назвою "Наличие"
-                stock_prop_node = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значення")
-                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.strip().lower() in [
-                    'true', 'да', 'є', 'yes']:
+                # [ВИПРАВЛЕНО ОПЕЧАТКУ] Значення -> Значение
+                stock_prop_node = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
+                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.lower() == 'true':
                     in_stock = True
                 else:
-                    # Шукаємо властивість за ID (якщо використовується інший формат)
-                    stock_prop_node_alt = product_node.find(".//ЗначенняСвойства[Ид='ИД-Наличие']/Значення")
-                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.lower() == 'true':
-                        in_stock = True
+                    # [ВИПРАВЛЕНО ОПЕЧАТКУ] Значення -> Значение
+                    stock_prop_node_alt = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значение")
+                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.strip().lower() in ['true', 'да', 'є', 'yes']:
+                         in_stock = True
 
             product_data = {
                 'name': name, 'price': price, 'description': description,
