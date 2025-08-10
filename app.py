@@ -65,13 +65,11 @@ login_manager.login_message_category = "info"
 
 # ... (Ваші функції send_email, send_telegram_notification залишаються без змін) ...
 def send_email(to_address, subject, html_body):
-    """Універсальна функція для надсилання листів."""
     smtp_user = os.getenv("SMTP_USER", "artemcool200911@gmail.com")
     app_pass = os.getenv("EMAIL_PASS")
     if not app_pass or not smtp_user:
         print("Помилка: SMTP_USER або EMAIL_PASS не налаштовано в .env")
         return False
-
     msg = MIMEMultipart()
     msg["From"] = f"Магазин {shop_info['name']} <{smtp_user}>"
     msg["To"] = to_address
@@ -89,30 +87,20 @@ def send_email(to_address, subject, html_body):
 
 
 def send_telegram_notification(order, items):
-    """Відправляє дані про замовлення на вебхук Make.com."""
     webhook_url = os.getenv("MAKE_WEBHOOK_URL")
-
     if not webhook_url:
         print(">>> ПОМИЛКА Make.com: URL вебхука не вказано в .env")
         return
-
     product_names = ", ".join([f"{item['product'].name} ({item['quantity']} шт)" for item in items])
-
     delivery_details = order.delivery_method
     if order.delivery_method == 'Нова Пошта':
         delivery_details += f" ({order.delivery_city}, {order.delivery_warehouse})"
-
     payload = {
-        "order_id": order.id,
-        "order_status": order.status,
-        "customer_name": order.customer_name,
-        "customer_phone": order.customer_phone,
-        "product_name": product_names,
-        "delivery_method": delivery_details,
-        "payment_method": order.payment_method,
+        "order_id": order.id, "order_status": order.status, "customer_name": order.customer_name,
+        "customer_phone": order.customer_phone, "product_name": product_names,
+        "delivery_method": delivery_details, "payment_method": order.payment_method,
         "total_cost": f"{order.total_cost:.2f} ₴"
     }
-
     try:
         response = requests.post(webhook_url, json=payload, timeout=10)
         if response.status_code == 200 and "Accepted" in response.text:
@@ -123,7 +111,7 @@ def send_telegram_notification(order, items):
         print(f">>> Make.com: КРИТИЧНА ПОМИЛКА при відправці сповіщення: {e}")
 
 
-# ... (Ваші моделі User, Review, Order, OrderItem, OAuth залишаються без змін) ...
+# ... (Ваші моделі User, Product, Review, Order, OrderItem, OAuth залишаються без змін) ...
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(80), nullable=False)
@@ -204,7 +192,6 @@ class OAuth(db.Model):
     user = db.relationship(User)
 
 
-# ... (Ваші налаштування google_blueprint, shop_info, login_manager залишаються без змін) ...
 google_blueprint = make_google_blueprint(scope=["openid", "https://www.googleapis.com/auth/userinfo.email",
                                                 "https://www.googleapis.com/auth/userinfo.profile"],
                                          storage=SQLAlchemyStorage(OAuth, db.session, user=current_user))
@@ -255,10 +242,6 @@ def index():
 
 
 def get_category_hierarchy():
-    """
-    [НОВА ФУНКЦІЯ]
-    Створює динамічну ієрархічну структуру категорій на основі даних з БД.
-    """
     MAIN_CATEGORIES = {
         "Поливочна система": ["полив", "зрошення", "шланг", "конектор", "розпилювач", "краплинн", "дощувач"],
         "Насоси та гідрофори": ["насос", "помпа", "гідрофор", "дренажн", "фекальн", "циркуляційн", "свердловин"],
@@ -270,44 +253,32 @@ def get_category_hierarchy():
                                        "тепла підлога"],
         "Запчастини та комплектуючі": ["запчастин", "комплектуюч", "термопар", "автоматика", "реле", "мембрана"]
     }
-
     products = db.session.query(Product.category) \
         .filter(Product.category.isnot(None), Product.category != '', Product.in_stock == True) \
         .all()
-
     hierarchy = {}
     other_category_name = "Різне"
-
     for category_tuple in products:
         category_name = category_tuple[0].strip()
         if not category_name:
             continue
-
         assigned_main_category = None
         for main_cat, keywords in MAIN_CATEGORIES.items():
-            # Перевіряємо, чи назва категорії сама є однією з головних
             if category_name.lower() == main_cat.lower():
                 assigned_main_category = main_cat
                 break
-            # Перевіряємо за ключовими словами
             if any(keyword in category_name.lower() for keyword in keywords):
                 assigned_main_category = main_cat
                 break
-
         if not assigned_main_category:
             assigned_main_category = other_category_name
-
         if assigned_main_category not in hierarchy:
             hierarchy[assigned_main_category] = {'count': 0, 'subcategories': {}}
-
         hierarchy[assigned_main_category]['count'] += 1
-
-        # Додаємо як підкатегорію, якщо вона не є головною
         if category_name.lower() != assigned_main_category.lower():
             if category_name not in hierarchy[assigned_main_category]['subcategories']:
                 hierarchy[assigned_main_category]['subcategories'][category_name] = 0
             hierarchy[assigned_main_category]['subcategories'][category_name] += 1
-
     return hierarchy
 
 
@@ -316,16 +287,14 @@ def get_category_hierarchy():
 def catalog(category_slug):
     page = request.args.get('page', 1, type=int)
     hierarchy = get_category_hierarchy()
-
     min_price_str = request.args.get('min_price', '')
     max_price_str = request.args.get('max_price', '')
     search_query = request.args.get('search', '').strip()
-
     min_price = float(min_price_str) if min_price_str.isdigit() else None
     max_price = float(max_price_str) if max_price_str.isdigit() else None
 
-    # [НОВА ЛОГІКА] Автоматичне перенаправлення при пошуку з інших сторінок
-    if search_query and not category_slug:
+    # [ВИПРАВЛЕНО] Логіка редіректу тепер коректно обробляє пошук з існуючої категорії
+    if search_query:
         found_product = Product.query.filter(
             Product.name.ilike(f'%{search_query}%'),
             Product.in_stock == True,
@@ -336,18 +305,13 @@ def catalog(category_slug):
         if found_product and found_product.category:
             product_main_category = None
             MAIN_CATEGORIES_FOR_REDIRECT = {
-                "Поливочна система": ["полив", "зрошення", "шланг", "конектор", "розпилювач", "краплинн", "дощувач"],
-                "Насоси та гідрофори": ["насос", "помпа", "гідрофор", "дренажн", "фекальн", "циркуляційн",
-                                        "свердловин"],
-                "Водонагрівачі": ["бойлер", "водонагрівач", "тен"],
-                "Змішувачі та сифони": ["змішувач", "кран", "сифон", "душов", "лійка"],
-                "Вентиляція та витяжки": ["витяжк", "вентилятор", "решітка", "канал"],
-                "Газове обладнання": ["колонк", "газов", "конвектор"],
-                "Опалення та водопостачання": ["опален", "радіатор", "рушникосуш", "котел", "фітинг", "труба", "крани",
-                                               "тепла підлога"],
-                "Запчастини та комплектуючі": ["запчастин", "комплектуюч", "термопар", "автоматика", "реле", "мембрана"]
+                "Поливочна система": ["полив", "зрошення", "шланг"],
+                "Насоси та гідрофори": ["насос", "помпа", "гідрофор"],
+                "Водонагрівачі": ["бойлер", "водонагрівач"], "Змішувачі та сифони": ["змішувач", "кран", "сифон"],
+                "Вентиляція та витяжки": ["витяжк", "вентилятор"], "Газове обладнання": ["колонк", "газов"],
+                "Опалення та водопостачання": ["опален", "радіатор", "котел"],
+                "Запчастини та комплектуючі": ["запчастин"]
             }
-
             for main_cat, keywords in MAIN_CATEGORIES_FOR_REDIRECT.items():
                 if any(keyword in found_product.category.lower() for keyword in keywords):
                     product_main_category = main_cat
@@ -357,9 +321,13 @@ def catalog(category_slug):
 
             new_slug = product_main_category.replace(' ', '-').replace('/', '-')
 
-            redirect_args = request.args.copy()
-            redirect_args.pop('search', None)  # Ми передамо його явно
-            return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
+            # Якщо ми шукаємо з іншої сторінки (не каталогу) або з іншої категорії
+            if not category_slug or category_slug.replace('-', ' ').replace('/', ' ') != new_slug.replace('-', ' '):
+                redirect_args = request.args.copy()
+                redirect_args.pop('search', None)
+                # [КЛЮЧОВИЙ ФІКС] Видаляємо старий category_slug з параметрів, якщо він там був
+                redirect_args.pop('category_slug', None)
+                return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
 
     query = Product.query.filter(
         Product.in_stock == True,
@@ -367,7 +335,6 @@ def catalog(category_slug):
         Product.description != '',
         Product.image.notlike('default_tovar%')
     )
-
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
@@ -383,46 +350,37 @@ def catalog(category_slug):
                 all_cats_for_filter = [current_category] + subcategories
                 query = query.filter(Product.category.in_(all_cats_for_filter))
                 break
-
             for sub_cat in data.get('subcategories', {}):
                 if sub_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
                     current_category = sub_cat
                     main_category_of_current = main_cat
                     query = query.filter(Product.category == current_category)
                     break
-            if current_category:
-                break
+            if current_category: break
 
-    query_for_counts = query
     price_range = db.session.query(func.floor(func.min(Product.price)), func.ceil(func.max(Product.price))) \
-        .select_from(query_for_counts.subquery()).one()
+        .select_from(query.subquery()).one()
     min_price_available = price_range[0] or 0
     max_price_available = price_range[1] or 10000
-
     if min_price:
         query = query.filter(Product.price >= min_price)
     if max_price:
         query = query.filter(Product.price <= max_price)
 
-    products = query.order_by(Product.id.desc()).paginate(page=page, per_page=12, error_out=False)
+    # [ЗМІНЕНО] Кількість товарів на сторінці
+    products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
 
     current_filters = request.args.copy()
     current_filters.pop('page', None)
-
     return render_template(
-        'catalog.html',
-        products=products,
-        hierarchy=hierarchy,
-        current_category=current_category,
-        main_category_of_current=main_category_of_current,
-        current_filters=current_filters,
-        category_slug=category_slug,
-        min_price_available=min_price_available,
-        max_price_available=max_price_available,
-        search_query=search_query
+        'catalog.html', products=products, hierarchy=hierarchy, current_category=current_category,
+        main_category_of_current=main_category_of_current, current_filters=current_filters,
+        category_slug=category_slug, min_price_available=min_price_available,
+        max_price_available=max_price_available, search_query=search_query
     )
 
 
+# ... (Решта функцій до /api/bas_import залишаються без змін) ...
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
@@ -442,11 +400,8 @@ def get_products_by_ids():
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid IDs provided'}), 400
     products = Product.query.filter(Product.id.in_(safe_product_ids)).all()
-
-    products_data = [
-        {'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'in_stock': p.in_stock,
-         'url': url_for('product_detail', product_id=p.id)} for p in products]
-
+    products_data = [{'id': p.id, 'name': p.name, 'price': p.price, 'image': p.image, 'in_stock': p.in_stock,
+                      'url': url_for('product_detail', product_id=p.id)} for p in products]
     return jsonify(products_data)
 
 
@@ -500,9 +455,6 @@ def add_review(product_id):
                             product_id=product_id))
 
 
-# ────────────────────────────────
-#  АВТЕНТИФІКАЦІЯ
-# ────────────────────────────────
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -522,8 +474,7 @@ def register():
         {"status": "error", "message": "Ім'я, Email та Пароль є обов'язковими"}), 400
     if User.query.filter_by(email=email).first(): return jsonify(
         {"status": "error", "message": "Цей email вже зареєстровано"}), 400
-    username_base = first_name.strip()
-    username, counter = username_base, 1
+    username_base, username, counter = first_name.strip(), first_name.strip(), 1
     while User.query.filter_by(username=username).first():
         username = f"{username_base}_{counter}"
         counter += 1
@@ -547,45 +498,37 @@ def logout():
 
 @oauth_authorized.connect_via(google_blueprint)
 def google_logged_in(blueprint, token):
-    if not token:
-        flash("Не вдалося увійти через Google.", category="error")
-        return redirect(url_for("index"))
+    if not token: flash("Не вдалося увійти через Google.", category="error"); return redirect(url_for("index"))
     resp = blueprint.session.get("/oauth2/v2/userinfo")
     if not resp.ok:
         msg = resp.json().get("error", {}).get("message", "Невідома помилка.")
         flash(f"Не вдалося отримати інформацію про користувача з Google: {msg}", category="error")
         return redirect(url_for("index"))
-    google_info = resp.json()
-    email = google_info["email"]
+    google_info, email = resp.json(), google_info["email"]
     user = User.query.filter_by(email=email).first()
     if not user:
         first_name = google_info.get("given_name", "User")
         last_name = google_info.get("family_name")
-        username_base = first_name.lower().strip()
-        username, counter = username_base, 1
+        username_base, username, counter = first_name.lower().strip(), first_name.lower().strip(), 1
         while User.query.filter_by(username=username).first():
-            username = f"{username_base}{counter}"
+            username = f"{username_base}{counter}";
             counter += 1
         user = User(email=email, username=username, first_name=first_name, last_name=last_name,
                     avatar_url=google_info.get('picture'))
-        db.session.add(user)
+        db.session.add(user);
         db.session.commit()
-        subject = f"Вітаємо у {shop_info['name']}!"
-        html_body = render_template("email/welcome.html", user=user, shop=shop_info)
-        send_email(user.email, subject, html_body)
+        send_email(user.email, f"Вітаємо у {shop_info['name']}!",
+                   render_template("email/welcome.html", user=user, shop=shop_info))
         flash("Ви успішно зареєструвалися та увійшли через Google!", category="success")
     else:
         if not user.avatar_url and google_info.get('picture'):
-            user.avatar_url = google_info.get('picture')
+            user.avatar_url = google_info.get('picture');
             db.session.commit()
         flash("Ви успішно увійшли через Google!", category="success")
     login_user(user, remember=True)
     return redirect(url_for("index"))
 
 
-# ────────────────────────────────
-#  КОШИК ТА ОФОРМЛЕННЯ ЗАМОВЛЕННЯ
-# ────────────────────────────────
 @app.route('/add_to_cart', methods=['POST'])
 def add_to_cart():
     data = request.get_json()
@@ -598,9 +541,7 @@ def add_to_cart():
 
 @app.route('/update_cart_quantity/<int:product_id>', methods=['POST'])
 def update_cart_quantity(product_id):
-    cart = session.get("cart", {})
-    product_id_str = str(product_id)
-    new_quantity = request.json.get('quantity')
+    cart, product_id_str, new_quantity = session.get("cart", {}), str(product_id), request.json.get('quantity')
     if product_id_str in cart:
         if new_quantity and new_quantity > 0:
             cart[product_id_str] = new_quantity
@@ -617,19 +558,14 @@ def get_cart():
     cart_items, total = [], 0
     if cart:
         product_ids = [int(pid) for pid in cart.keys() if pid.isdigit()]
-        products = Product.query.filter(Product.id.in_(product_ids)).all()
+        products, product_map = Product.query.filter(Product.id.in_(product_ids)).all(), {}
         product_map = {str(p.id): p for p in products}
         for product_id, quantity in cart.items():
             if product := product_map.get(product_id):
-                cart_items.append({
-                    "id": product.id,
-                    "name": product.name,
-                    "price": product.price,
-                    "image": product.image,
-                    "quantity": quantity,
-                    "in_stock": product.in_stock,
-                    "url": url_for('product_detail', product_id=product.id)
-                })
+                cart_items.append(
+                    {"id": product.id, "name": product.name, "price": product.price, "image": product.image,
+                     "quantity": quantity, "in_stock": product.in_stock,
+                     "url": url_for('product_detail', product_id=product.id)})
                 total += product.price * quantity
     return jsonify({"items": cart_items, "total": total})
 
@@ -651,12 +587,10 @@ def buy_now():
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
     cart = session.get('cart', {})
-    if not cart:
-        flash('Ваш кошик порожній.', 'info')
-        return redirect(url_for('catalog'))
+    if not cart: flash('Ваш кошик порожній.', 'info'); return redirect(url_for('catalog'))
     if request.method == 'POST':
         product_ids = [int(pid) for pid in cart.keys() if pid.isdigit()]
-        products = Product.query.filter(Product.id.in_(product_ids)).all()
+        products, product_map = Product.query.filter(Product.id.in_(product_ids)).all(), {}
         product_map = {str(p.id): p for p in products}
         total_cost = sum(product_map[pid].price * qty for pid, qty in cart.items())
         first_name, last_name = request.form.get('customer_first_name', '').strip(), request.form.get(
@@ -669,7 +603,7 @@ def checkout():
                       payment_method=request.form.get('payment_method'), total_cost=total_cost,
                       comment=request.form.get('order_comment'),
                       user_id=current_user.id if current_user.is_authenticated else None)
-        db.session.add(order)
+        db.session.add(order);
         db.session.flush()
         order_items_for_email_and_tg = []
         for pid, qty in cart.items():
@@ -692,9 +626,6 @@ def checkout():
     return render_template('checkout.html')
 
 
-# ────────────────────────────────
-#  ПРОФІЛЬ КОРИСТУВАЧА
-# ────────────────────────────────
 @app.route('/profile/orders')
 @login_required
 def my_orders():
@@ -720,25 +651,19 @@ def my_reviews():
 def profile_settings():
     if request.method == 'POST':
         if 'update_info' in request.form:
-            current_user.first_name = request.form.get('first_name')
-            current_user.last_name = request.form.get('last_name')
-            current_user.phone = request.form.get('phone')
-
+            current_user.first_name, current_user.last_name, current_user.phone = request.form.get(
+                'first_name'), request.form.get('last_name'), request.form.get('phone')
             new_email = request.form.get('email')
             if new_email != current_user.email:
                 if User.query.filter_by(email=new_email).first():
                     flash('Цей email вже використовується іншим користувачем.', 'danger')
                     return redirect(url_for('profile_settings'))
                 current_user.email = new_email
-
-            db.session.commit()
+            db.session.commit();
             flash('Ваші дані успішно оновлено.', 'success')
-
         elif 'change_password' in request.form:
-            current_password = request.form.get('current_password')
-            new_password = request.form.get('new_password')
-            confirm_password = request.form.get('confirm_password')
-
+            current_password, new_password, confirm_password = request.form.get('current_password'), request.form.get(
+                'new_password'), request.form.get('confirm_password')
             if not current_user.password_hash:
                 flash('Неможливо змінити пароль, оскільки ви увійшли через соціальну мережу.', 'warning')
             elif not current_user.check_password(current_password):
@@ -751,15 +676,10 @@ def profile_settings():
                 current_user.set_password(new_password)
                 db.session.commit()
                 flash('Пароль успішно змінено.', 'success')
-
         return redirect(url_for('profile_settings'))
-
     return render_template('profile_settings.html')
 
 
-# ────────────────────────────────
-#  АДМІН-ПАНЕЛЬ
-# ────────────────────────────────
 @app.route('/admin/orders', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -767,12 +687,9 @@ def admin_orders():
     if request.method == 'POST':
         order_id, new_status = request.form.get('order_id'), request.form.get('status')
         if order := Order.query.get(order_id):
-            order.status = new_status
-            db.session.commit()
-            flash(f"Статус замовлення #{order.id} оновлено.", "success")
+            order.status, db.session.commit(), flash(f"Статус замовлення #{order.id} оновлено.", "success")
         return redirect(url_for('admin_orders', status=request.args.get('status', 'Нове')))
-    page = request.args.get('page', 1, type=int)
-    status_filter = request.args.get('status', 'Нове')
+    page, status_filter = request.args.get('page', 1, type=int), request.args.get('status', 'Нове')
     query = Order.query if status_filter == 'all' else Order.query.filter_by(status=status_filter)
     orders = query.order_by(Order.timestamp.desc()).paginate(page=page, per_page=15, error_out=False)
     all_statuses = ['Нове', 'Відправлено', 'Виконано', 'Скасовано']
@@ -793,15 +710,11 @@ def admin_reviews():
 @admin_required
 def add_product():
     if request.method == 'POST':
-        new_product = Product(
-            name=request.form['name'],
-            price=float(request.form['price']),
-            description=request.form['description'],
-            image=_get_cloudinary_url(request.form['image'].strip()),
-            category=request.form['category'],
-            in_stock='in_stock' in request.form
-        )
-        db.session.add(new_product)
+        new_product = Product(name=request.form['name'], price=float(request.form['price']),
+                              description=request.form['description'],
+                              image=_get_cloudinary_url(request.form['image'].strip()),
+                              category=request.form['category'], in_stock='in_stock' in request.form)
+        db.session.add(new_product);
         db.session.commit()
         flash(f"Товар '{new_product.name}' додано!", "success")
         return redirect(url_for('catalog'))
@@ -814,26 +727,19 @@ def add_product():
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == 'POST':
-        product.name = request.form['name']
-        product.price = float(request.form['price'])
-        product.description = request.form['description']
-        product.image = _get_cloudinary_url(request.form['image'].strip())
-        product.category = request.form['category']
-        product.in_stock = 'in_stock' in request.form
-
+        product.name, product.price, product.description, product.image, product.category, product.in_stock = \
+        request.form['name'], float(request.form['price']), request.form['description'], _get_cloudinary_url(
+            request.form['image'].strip()), request.form['category'], 'in_stock' in request.form
         db.session.commit()
         flash(f"Товар '{product.name}' оновлено!", "success")
         return redirect(url_for('catalog'))
-
     image_filename = ''
     if product.image:
         try:
-            match = re.search(r'/products/products/([^/.]+)', product.image)
-            if match:
+            if match := re.search(r'/products/products/([^/.]+)', product.image):
                 image_filename = match.group(1) + '.jpg'
         except Exception:
             pass
-
     return render_template("edit_product.html", product=product, image_to_display=image_filename)
 
 
@@ -863,13 +769,11 @@ def delete_product(product_id):
 @login_required
 @admin_required
 def admin_unfinished():
-    page = request.args.get('page', 1, type=int)
-    query = Product.query
+    page, query = request.args.get('page', 1, type=int), Product.query
     active_filters = [k for k in request.args if k in ['no_stock', 'no_description', 'no_image']]
     if not active_filters:
         query = query.filter(
-            db_or(Product.in_stock == False,
-                  (Product.description == None) | (Product.description == ''),
+            db_or(Product.in_stock == False, (Product.description == None) | (Product.description == ''),
                   Product.image.like('default_tovar%') | (Product.image == None)))
     else:
         if 'no_stock' in active_filters: query = query.filter(Product.in_stock == False)
@@ -877,87 +781,28 @@ def admin_unfinished():
             (Product.description == None) | (Product.description == ''))
         if 'no_image' in active_filters: query = query.filter(
             Product.image.like('default_tovar%') | (Product.image == None))
-
     counts = {'no_stock': Product.query.filter(Product.in_stock == False).count(),
               'no_description': Product.query.filter(
                   (Product.description == None) | (Product.description == '')).count(),
               'no_image': Product.query.filter(Product.image.like('default_tovar%') | (Product.image == None)).count()}
-
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
     return render_template('admin_unfinished.html', products=products, counts=counts)
 
 
-# ────────────────────────────────
-#  ІНШІ МАРШРУТИ ТА API
-# ────────────────────────────────
 @app.route("/send_message", methods=["POST"])
 def send_message():
-    form = request.form
-    form_data = {'name': form.get('name'), 'email': form.get('email'), 'message': form.get('message')}
-    subject = f"Нове повідомлення з сайту від {form_data['name']}"
-    html_body = render_template('email/contact_form_notification.html', data=form_data, shop=shop_info)
+    form, form_data = request.form, {'name': request.form.get('name'), 'email': request.form.get('email'),
+                                     'message': request.form.get('message')}
+    subject, html_body = f"Нове повідомлення з сайту від {form_data['name']}", render_template(
+        'email/contact_form_notification.html', data=form_data, shop=shop_info)
     if send_email(os.getenv("SMTP_USER"), subject, html_body):
         return jsonify(status="success", message="✅ Повідомлення успішно надіслано!")
-    else:
-        return jsonify(status="error", message="❌ Помилка сервера при відправці повідомлення."), 500
-
-
-# ────────────────────────────────
-#  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - НАДІЙНА ВЕРСІЯ
-# ────────────────────────────────
-
-
-def require_api_key(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        api_key = os.getenv('BAS_API_KEY')
-        provided_key = request.headers.get('X-API-KEY') or request.args.get('key')
-        if not api_key or provided_key != api_key:
-            return "failure\nInvalid API key.", 401
-        return f(*args, **kwargs)
-
-    return decorated_function
-
-
-@app.route('/cabinet/product_import/get_1c_system_info', methods=['GET'])
-def handle_bas_handshake():
-    print("BAS: пройдено етап handshake.")
-    return "success\nphpsessid\n1234567\nzip=no\nfile_limit=20971520"
-
-
-def _get_cloudinary_url(image_filename):
-    """
-    [ОНОВЛЕНО] Внутрішня функція для генерації повного URL зображення з Cloudinary.
-    """
-    DEFAULT_IMAGE_PUBLIC_ID = "products/products/default_tovar"
-
-    public_id = ""
-    try:
-        if image_filename and image_filename.strip():
-            filename_without_extension = os.path.splitext(image_filename)[0]
-            public_id = f"products/products/{filename_without_extension}"
-        else:
-            public_id = DEFAULT_IMAGE_PUBLIC_ID
-
-        url, _ = cloudinary.utils.cloudinary_url(
-            public_id,
-            secure=True,
-            fetch_format="auto",
-            quality="auto",
-            transformation=[{'dpr': "auto"}]
-        )
-        return url
-    except Exception as e:
-        print(f"!!! ПОМИЛКА генерації Cloudinary URL для ID '{public_id}': {e}")
-        # Повертаємо URL для заглушки за замовчуванням у разі помилки
-        url, _ = cloudinary.utils.cloudinary_url(DEFAULT_IMAGE_PUBLIC_ID, secure=True)
-        return url
+    return jsonify(status="error", message="❌ Помилка сервера при відправці повідомлення."), 500
 
 
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    """ [ВЕРСІЯ З ВИПРАВЛЕНОЮ ЛОГІКОЮ НАЯВНОСТІ ТА ЗОБРАЖЕНЬ] """
     if 'file' not in request.files:
         return "failure\nFile part is missing in the request.", 400
     cml_file = request.files['file']
@@ -988,22 +833,17 @@ def bas_import():
         print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю оптимізовану обробку...")
 
         print("Оптимізація: Завантажую існуючі товари з бази даних порціями...")
-        existing_products_map = {}
-        offset = 0
-        chunk_size = 500
+        existing_products_map, offset, chunk_size = {}, 0, 500
         while True:
             chunk = db.session.query(Product.id, Product.name).offset(offset).limit(chunk_size).all()
-            if not chunk:
-                break
-            for pid, name in chunk:
-                existing_products_map[name] = pid
+            if not chunk: break
+            for pid, name in chunk: existing_products_map[name] = pid
             offset += chunk_size
             print(f"  - завантажено {len(existing_products_map)} товарів...")
 
         print(f"Успішно завантажено {len(existing_products_map)} існуючих товарів з бази даних.")
 
-        products_to_update = []
-        products_to_add = []
+        products_to_update, products_to_add = [], []
 
         for product_node in products_from_xml:
             product_id_from_xml = product_node.findtext('Ид')
@@ -1015,19 +855,11 @@ def bas_import():
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Різне")
 
-            # [ПОКРАЩЕНО] Логіка вибору зображення
             main_image_node = product_node.find(".//Картинка[@main_image='1']")
-            if main_image_node is not None:
-                image_filename_from_xml = main_image_node.text
-            else:
-                # Якщо головного немає, беремо перше-ліпше
-                image_filename_from_xml = product_node.findtext('Картинка') or ''
-            image_filename_from_xml = image_filename_from_xml.strip()
+            image_filename_from_xml = (main_image_node.text if main_image_node is not None else product_node.findtext(
+                'Картинка') or '').strip()
 
-
-            price = 0.0
-            in_stock = False
-
+            price, in_stock = 0.0, False
             offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
             if offer_node is not None:
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
@@ -1036,53 +868,42 @@ def bas_import():
                         price = float(re.sub(r'[^\d.]', '', price_node.text.replace(',', '.')))
                     except (ValueError, AttributeError):
                         pass
-
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
-                        if int(float(quantity_node.text.strip())) > 0:
-                            in_stock = True
+                        if int(float(quantity_node.text.strip())) > 0: in_stock = True
                     except (ValueError, TypeError):
                         pass
 
             if not in_stock:
-                # [ВИПРАВЛЕНО ОПЕЧАТКУ] Значення -> Значение
                 stock_prop_node = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
                 if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.lower() == 'true':
                     in_stock = True
                 else:
-                    # [ВИПРАВЛЕНО ОПЕЧАТКУ] Значення -> Значение
-                    stock_prop_node_alt = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значение")
-                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.strip().lower() in ['true', 'да', 'є', 'yes']:
-                         in_stock = True
+                    stock_prop_node_alt = product_node.find(".//ЗначенияРеквизита[Наименование='Наличие']/Значение")
+                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.strip().lower() in [
+                        'true', 'да', 'є', 'yes']:
+                        in_stock = True
 
-            product_data = {
-                'name': name, 'price': price, 'description': description,
-                'category': category,
-                'image': _get_cloudinary_url(image_filename_from_xml),
-                'in_stock': in_stock
-            }
-
+            product_data = {'name': name, 'price': price, 'description': description, 'category': category,
+                            'image': _get_cloudinary_url(image_filename_from_xml), 'in_stock': in_stock}
             if name in existing_products_map:
                 product_data['id'] = existing_products_map[name]
                 products_to_update.append(product_data)
             else:
                 products_to_add.append(product_data)
 
-        updated_count = len(products_to_update)
-        added_count = len(products_to_add)
+        updated_count, added_count = len(products_to_update), len(products_to_add)
         print(f"Підготовлено до оновлення: {updated_count}. Підготовлено до додавання: {added_count}.")
 
         if products_to_add:
             print(f"Виконую пакетне додавання {len(products_to_add)} нових товарів...")
             db.session.bulk_insert_mappings(Product, products_to_add)
             print("Пакетне додавання завершено.")
-
         if products_to_update:
             print(f"Виконую пакетне оновлення {len(products_to_update)} існуючих товарів...")
             db.session.bulk_update_mappings(Product, products_to_update)
             print("Пакетне оновлення завершено.")
-
         if products_to_add or products_to_update:
             print("Зберігаю зміни в базі даних (commit)...")
             db.session.commit()
@@ -1102,11 +923,26 @@ def bas_import():
         return f"failure\nВнутрішня помилка сервера: {e}", 500
 
 
+@app.route('/api/search_suggestions')
+def search_suggestions():
+    query = request.args.get('q', '').strip()
+    if len(query) < 2:
+        return jsonify([])
+
+    products = Product.query.filter(
+        Product.name.ilike(f'%{query}%'),
+        Product.in_stock == True
+    ).limit(7).all()
+
+    suggestions = [{'name': p.name, 'url': url_for('product_detail', product_id=p.id)} for p in products]
+    return jsonify(suggestions)
+
+
+# ... (Решта функцій до /api/catalog/load_more залишаються без змін) ...
 def require_bot_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        api_key = os.getenv('BOT_API_KEY')
-        provided_key = request.headers.get('X-Bot-API-Key')
+        api_key, provided_key = os.getenv('BOT_API_KEY'), request.headers.get('X-Bot-API-Key')
         if not api_key or provided_key != api_key: return jsonify(
             {"status": "error", "message": "Invalid API key"}), 401
         return f(*args, **kwargs)
@@ -1117,11 +953,9 @@ def require_bot_api_key(f):
 @app.route('/api/order/<int:order_id>/update_status', methods=['POST'])
 @require_bot_api_key
 def api_update_order_status(order_id):
-    order = Order.query.get_or_404(order_id)
-    new_status = request.json.get('status')
+    order, new_status = Order.query.get_or_404(order_id), request.json.get('status')
     if new_status in ['Виконано', 'Скасовано', 'Нове', 'Відправлено']:
-        order.status = new_status
-        db.session.commit()
+        order.status, db.session.commit()
         return jsonify({"status": "success", "message": f"Order #{order.id} status updated to {new_status}"})
     return jsonify({"status": "error", "message": "Invalid status"}), 400
 
@@ -1138,31 +972,19 @@ def api_get_orders():
     return jsonify({"status": "success", "orders": orders_data})
 
 
-# API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
 def find_np_cities():
-    """Пошук населених пунктів."""
-    api_key = os.getenv('NOVA_POSHTA_API_KEY')
-    query = request.args.get('q', '')
-
-    if not api_key:
-        return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
-    if len(query) < 2:
-        return jsonify([])
-
-    payload = {
-        "apiKey": api_key,
-        "modelName": "Address",
-        "calledMethod": "searchSettlements",
-        "methodProperties": {"CityName": query, "Limit": "20"}
-    }
+    api_key, query = os.getenv('NOVA_POSHTA_API_KEY'), request.args.get('q', '')
+    if not api_key: return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
+    if len(query) < 2: return jsonify([])
+    payload = {"apiKey": api_key, "modelName": "Address", "calledMethod": "searchSettlements",
+               "methodProperties": {"CityName": query, "Limit": "20"}}
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
         response.raise_for_status()
         data = response.json()
         if data['success'] and data['data'][0]['TotalCount'] > 0:
-            cities = data['data'][0]['Addresses']
-            return jsonify([{'ref': c['Ref'], 'name': c['Present']} for c in cities])
+            return jsonify([{'ref': c['Ref'], 'name': c['Present']} for c in data['data'][0]['Addresses']])
         return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (міста): {e}")
@@ -1171,31 +993,17 @@ def find_np_cities():
 
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання ВІДДІЛЕНЬ ТА ПОШТОМАТІВ для населеного пункту."""
-    api_key = os.getenv('NOVA_POSHTA_API_KEY')
-    city_ref = request.args.get('city_ref', '')
-
-    if not api_key:
-        return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
-    if not city_ref:
-        return jsonify([])
-
-    payload = {
-        "apiKey": api_key,
-        "modelName": "AddressGeneral",
-        "calledMethod": "getWarehouses",
-        "methodProperties": {
-            "SettlementRef": city_ref,
-            "TypeOfWarehouseRef": "841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28"
-        }
-    }
+    api_key, city_ref = os.getenv('NOVA_POSHTA_API_KEY'), request.args.get('city_ref', '')
+    if not api_key: return jsonify({"error": "API-ключ Нової Пошти не налаштовано на сервері."}), 500
+    if not city_ref: return jsonify([])
+    payload = {"apiKey": api_key, "modelName": "AddressGeneral", "calledMethod": "getWarehouses",
+               "methodProperties": {"SettlementRef": city_ref,
+                                    "TypeOfWarehouseRef": "841339c7-591a-42e2-8234-7a0a00f0ed6f,9a6886f2-89b7-41b0-9b0c-e675a080cb28"}}
     try:
         response = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5)
         response.raise_for_status()
         data = response.json()
-        if data['success']:
-            all_warehouses = data.get('data', [])
-            return jsonify([w['Description'] for w in all_warehouses])
+        if data['success']: return jsonify([w['Description'] for w in data.get('data', [])])
         return jsonify([])
     except requests.exceptions.RequestException as e:
         print(f"Помилка API Нової Пошти (відділення): {e}")
@@ -1222,7 +1030,6 @@ def api_load_more():
         Product.description != '',
         Product.image.notlike('default_tovar%')
     )
-
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
@@ -1236,22 +1043,21 @@ def api_load_more():
                 all_cats_for_filter = [current_category] + subcategories
                 query = query.filter(Product.category.in_(all_cats_for_filter))
                 break
-
             for sub_cat in data.get('subcategories', {}):
                 if sub_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
                     current_category = sub_cat
                     query = query.filter(Product.category == current_category)
                     break
-            if current_category:
-                break
+            if current_category: break
 
     if min_price:
         query = query.filter(Product.price >= min_price)
     if max_price:
         query = query.filter(Product.price <= max_price)
 
+    # [ЗМІНЕНО] Кількість товарів, що завантажуються через API
     products_pagination = query.order_by(Product.id.desc()).paginate(
-        page=page, per_page=12, error_out=False
+        page=page, per_page=15, error_out=False
     )
 
     html = render_template('_products_grid_items.html', products=products_pagination.items)
