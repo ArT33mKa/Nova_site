@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // [ОНОВЛЕНО] Запуск нових функцій
     initInfiniteScroll();
-    initSearchSuggestions();
+    initSearchSuggestions(); // <--- ОСЬ ЦЕ ВИПРАВЛЕННЯ!
 
     updateCartView();
     updateFavoritesUI();
@@ -797,6 +797,3 @@ function initSearchSuggestions() {
         }
     });
 }
-
-// Запускаємо нашу нову функцію при завантаженні сторінки
-document.addEventListener('DOMContentLoaded', initSearchSuggestions);

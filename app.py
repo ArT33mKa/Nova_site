@@ -1,5 +1,6 @@
 import os
 import re
+import math
 import locale
 import smtplib
 import requests  # для Telegram та Нової Пошти
@@ -8,7 +9,7 @@ from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
 from collections import Counter
-from sqlalchemy import func, and_, or_ as db_or
+from sqlalchemy import func, and_, or_ as db_orб, select
 from email.mime.text import MIMEText
 from lxml import etree as lxml_etree
 from flask_sqlalchemy import SQLAlchemy
@@ -355,10 +356,16 @@ def catalog(category_slug):
                     break
             if current_category: break
 
-    price_range = db.session.query(func.floor(func.min(Product.price)), func.ceil(func.max(Product.price))) \
-        .select_from(query.subquery()).one()
-    min_price_available = price_range[0] or 0
-    max_price_available = price_range[1] or 10000
+    price_range_statement = select(func.min(Product.price), func.max(Product.price)).select_from(query.subquery())
+    price_range_result = db.session.execute(price_range_statement).first()
+
+    if price_range_result and price_range_result[0] is not None:
+        min_val, max_val = price_range_result
+        min_price_available = math.floor(min_val)
+        max_price_available = math.ceil(max_val)
+    else:
+        min_price_available = 0
+        max_price_available = 10000
     if min_price:
         query = query.filter(Product.price >= min_price)
     if max_price:
