@@ -730,124 +730,30 @@ function initAutoApplyFilters() {
 }
 
 function initSearchSuggestions() {
-    const triggerEl = document.getElementById('search-overlay-trigger');
-    const mainSearchInput = document.getElementById('search-input');
-    if (!triggerEl || !mainSearchInput) return;
+    const searchInput = document.getElementById('search-input');
+    const suggestionsContainer = document.getElementById('search-suggestions-container');
 
-    let overlayEl = null;
+    if (!searchInput || !suggestionsContainer) return;
+
     let searchTimeout;
 
-    const createOverlay = () => {
-        // Створюємо оверлей лише один раз
-        if (overlayEl) return;
+    const showSuggestions = () => suggestionsContainer.classList.add('active');
+    const hideSuggestions = () => suggestionsContainer.classList.remove('active');
 
-        const overlayHTML = `
-            <div class="search-overlay" id="search-overlay">
-                <div class="search-overlay-content">
-                    <div class="search-overlay-header">
-                        <div class="search-input-wrapper">
-                             <input type="search" id="search-input-overlay" placeholder="Я шукаю..." autocomplete="off">
-                             <button class="search-btn" id="search-btn-overlay" title="Знайти"><i class="fas fa-search"></i></button>
-                        </div>
-                    </div>
-                    <div class="search-overlay-body" id="search-overlay-body">
-                        <!-- Сюди будуть завантажуватись підказки -->
-                    </div>
-                </div>
-                <button class="search-overlay-close-btn" id="search-overlay-close" title="Закрити">&times;</button>
-            </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', overlayHTML);
-        overlayEl = document.getElementById('search-overlay');
-
-        // Додаємо слухачів подій для нового оверлею
-        const overlayContent = overlayEl.querySelector('.search-overlay-content');
-        const overlayInput = document.getElementById('search-input-overlay');
-        const overlayBtn = document.getElementById('search-btn-overlay');
-        const overlayCloseBtn = document.getElementById('search-overlay-close');
-        const overlayBody = document.getElementById('search-overlay-body');
-
-        overlayEl.addEventListener('click', (e) => {
-            if (e.target === overlayEl || e.target === overlayCloseBtn) {
-                closeOverlay();
-            }
-        });
-
-        overlayInput.addEventListener('input', () => {
-            handleInput(overlayInput.value);
-        });
-
-        overlayInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                submitSearch(overlayInput.value);
-            }
-        });
-
-        overlayBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            submitSearch(overlayInput.value);
-        });
-
-        // Керування історією та популярними запитами
-        overlayBody.addEventListener('click', (e) => {
-            const clearBtn = e.target.closest('.clear-history-btn');
-            const removeBtn = e.target.closest('.remove-history-btn');
-
-            if (clearBtn) {
-                localStorage.removeItem('searchHistory');
-                renderInitialState();
-            }
-            if (removeBtn) {
-                const termToRemove = removeBtn.dataset.term;
-                let history = getSearchHistory();
-                history = history.filter(item => item !== termToRemove);
-                localStorage.setItem('searchHistory', JSON.stringify(history));
-                e.target.closest('.suggestion-item').remove();
-            }
-        });
-    };
-
-    const openOverlay = () => {
-        createOverlay();
-        overlayEl.classList.add('active');
-        document.body.style.overflow = 'hidden'; // Заборонити скрол сторінки
-
-        const overlayInput = document.getElementById('search-input-overlay');
-        overlayInput.value = mainSearchInput.value;
-        overlayInput.focus();
-
-        if (mainSearchInput.value.length > 1) {
-            handleInput(mainSearchInput.value);
-        } else {
-            renderInitialState();
-        }
-    };
-
-    const closeOverlay = () => {
-        if (!overlayEl) return;
-        overlayEl.classList.remove('active');
-        document.body.style.overflow = '';
-    };
-
-    const getSearchHistory = () => {
-        return JSON.parse(localStorage.getItem('searchHistory')) || [];
-    };
+    const getSearchHistory = () => JSON.parse(localStorage.getItem('searchHistory')) || [];
 
     const addToSearchHistory = (term) => {
         if (!term) return;
         let history = getSearchHistory();
-        // Видаляємо старий запис, якщо він є, щоб перемістити його на початок
         history = history.filter(item => item !== term);
         history.unshift(term);
-        // Зберігаємо тільки 5 останніх запитів
         localStorage.setItem('searchHistory', JSON.stringify(history.slice(0, 5)));
     };
 
     const renderInitialState = () => {
         const history = getSearchHistory();
         const popularSearches = ['насос', 'змішувач', 'шланг для поливу', 'бойлер', 'радіатор', 'витяжка'];
-        let html = '';
+        let html = '<div class="search-suggestions-body">';
 
         if (history.length > 0) {
             html += `
@@ -863,8 +769,7 @@ function initSearchSuggestions() {
                             <button class="remove-history-btn" data-term="${term}" title="Видалити">&times;</button>
                         </a>
                     `).join('')}
-                </div>
-            `;
+                </div>`;
         }
 
         html += `
@@ -875,13 +780,57 @@ function initSearchSuggestions() {
                 <div class="popular-searches">
                     ${popularSearches.map(term => `<a href="/catalog?search=${encodeURIComponent(term)}">${term}</a>`).join('')}
                 </div>
-            </div>
-        `;
-        document.getElementById('search-overlay-body').innerHTML = html;
+            </div>`;
+
+        html += '</div>'; // close search-suggestions-body
+        suggestionsContainer.innerHTML = html;
+        showSuggestions();
     };
 
-    const handleInput = (query) => {
-        const overlayBody = document.getElementById('search-overlay-body');
+    const renderResults = (data) => {
+        let html = '<div class="search-suggestions-body">';
+
+        if (data.categories.length > 0) {
+            html += `
+                <div class="suggestions-section">
+                    <h4 class="suggestions-section-title">Категорії</h4>
+                    ${data.categories.map(c => `
+                         <a href="${c.url}" class="suggestion-item">
+                            <span class="suggestion-icon"><i class="fas fa-list"></i></span>
+                            <span class="suggestion-text">${c.name}</span>
+                          </a>`).join('')}
+                </div>`;
+        }
+
+        if (data.products.length > 0) {
+            html += `
+                <div class="suggestions-section">
+                    <h4 class="suggestions-section-title">Товари</h4>
+                    ${data.products.map(p => `
+                        <a href="${p.url}" class="suggestion-item">
+                            <span class="suggestion-icon"><i class="fas fa-box-open"></i></span>
+                            <span class="suggestion-text">${p.name}</span>
+                        </a>`).join('')}
+                </div>`;
+        }
+
+        if (html === '<div class="search-suggestions-body">') {
+            html += `<p style="text-align: center; color: var(--gray-color); padding: 20px 0;">За вашим запитом нічого не знайдено</p>`;
+        }
+
+        html += '</div>'; // close search-suggestions-body
+        suggestionsContainer.innerHTML = html;
+        showSuggestions();
+    };
+
+    searchInput.addEventListener('focus', () => {
+        if (searchInput.value.length < 2) {
+            renderInitialState();
+        }
+    });
+
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim();
         clearTimeout(searchTimeout);
 
         if (query.length < 2) {
@@ -892,50 +841,39 @@ function initSearchSuggestions() {
         searchTimeout = setTimeout(() => {
             fetch(`/api/search_suggestions?q=${encodeURIComponent(query)}`)
                 .then(res => res.json())
-                .then(data => {
-                    let html = '';
-                    if (data.products.length > 0) {
-                        html += `
-                            <div class="suggestions-section">
-                                <h4 class="suggestions-section-title">Товари</h4>
-                                ${data.products.map(p => `
-                                    <a href="${p.url}" class="suggestion-item">
-                                        <span class="suggestion-icon"><i class="fas fa-box-open"></i></span>
-                                        <span class="suggestion-text">${p.name}</span>
-                                    </a>`).join('')}
-                            </div>`;
-                    }
-                    if (data.categories.length > 0) {
-                        html += `
-                            <div class="suggestions-section">
-                                <h4 class="suggestions-section-title">Категорії</h4>
-                                ${data.categories.map(c => `
-                                     <a href="${c.url}" class="suggestion-item">
-                                        <span class="suggestion-icon"><i class="fas fa-list"></i></span>
-                                        <span class="suggestion-text">${c.name}</span>
-                                      </a>`).join('')}
-                            </div>`;
-                    }
-
-                    if (html === '') {
-                        html = `<p style="text-align: center; color: var(--gray-color); padding: 20px 0;">За вашим запитом нічого не знайдено</p>`;
-                    }
-
-                    overlayBody.innerHTML = html;
-                });
+                .then(data => renderResults(data));
         }, 250);
-    };
+    });
 
-    const submitSearch = (query) => {
-        if (query.trim()) {
-            addToSearchHistory(query.trim());
-            window.location.href = `/catalog?search=${encodeURIComponent(query.trim())}`;
+    // Ховаємо підказки, якщо клікнули поза зоною пошуку
+    document.addEventListener('click', (e) => {
+        if (!searchInput.parentElement.contains(e.target)) {
+            hideSuggestions();
         }
-    };
+    });
 
-    // Головний слухач, який все запускає
-    mainSearchInput.addEventListener('focus', (e) => {
-        e.preventDefault();
-        openOverlay();
+    // Збереження в історію при відправці форми
+    searchInput.form.addEventListener('submit', () => {
+        addToSearchHistory(searchInput.value.trim());
+    });
+
+    // Керування історією
+    suggestionsContainer.addEventListener('click', (e) => {
+        const clearBtn = e.target.closest('.clear-history-btn');
+        const removeBtn = e.target.closest('.remove-history-btn');
+
+        if (clearBtn) {
+            e.preventDefault();
+            localStorage.removeItem('searchHistory');
+            renderInitialState();
+        }
+        if (removeBtn) {
+            e.preventDefault();
+            const termToRemove = removeBtn.dataset.term;
+            let history = getSearchHistory();
+            history = history.filter(item => item !== termToRemove);
+            localStorage.setItem('searchHistory', JSON.stringify(history));
+            removeBtn.closest('.suggestion-item').remove();
+        }
     });
 }
