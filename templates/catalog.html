@@ -62,7 +62,7 @@
                     {% if category_slug and not search_query %}<input type="hidden" name="category_slug" value="{{ category_slug }}">{% endif %}
                     <div class="search-input-wrapper">
                         <input type="search" name="search" id="search-input" value="{{ search_query or '' }}" placeholder="Я шукаю..." autocomplete="off">
-                        <!-- ↓↓↓ ДОДАЙ ЦЕЙ РЯДОК ↓↓↓ -->
+                        <!-- ↓↓↓ ОСЬ ТУТ БУЛА ПРОБЛЕМА. ДОДАЄМО ЦЕЙ РЯДОК ↓↓↓ -->
                         <div id="search-suggestions-container" class="search-suggestions"></div>
                         <button type="submit" class="search-btn" title="Знайти"><i class="fas fa-search"></i></button>
                     </div>
