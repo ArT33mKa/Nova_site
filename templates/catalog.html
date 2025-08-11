@@ -58,15 +58,17 @@
 
         <div class="products-container">
             <div class="search-bar-container">
-                <form id="search-form" method="GET" action="{{ url_for('catalog') }}" class="search-form">
-                    {% if category_slug and not search_query %}<input type="hidden" name="category_slug" value="{{ category_slug }}">{% endif %}
-                    <div class="search-input-wrapper">
-                        <input type="search" name="search" id="search-input" value="{{ search_query or '' }}" placeholder="Я шукаю..." autocomplete="off">
-                        <!-- ↓↓↓ ОСЬ ТУТ БУЛА ПРОБЛЕМА. ДОДАЄМО ЦЕЙ РЯДОК ↓↓↓ -->
-                        <div id="search-suggestions-container" class="search-suggestions"></div>
-                        <button type="submit" class="search-btn" title="Знайти"><i class="fas fa-search"></i></button>
-                    </div>
-                </form>
+                <!-- ================== ОСЬ ТУТ ЗМІНИ ================== -->
+                <div id="search-overlay-trigger">
+                    <form id="search-form" method="GET" action="{{ url_for('catalog') }}" class="search-form">
+                        {% if category_slug and not search_query %}<input type="hidden" name="category_slug" value="{{ category_slug }}">{% endif %}
+                        <div class="search-input-wrapper">
+                             <input type="search" name="search" id="search-input" value="{{ search_query or '' }}" placeholder="Я шукаю..." autocomplete="off">
+                            <button type="submit" class="search-btn" title="Знайти"><i class="fas fa-search"></i></button>
+                        </div>
+                    </form>
+                </div>
+                <!-- ================== КІНЕЦЬ ЗМІН ================== -->
             </div>
 
             <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
@@ -84,7 +86,6 @@
                                 data-search="{{ search_query or '' }}"
                                 data-min-price="{{ request.args.get('min_price', '') }}"
                                 data-max-price="{{ request.args.get('max_price', '') }}">
-                            <!-- [ОНОВЛЕНО] Додано span для тексту та для спінера -->
                             <span class="btn-text">Завантажити ще</span>
                             <span class="btn-spinner"></span>
                         </button>
