@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // [ОНОВЛЕНО] Запуск нових функцій
     initInfiniteScroll();
-    initSearchSuggestions(); // <--- ОСЬ ЦЕ ВИПРАВЛЕННЯ!
+    initSearchSuggestions(); // <--- ОСЬ ЦЕЙ РЯДОК ВСЕ ВИРІШУЄ! ЙОГО НЕ БУЛО.
 
     updateCartView();
     updateFavoritesUI();
