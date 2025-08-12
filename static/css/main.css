@@ -1455,10 +1455,17 @@ img {
     width: 100%;
     border: 2px solid var(--primary-color);
     border-radius: 50px;
-    /* overflow: hidden;  <--- ВИДАЛЕНО */
     background-color: #fff;
     box-shadow: 0 4px 15px rgba(0, 102, 204, 0.1);
+    transition: border-radius 0.2s ease-in-out;
 }
+
+.search-input-wrapper.suggestions-active {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    box-shadow: 0 4px 20px rgba(0, 102, 204, 0.2);
+}
+
 #search-input {
     flex-grow: 1;
     border: none;
@@ -1480,6 +1487,7 @@ img {
     font-size: 1.2rem;
     cursor: pointer;
     transition: background-color 0.2s;
+    border-radius: 0 50px 50px 0;
 }
 .search-btn:hover {
     background-color: var(--secondary-color);
@@ -2243,16 +2251,6 @@ img {
     color: var(--primary-color);
 }
 
-/* --- Search Bar & Suggestions --- */
-.search-bar-container {
-    margin-bottom: 25px;
-}
-.search-form {
-    width: 100%;
-    max-width: 700px;
-    margin: 0 auto;
-}
-
 .search-input-wrapper {
     position: relative;
     display: flex;
@@ -2261,11 +2259,9 @@ img {
     border-radius: 50px;
     background-color: #fff;
     box-shadow: 0 4px 15px rgba(0, 102, 204, 0.1);
-    /* [ДОДАНО] Плавний перехід для заокруглення */
     transition: border-radius 0.2s ease-in-out;
 }
 
-/* [ДОДАНО] Новий стиль для активного стану */
 .search-input-wrapper.suggestions-active {
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
@@ -2292,23 +2288,27 @@ img {
     color: white;
     font-size: 1.2rem;
     cursor: pointer;
-    transition: background-color 0.2s;
     border-radius: 0 50px 50px 0;
+    /* [ДОДАНО] Плавний перехід для заокруглення кнопки */
+    transition: background-color 0.2s, border-radius 0.2s ease-in-out;
 }
 .search-btn:hover {
     background-color: var(--secondary-color);
 }
 
+/* [НОВИЙ СТИЛЬ] Випрямляємо нижній правий кут кнопки при активних підказках */
+.search-input-wrapper.suggestions-active .search-btn {
+    border-bottom-right-radius: 0;
+}
+
 .search-suggestions-popup {
     position: absolute;
-    /* [ЗМІНЕНО] Прибираємо проміжок і з'єднуємо рамки */
     top: 100%;
-    left: -2px; /* Компенсація рамки батька */
-    right: -2px; /* Компенсація рамки батька */
+    left: -2px;
+    right: -2px;
     background-color: white;
-    border: 2px solid var(--primary-color); /* Робимо рамку такою ж, як у поля вводу */
-    border-top: none; /* Прибираємо верхню рамку, щоб не було подвійної лінії */
-    /* [ЗМІНЕНО] Заокруглюємо тільки нижні кути */
+    border: 2px solid var(--primary-color);
+    border-top: none;
     border-radius: 0 0 var(--border-radius) var(--border-radius);
     z-index: 1000;
     max-height: 70vh;
