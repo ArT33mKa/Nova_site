@@ -62,8 +62,9 @@
                     {% if category_slug and not search_query %}<input type="hidden" name="category_slug" value="{{ category_slug }}">{% endif %}
                     <div class="search-input-wrapper">
                         <input type="search" name="search" id="search-input" value="{{ search_query or '' }}" placeholder="Я шукаю..." autocomplete="off">
+                        <!-- [НОВЕ] Кнопка для очищення пошуку -->
+                        <button type="button" class="clear-search-btn" id="clear-search-btn" title="Очистити пошук">&times;</button>
                         <button type="submit" class="search-btn" title="Знайти"><i class="fas fa-search"></i></button>
-                        <!-- [НОВА ВЕРСІЯ] Контейнер для підказок тепер всередині обгортки -->
                         <div id="search-suggestions-container" class="search-suggestions-popup"></div>
                     </div>
                 </form>

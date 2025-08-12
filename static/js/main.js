@@ -731,22 +731,29 @@ function initAutoApplyFilters() {
 function initSearchSuggestions() {
     const searchInput = document.getElementById('search-input');
     const suggestionsContainer = document.getElementById('search-suggestions-container');
-    // [ДОДАНО] Знаходимо головну обгортку
     const searchWrapper = searchInput.closest('.search-input-wrapper');
+    // [НОВЕ] Знаходимо нашу кнопку очищення
+    const clearButton = document.getElementById('clear-search-btn');
 
-    if (!searchInput || !suggestionsContainer || !searchWrapper) return;
+    if (!searchInput || !suggestionsContainer || !searchWrapper || !clearButton) return;
 
     let searchTimeout;
 
-    // Знайдіть функцію showSuggestions всередині initSearchSuggestions
-    // і замініть її на цю:
+    // [НОВЕ] Функція для показу/приховування хрестика
+    const toggleClearButton = () => {
+        // Якщо в полі є текст - показуємо кнопку, якщо ні - ховаємо
+        if (searchInput.value.length > 0) {
+            clearButton.classList.add('visible');
+        } else {
+            clearButton.classList.remove('visible');
+        }
+    };
+
     const showSuggestions = () => {
         suggestionsContainer.classList.add('active');
         searchWrapper.classList.add('suggestions-active');
     };
 
-    // Знайдіть функцію hideSuggestions всередині initSearchSuggestions
-    // і замініть її на цю:
     const hideSuggestions = () => {
         suggestionsContainer.classList.remove('active');
         searchWrapper.classList.remove('suggestions-active');
@@ -845,6 +852,9 @@ function initSearchSuggestions() {
         const query = searchInput.value.trim();
         clearTimeout(searchTimeout);
 
+        // [ОНОВЛЕНО] Перевіряємо видимість хрестика при кожному вводі
+        toggleClearButton();
+
         if (query.length < 2) {
             renderInitialState();
             return;
@@ -867,6 +877,14 @@ function initSearchSuggestions() {
         addToSearchHistory(searchInput.value.trim());
     });
 
+    // [НОВЕ] Обробник кліку на хрестик
+    clearButton.addEventListener('click', () => {
+        searchInput.value = '';         // Очищуємо поле
+        toggleClearButton();            // Ховаємо хрестик
+        searchInput.focus();            // Повертаємо фокус в поле для зручності
+        renderInitialState();           // Показуємо початковий стан підказок (історію)
+    });
+
     suggestionsContainer.addEventListener('click', (e) => {
         const clearBtn = e.target.closest('.clear-history-btn');
         const removeBtn = e.target.closest('.remove-history-btn');
@@ -885,4 +903,8 @@ function initSearchSuggestions() {
             removeBtn.closest('.suggestion-item').remove();
         }
     });
+
+    // [НОВЕ] Перевіряємо стан кнопки при завантаженні сторінки
+    // (на випадок, якщо сторінка перезавантажилась із заповненим полем пошуку)
+    toggleClearButton();
 }

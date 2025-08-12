@@ -41,10 +41,6 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
     display: flex;
     flex-direction: column;
     min-height: 100%;
@@ -1438,60 +1434,6 @@ img {
 #load-more-btn.loading .btn-spinner {
     display: block;
 }
-
-/* --- Search Bar & Suggestions --- */
-.search-bar-container {
-    margin-bottom: 25px;
-}
-.search-form {
-    width: 100%;
-    max-width: 700px;
-    margin: 0 auto;
-}
-
-.search-input-wrapper {
-    position: relative;
-    display: flex;
-    width: 100%;
-    border: 2px solid var(--primary-color);
-    border-radius: 50px;
-    background-color: #fff;
-    box-shadow: 0 4px 15px rgba(0, 102, 204, 0.1);
-    transition: border-radius 0.2s ease-in-out;
-}
-
-.search-input-wrapper.suggestions-active {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    box-shadow: 0 4px 20px rgba(0, 102, 204, 0.2);
-}
-
-#search-input {
-    flex-grow: 1;
-    border: none;
-    background: transparent;
-    padding: 15px 25px;
-    font-size: 1.1rem;
-    color: var(--dark-color);
-}
-#search-input:focus {
-    outline: none;
-    box-shadow: none;
-}
-.search-btn {
-    flex-shrink: 0;
-    padding: 0 25px;
-    background-color: var(--primary-color);
-    border: none;
-    color: white;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    border-radius: 0 50px 50px 0;
-}
-.search-btn:hover {
-    background-color: var(--secondary-color);
-}
 /* --- Product Detail Page --- */
 .product-detail-grid {
     display: grid;
@@ -1919,328 +1861,43 @@ img {
     }
 }
 
-.search-input-wrapper {
-    position: relative;
-}
-
-.search-suggestions {
-    display: none; /* Спочатку приховано */
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background-color: white;
-    border: 1px solid #ddd;
-    border-top: none;
-    border-radius: 0 0 24px 24px;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-    z-index: 100;
-    overflow: hidden;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.search-suggestions-header {
-    padding: 10px 15px 5px;
-    font-size: 0.85rem;
-    color: var(--gray-color);
-    font-weight: 500;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.search-suggestions-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 15px;
-    color: var(--dark-color);
-    text-decoration: none;
-    transition: background-color 0.2s;
-}
-
-.search-suggestions-item:hover {
-    background-color: #f5f5f5;
-}
-
-.search-suggestions-item i {
-    color: var(--gray-color);
-}
-
-.search-suggestions-item strong {
-    color: var(--primary-color);
-}
-
-.search-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.4);
-    z-index: 1050; /* Вище ніж header */
-    display: flex;
-    justify-content: center;
-    padding-top: 5vh;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-}
-
-.search-overlay.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.search-overlay-content {
-    background-color: white;
-    width: 90%;
-    max-width: 700px;
-    height: fit-content;
-    max-height: 85vh;
-    border-radius: var(--border-radius);
-    display: flex;
-    flex-direction: column;
-    transform: translateY(-20px);
-    transition: transform 0.3s ease;
-}
-
-.search-overlay.active .search-overlay-content {
-    transform: translateY(0);
-}
-
-.search-overlay-header {
-    padding: 15px;
-    border-bottom: 1px solid var(--light-gray);
-    position: relative;
-}
-
-.search-overlay-header .search-input-wrapper {
-    margin: 0;
-    border-radius: 8px; /* Робимо пошук менш заокругленим всередині вікна */
-    border-width: 1px;
-}
-.search-overlay-header #search-input-overlay {
-    padding: 12px 15px;
-    font-size: 1rem;
-}
-.search-overlay-header .search-btn {
-    padding: 0 20px;
-}
-
-.search-overlay-close-btn {
-    position: absolute;
-    top: 50%;
-    right: -40px;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: white;
-    font-size: 2rem;
-    cursor: pointer;
-    opacity: 0.8;
-}
-.search-overlay-close-btn:hover {
-    opacity: 1;
-}
-
-.search-overlay-body {
-    padding: 20px;
-    overflow-y: auto;
-    flex-grow: 1;
-}
-
-.suggestions-section:last-child {
-    margin-bottom: 0;
-}
-
-.suggestions-section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.suggestions-section-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-.clear-history-btn {
-    font-size: 0.85rem;
-    color: var(--gray-color);
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-.clear-history-btn:hover {
-    color: var(--primary-color);
-}
-
-.suggestion-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    color: var(--dark-color);
-}
-.suggestion-item:hover {
-    background-color: #f5f5f5;
-}
-
-.suggestion-item .suggestion-icon {
-    width: 20px;
-    text-align: center;
-    color: var(--gray-color);
-}
-.suggestion-item .suggestion-text {
-    flex-grow: 1;
-}
-.suggestion-item .remove-history-btn {
-    background: none;
-    border: none;
-    color: var(--gray-color);
-    font-size: 1.1rem;
-    cursor: pointer;
-    padding: 5px;
-    line-height: 1;
-}
-.suggestion-item .remove-history-btn:hover {
-    color: var(--danger-color);
-}
-
-.popular-searches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-.popular-searches a {
-    display: inline-block;
-    padding: 8px 15px;
-    background-color: var(--light-color);
-    border: 1px solid var(--light-gray);
-    border-radius: 20px;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-}
-.popular-searches a:hover {
-    background-color: #e9ecef;
-    border-color: #ddd;
-    color: var(--primary-color);
-}
-
-.search-input-wrapper {
-    position: relative;
-}
-
-
-.suggestions-section {
+.search-bar-container {
     margin-bottom: 25px;
 }
-.suggestions-section:last-child {
-    margin-bottom: 0;
-}
-
-.suggestions-section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.suggestions-section-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-.clear-history-btn {
-    font-size: 0.85rem;
-    color: var(--gray-color);
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-.clear-history-btn:hover {
-    color: var(--primary-color);
-}
-
-.suggestion-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    color: var(--dark-color);
-}
-.suggestion-item:hover {
-    background-color: #f5f5f5;
-}
-
-.suggestion-item .suggestion-icon {
-    width: 20px;
-    text-align: center;
-    color: var(--gray-color);
-}
-.suggestion-item .suggestion-text {
-    flex-grow: 1;
-}
-.suggestion-item .remove-history-btn {
-    background: none;
-    border: none;
-    color: var(--gray-color);
-    font-size: 1.1rem;
-    padding: 5px;
-    line-height: 1;
-    /* >>> ОСЬ ВИПРАВЛЕННЯ КУРСОРУ <<< */
-    cursor: pointer;
-}
-.suggestion-item .remove-history-btn:hover {
-    color: var(--danger-color);
-}
-
-.popular-searches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-.popular-searches a {
-    display: inline-block;
-    padding: 8px 15px;
-    background-color: var(--light-color);
-    border: 1px solid var(--light-gray);
-    border-radius: 20px;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-}
-.popular-searches a:hover {
-    background-color: #e9ecef;
-    border-color: #ddd;
-    color: var(--primary-color);
+.search-form {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+    position: relative; /* Важливо для позиціонування випадаючого списку */
 }
 
 .search-input-wrapper {
     position: relative;
     display: flex;
     width: 100%;
-    border: 2px solid var(--primary-color);
-    border-radius: 50px;
+    border: 1px solid #ddd; /* М'яка рамка за замовчуванням */
+    border-radius: var(--border-radius);
     background-color: #fff;
-    box-shadow: 0 4px 15px rgba(0, 102, 204, 0.1);
-    transition: border-radius 0.3s ease, box-shadow 0.3s ease;
+    transition: all 0.3s ease; /* Плавний перехід для всіх властивостей */
 }
 
-/* [ОНОВЛЕНО] Стиль для активного стану, коли підказки видимі */
-.search-input-wrapper.suggestions-active {
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
-    box-shadow: 0 4px 20px rgba(0, 102, 204, 0.2);
-    /* Прибираємо нижню рамку, щоб не було подвійної лінії */
-    border-bottom: none;
-    /* Компенсуємо висоту прибраної рамки, щоб поле вводу не "стрибало" */
-    padding-bottom: 2px;
+/* При фокусі всередині обгортки - робимо її активною */
+.search-input-wrapper:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.2);
+}
+
+#search-input {
+    flex-grow: 1;
+    border: none;
+    background: transparent;
+    padding: 15px 20px;
+    font-size: 1.1rem;
+    color: var(--dark-color);
+}
+#search-input:focus {
+    outline: none;
+    box-shadow: none;
 }
 
 .search-btn {
@@ -2251,79 +1908,61 @@ img {
     color: white;
     font-size: 1.2rem;
     cursor: pointer;
-    border-radius: 0 50px 50px 0;
-    transition: background-color 0.2s, border-radius 0.3s ease;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    transition: background-color 0.2s;
 }
-
-/* [ДОДАНО] Змінюємо заокруглення кнопки в активному стані */
-.search-input-wrapper.suggestions-active .search-btn {
-    border-radius: 0 var(--border-radius) 0 0;
-}
-
 .search-btn:hover {
     background-color: var(--secondary-color);
 }
 
-.search-input-wrapper.suggestions-active .search-btn {
-    border-radius: 0 var(--border-radius) 0 0;
-}
-
+/* Випадаючий список з підказками */
 .search-suggestions-popup {
     position: absolute;
-    /* Ідеальне вирівнювання під обгорткою */
-    top: 100%;
+    top: calc(100% + 8px); /* Невеликий відступ для ефекту "польоту" */
     left: 0;
     right: 0;
     background-color: white;
-    /* Рамка тепер тільки з трьох сторін, щоб з'єднатися з пошуком */
-    border-left: 2px solid var(--primary-color);
-    border-right: 2px solid var(--primary-color);
-    border-bottom: 2px solid var(--primary-color);
-    border-radius: 0 0 var(--border-radius) var(--border-radius);
-    z-index: 999;
+    border: 1px solid var(--light-gray);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    z-index: 1000;
     max-height: 70vh;
-    display: none;
-    flex-direction: column;
     overflow: hidden;
+    /* Анімація появи */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
 }
 
 .search-suggestions-popup.active {
-    display: flex;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
 }
 
+/* Двоколонковий макет для ПК, який вирішує проблему "кривизни" */
 .search-suggestions-body {
-    padding: 10px;
+    padding: 20px;
     overflow-y: auto;
-    flex-grow: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Дві колонки */
+    gap: 30px;
 }
 
-.suggestions-section:last-child {
-    margin-bottom: 0;
+.suggestions-section {
+    margin-bottom: 0; /* Прибираємо зайвий відступ */
 }
 
 .suggestions-section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    padding: 0 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--light-gray);
 }
 
 .suggestions-section-title {
     font-size: 1rem;
     font-weight: 600;
-    color: var(--dark-color);
-}
-
-.clear-history-btn {
-    font-size: 0.8rem;
-    color: var(--gray-color);
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-.clear-history-btn:hover {
-    color: var(--primary-color);
 }
 
 .suggestion-item {
@@ -2338,9 +1977,8 @@ img {
     text-align: left;
 }
 .suggestion-item:hover {
-    background-color: #f5f5f5;
+    background-color: var(--light-color);
 }
-
 .suggestion-item .suggestion-icon {
     width: 20px;
     text-align: center;
@@ -2349,31 +1987,46 @@ img {
 .suggestion-item .suggestion-text {
     flex-grow: 1;
 }
+/* [НОВІ СТИЛІ] для правильної структури елемента історії */
+.suggestion-item-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-grow: 1; /* Посилання займає весь вільний простір */
+    text-decoration: none;
+    color: inherit;
+}
+
 .suggestion-item .remove-history-btn {
     background: none;
     border: none;
     color: var(--gray-color);
-    font-size: 1.1rem;
-    padding: 5px;
+    font-size: 1.2rem; /* Зробимо трохи більшим */
+    padding: 5px 8px;
     line-height: 1;
+    border-radius: 50%; /* Зробимо його круглим */
     cursor: pointer;
+    transition: all 0.2s;
 }
+
 .suggestion-item .remove-history-btn:hover {
+    background-color: var(--light-color);
     color: var(--danger-color);
 }
 
+
+/* Стилі для тегів "Популярні запити" */
 .popular-searches {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    padding: 0 10px;
 }
 .popular-searches a {
     display: inline-block;
-    padding: 8px 15px;
+    padding: 6px 14px;
     background-color: var(--light-color);
     border: 1px solid var(--light-gray);
-    border-radius: 20px;
+    border-radius: 20px; /* Робимо їх схожими на "пігулки" */
     font-size: 0.9rem;
     transition: all 0.2s;
 }
@@ -2383,3 +2036,68 @@ img {
     color: var(--primary-color);
 }
 
+/* Адаптивність: на мобільних робимо одну колонку */
+@media (max-width: 768px) {
+    .search-suggestions-body {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}
+
+
+#search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    display: none;
+}
+
+#search-input {
+    /* Збільшуємо відступ справа, щоб текст точно не заходив під кнопки */
+    padding-right: 110px;
+}
+
+.clear-search-btn {
+    position: absolute;
+    /* Збільшуємо відступ, щоб посунути кнопку лівіше від лупи */
+    right: 75px;
+    top: 50%;
+    transform: translateY(-50%) scale(0.5);
+    width: 28px;
+    height: 28px;
+    background-color: transparent;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--gray-color);
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Коли кнопка видима */
+.clear-search-btn.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) scale(1);
+}
+
+/* Ефект при наведенні */
+.clear-search-btn:hover {
+    background-color: var(--light-gray);
+    color: var(--dark-color);
+    transform: translateY(-50%) scale(1) rotate(90deg);
+}
+
+/* [ОНОВЛЕНО] Адаптивність для відступів */
+@media (max-width: 768px) {
+    #search-input {
+        padding-right: 95px;
+    }
+    .clear-search-btn {
+        right: 65px;
+    }
+}
