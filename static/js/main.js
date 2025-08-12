@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     initInfiniteScroll();
     initSearchSuggestions();
-
+    initSearchOverlay();
     updateCartView();
     updateFavoritesUI();
 
@@ -738,11 +738,15 @@ function initSearchSuggestions() {
 
     let searchTimeout;
 
-    // [ЗМІНЕНО] Функції тепер керують класом на обгортці
+    // Знайдіть функцію showSuggestions всередині initSearchSuggestions
+    // і замініть її на цю:
     const showSuggestions = () => {
         suggestionsContainer.classList.add('active');
         searchWrapper.classList.add('suggestions-active');
     };
+
+    // Знайдіть функцію hideSuggestions всередині initSearchSuggestions
+    // і замініть її на цю:
     const hideSuggestions = () => {
         suggestionsContainer.classList.remove('active');
         searchWrapper.classList.remove('suggestions-active');

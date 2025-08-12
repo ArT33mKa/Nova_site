@@ -2049,9 +2049,6 @@ img {
     flex-grow: 1;
 }
 
-.suggestions-section {
-    margin-bottom: 25px;
-}
 .suggestions-section:last-child {
     margin-bottom: 0;
 }
@@ -2138,32 +2135,6 @@ img {
     position: relative;
 }
 
-.search-suggestions-popup {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    width: 100%;
-    background-color: white;
-    border: 1px solid #ddd;
-    border-radius: var(--border-radius);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-    z-index: 1000;
-    max-height: 70vh;
-    display: none; /* Спочатку приховано */
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.search-suggestions-popup.active {
-    display: flex; /* Показуємо при активації */
-}
-
-.search-suggestions-body {
-    padding: 20px;
-    overflow-y: auto;
-    flex-grow: 1;
-}
 
 .suggestions-section {
     margin-bottom: 25px;
@@ -2262,28 +2233,16 @@ img {
     transition: border-radius 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* [ОНОВЛЕНО] Стиль для активного стану */
+/* [ОНОВЛЕНО] Стиль для активного стану, коли підказки видимі */
 .search-input-wrapper.suggestions-active {
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     box-shadow: 0 4px 20px rgba(0, 102, 204, 0.2);
-    /* [КЛЮЧОВЕ ВИПРАВЛЕННЯ №1] Прибираємо нижню рамку, щоб не було подвійної лінії */
+    /* Прибираємо нижню рамку, щоб не було подвійної лінії */
     border-bottom: none;
-    /* [КЛЮЧОВЕ ВИПРАВЛЕННЯ №2] Додаємо padding, щоб поле вводу не "стрибало" по висоті */
+    /* Компенсуємо висоту прибраної рамки, щоб поле вводу не "стрибало" */
     padding-bottom: 2px;
 }
 
-#search-input {
-    flex-grow: 1;
-    border: none;
-    background: transparent;
-    padding: 15px 25px;
-    font-size: 1.1rem;
-    color: var(--dark-color);
-}
-#search-input:focus {
-    outline: none;
-    box-shadow: none;
-}
 .search-btn {
     flex-shrink: 0;
     padding: 0 25px;
@@ -2295,6 +2254,12 @@ img {
     border-radius: 0 50px 50px 0;
     transition: background-color 0.2s, border-radius 0.3s ease;
 }
+
+/* [ДОДАНО] Змінюємо заокруглення кнопки в активному стані */
+.search-input-wrapper.suggestions-active .search-btn {
+    border-radius: 0 var(--border-radius) 0 0;
+}
+
 .search-btn:hover {
     background-color: var(--secondary-color);
 }
@@ -2305,12 +2270,12 @@ img {
 
 .search-suggestions-popup {
     position: absolute;
-    /* [ОНОВЛЕНО] Ідеальне вирівнювання без ручної компенсації */
+    /* Ідеальне вирівнювання під обгорткою */
     top: 100%;
     left: 0;
     right: 0;
     background-color: white;
-    /* [ОНОВЛЕНО] Рамка тепер тільки з трьох сторін */
+    /* Рамка тепер тільки з трьох сторін, щоб з'єднатися з пошуком */
     border-left: 2px solid var(--primary-color);
     border-right: 2px solid var(--primary-color);
     border-bottom: 2px solid var(--primary-color);
@@ -2332,9 +2297,6 @@ img {
     flex-grow: 1;
 }
 
-.suggestions-section {
-    margin-bottom: 15px;
-}
 .suggestions-section:last-child {
     margin-bottom: 0;
 }
@@ -2420,3 +2382,4 @@ img {
     border-color: #ddd;
     color: var(--primary-color);
 }
+
