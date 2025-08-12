@@ -2256,15 +2256,16 @@ img {
     display: flex;
     width: 100%;
     border: 2px solid var(--primary-color);
-    border-radius: 50px;
+    border-radius: 50px; /* Початкова форма "пігулки" */
     background-color: #fff;
     box-shadow: 0 4px 15px rgba(0, 102, 204, 0.1);
-    transition: border-radius 0.2s ease-in-out;
+    /* [ДОДАНО] Плавний перехід для заокруглення */
+    transition: border-radius 0.3s ease;
 }
 
+/* [ОНОВЛЕНО] Стиль для активного стану: робить верхню частину прямокутною */
 .search-input-wrapper.suggestions-active {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
     box-shadow: 0 4px 20px rgba(0, 102, 204, 0.2);
 }
 
@@ -2289,28 +2290,29 @@ img {
     font-size: 1.2rem;
     cursor: pointer;
     border-radius: 0 50px 50px 0;
-    /* [ДОДАНО] Плавний перехід для заокруглення кнопки */
-    transition: background-color 0.2s, border-radius 0.2s ease-in-out;
+    /* [ОНОВЛЕНО] Додано плавний перехід і для кнопки */
+    transition: background-color 0.2s, border-radius 0.3s ease;
 }
 .search-btn:hover {
     background-color: var(--secondary-color);
 }
 
-/* [НОВИЙ СТИЛЬ] Випрямляємо нижній правий кут кнопки при активних підказках */
+/* [ОНОВЛЕНО] Стиль для кнопки в активному стані */
 .search-input-wrapper.suggestions-active .search-btn {
-    border-bottom-right-radius: 0;
+    border-radius: 0 var(--border-radius) 0 0;
 }
 
 .search-suggestions-popup {
     position: absolute;
-    top: 100%;
+    /* [ВИПРАВЛЕНО] Піднімаємо вікно, щоб воно ідеально наклалося на нижню рамку поля вводу */
+    top: calc(100% - 2px);
     left: -2px;
     right: -2px;
     background-color: white;
     border: 2px solid var(--primary-color);
-    border-top: none;
+    border-top: none; /* Прибираємо верхню рамку, щоб не було подвійної */
     border-radius: 0 0 var(--border-radius) var(--border-radius);
-    z-index: 1000;
+    z-index: 999; /* Ставимо трохи нижче, щоб рамки не конфліктували */
     max-height: 70vh;
     display: none;
     flex-direction: column;
