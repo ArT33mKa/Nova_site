@@ -27,9 +27,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPhoneMaskAdvanced('#customer_phone');
     setupPhoneMaskAdvanced('#register_phone');
 
-    // [ОНОВЛЕНО] Запуск нових функцій
     initInfiniteScroll();
-    initSearchSuggestions(); // <--- ОСЬ ЦЕЙ РЯДОК ВСЕ ВИРІШУЄ! ЙОГО НЕ БУЛО.
+    initSearchSuggestions();
 
     updateCartView();
     updateFavoritesUI();

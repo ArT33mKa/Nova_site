@@ -61,14 +61,14 @@
                 <form id="search-form" method="GET" action="{{ url_for('catalog') }}" class="search-form">
                     {% if category_slug and not search_query %}<input type="hidden" name="category_slug" value="{{ category_slug }}">{% endif %}
                     <div class="search-input-wrapper">
-                         <input type="search" name="search" id="search-input" value="{{ search_query or '' }}" placeholder="Я шукаю..." autocomplete="off">
-                         <!-- ================== ОСЬ ТУТ ЗМІНИ ================== -->
-                         <div id="search-suggestions-container" class="search-suggestions-popup"></div>
-                         <!-- ================== КІНЕЦЬ ЗМІН ================== -->
+                        <input type="search" name="search" id="search-input" value="{{ search_query or '' }}" placeholder="Я шукаю..." autocomplete="off">
                         <button type="submit" class="search-btn" title="Знайти"><i class="fas fa-search"></i></button>
+                        <!-- [НОВА ВЕРСІЯ] Контейнер для підказок тепер всередині обгортки -->
+                        <div id="search-suggestions-container" class="search-suggestions-popup"></div>
                     </div>
                 </form>
             </div>
+
 
             <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
 
