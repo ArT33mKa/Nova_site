@@ -2256,17 +2256,20 @@ img {
     display: flex;
     width: 100%;
     border: 2px solid var(--primary-color);
-    border-radius: 50px; /* Початкова форма "пігулки" */
+    border-radius: 50px;
     background-color: #fff;
     box-shadow: 0 4px 15px rgba(0, 102, 204, 0.1);
-    /* [ДОДАНО] Плавний перехід для заокруглення */
-    transition: border-radius 0.3s ease;
+    transition: border-radius 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* [ОНОВЛЕНО] Стиль для активного стану: робить верхню частину прямокутною */
+/* [ОНОВЛЕНО] Стиль для активного стану */
 .search-input-wrapper.suggestions-active {
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     box-shadow: 0 4px 20px rgba(0, 102, 204, 0.2);
+    /* [КЛЮЧОВЕ ВИПРАВЛЕННЯ №1] Прибираємо нижню рамку, щоб не було подвійної лінії */
+    border-bottom: none;
+    /* [КЛЮЧОВЕ ВИПРАВЛЕННЯ №2] Додаємо padding, щоб поле вводу не "стрибало" по висоті */
+    padding-bottom: 2px;
 }
 
 #search-input {
@@ -2290,29 +2293,29 @@ img {
     font-size: 1.2rem;
     cursor: pointer;
     border-radius: 0 50px 50px 0;
-    /* [ОНОВЛЕНО] Додано плавний перехід і для кнопки */
     transition: background-color 0.2s, border-radius 0.3s ease;
 }
 .search-btn:hover {
     background-color: var(--secondary-color);
 }
 
-/* [ОНОВЛЕНО] Стиль для кнопки в активному стані */
 .search-input-wrapper.suggestions-active .search-btn {
     border-radius: 0 var(--border-radius) 0 0;
 }
 
 .search-suggestions-popup {
     position: absolute;
-    /* [ВИПРАВЛЕНО] Піднімаємо вікно, щоб воно ідеально наклалося на нижню рамку поля вводу */
-    top: calc(100% - 2px);
-    left: -2px;
-    right: -2px;
+    /* [ОНОВЛЕНО] Ідеальне вирівнювання без ручної компенсації */
+    top: 100%;
+    left: 0;
+    right: 0;
     background-color: white;
-    border: 2px solid var(--primary-color);
-    border-top: none; /* Прибираємо верхню рамку, щоб не було подвійної */
+    /* [ОНОВЛЕНО] Рамка тепер тільки з трьох сторін */
+    border-left: 2px solid var(--primary-color);
+    border-right: 2px solid var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
     border-radius: 0 0 var(--border-radius) var(--border-radius);
-    z-index: 999; /* Ставимо трохи нижче, щоб рамки не конфліктували */
+    z-index: 999;
     max-height: 70vh;
     display: none;
     flex-direction: column;
