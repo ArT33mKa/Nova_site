@@ -2243,6 +2243,7 @@ img {
     color: var(--primary-color);
 }
 
+/* --- Search Bar & Suggestions --- */
 .search-bar-container {
     margin-bottom: 25px;
 }
@@ -2253,14 +2254,24 @@ img {
 }
 
 .search-input-wrapper {
-    position: relative; /* Дуже важливо для позиціонування підказок */
+    position: relative;
     display: flex;
     width: 100%;
     border: 2px solid var(--primary-color);
     border-radius: 50px;
     background-color: #fff;
     box-shadow: 0 4px 15px rgba(0, 102, 204, 0.1);
+    /* [ДОДАНО] Плавний перехід для заокруглення */
+    transition: border-radius 0.2s ease-in-out;
 }
+
+/* [ДОДАНО] Новий стиль для активного стану */
+.search-input-wrapper.suggestions-active {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    box-shadow: 0 4px 20px rgba(0, 102, 204, 0.2);
+}
+
 #search-input {
     flex-grow: 1;
     border: none;
@@ -2282,33 +2293,32 @@ img {
     font-size: 1.2rem;
     cursor: pointer;
     transition: background-color 0.2s;
-    border-radius: 0 50px 50px 0; /* Виправлення заокруглення кнопки */
+    border-radius: 0 50px 50px 0;
 }
 .search-btn:hover {
     background-color: var(--secondary-color);
 }
 
-
-/* Нові стилі для спливаючого вікна підказок */
 .search-suggestions-popup {
     position: absolute;
-    top: calc(100% + 5px); /* Невеликий відступ від поля вводу */
-    left: 0;
-    right: 0;
-    width: 100%;
+    /* [ЗМІНЕНО] Прибираємо проміжок і з'єднуємо рамки */
+    top: 100%;
+    left: -2px; /* Компенсація рамки батька */
+    right: -2px; /* Компенсація рамки батька */
     background-color: white;
-    border: 1px solid #ddd;
-    border-radius: var(--border-radius);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    border: 2px solid var(--primary-color); /* Робимо рамку такою ж, як у поля вводу */
+    border-top: none; /* Прибираємо верхню рамку, щоб не було подвійної лінії */
+    /* [ЗМІНЕНО] Заокруглюємо тільки нижні кути */
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
     z-index: 1000;
     max-height: 70vh;
-    display: none; /* Спочатку приховано */
+    display: none;
     flex-direction: column;
     overflow: hidden;
 }
 
 .search-suggestions-popup.active {
-    display: flex; /* Показуємо при активації */
+    display: flex;
 }
 
 .search-suggestions-body {

@@ -731,13 +731,22 @@ function initAutoApplyFilters() {
 function initSearchSuggestions() {
     const searchInput = document.getElementById('search-input');
     const suggestionsContainer = document.getElementById('search-suggestions-container');
+    // [ДОДАНО] Знаходимо головну обгортку
+    const searchWrapper = searchInput.closest('.search-input-wrapper');
 
-    if (!searchInput || !suggestionsContainer) return;
+    if (!searchInput || !suggestionsContainer || !searchWrapper) return;
 
     let searchTimeout;
 
-    const showSuggestions = () => suggestionsContainer.classList.add('active');
-    const hideSuggestions = () => suggestionsContainer.classList.remove('active');
+    // [ЗМІНЕНО] Функції тепер керують класом на обгортці
+    const showSuggestions = () => {
+        suggestionsContainer.classList.add('active');
+        searchWrapper.classList.add('suggestions-active');
+    };
+    const hideSuggestions = () => {
+        suggestionsContainer.classList.remove('active');
+        searchWrapper.classList.remove('suggestions-active');
+    };
 
     const getSearchHistory = () => JSON.parse(localStorage.getItem('searchHistory')) || [];
 
@@ -781,7 +790,7 @@ function initSearchSuggestions() {
                 </div>
             </div>`;
 
-        html += '</div>'; // close search-suggestions-body
+        html += '</div>';
         suggestionsContainer.innerHTML = html;
         showSuggestions();
     };
@@ -817,7 +826,7 @@ function initSearchSuggestions() {
             html += `<p style="text-align: center; color: var(--gray-color); padding: 20px 0;">За вашим запитом нічого не знайдено</p>`;
         }
 
-        html += '</div>'; // close search-suggestions-body
+        html += '</div>';
         suggestionsContainer.innerHTML = html;
         showSuggestions();
     };
@@ -844,19 +853,16 @@ function initSearchSuggestions() {
         }, 250);
     });
 
-    // Ховаємо підказки, якщо клікнули поза зоною пошуку
     document.addEventListener('click', (e) => {
-        if (!searchInput.parentElement.contains(e.target)) {
+        if (!searchWrapper.contains(e.target)) {
             hideSuggestions();
         }
     });
 
-    // Збереження в історію при відправці форми
     searchInput.form.addEventListener('submit', () => {
         addToSearchHistory(searchInput.value.trim());
     });
 
-    // Керування історією
     suggestionsContainer.addEventListener('click', (e) => {
         const clearBtn = e.target.closest('.clear-history-btn');
         const removeBtn = e.target.closest('.remove-history-btn');
