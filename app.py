@@ -2,8 +2,10 @@ import os
 import re
 import math
 import locale
+import logging
 import smtplib
 import requests  # для Telegram та Нової Пошти
+import traceback
 import cloudinary.utils
 from functools import wraps
 from datetime import datetime
@@ -32,6 +34,17 @@ except locale.Error:
 load_dotenv()
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+if __name__ != '__main__':
+    # Якщо додаток запущено через Gunicorn (на Fly.io)
+    gunicorn_logger = logging.getLogger('gunicorn.error')
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)
+    app.logger.info('>>> Логування Flask інтегровано з Gunicorn.')
+else:
+    # Якщо запущено локально (python app.py)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    app.logger.info('>>> Запущено в режимі розробки, використано basicConfig.')
 
 try:
     cloudinary.config(
@@ -236,7 +249,20 @@ def index():
                     'subtitle': 'Від найкращих виробників'}, {'image': 'kotly.jpg', 'title': 'Все для систем опалення',
                                                               'subtitle': 'Котли, бойлери та комплектуючі'}]
     products = Product.query.order_by(Product.id.desc()).limit(5).all()
-    return render_template("index.html", products=products, hero_slides=hero_slides)
+    # >>> ДОДАЙТЕ ЦІ РЯДКИ
+    main_categories_hierarchy = get_category_hierarchy()
+    # Створюємо список з іконками, які у вас були в shop_info
+    shop_category_icons = {cat['name'].lower(): cat.get('icon', 'gas_parts.jpg') for cat in shop_info['categories']}
+
+    dynamic_categories = []
+    for cat_name in sorted(main_categories_hierarchy.keys()):
+        dynamic_categories.append({
+            'name': cat_name,
+            'icon': shop_category_icons.get(cat_name.lower(), 'gas_parts.jpg')
+            # Використовуємо іконку, якщо знайдено, або стандартну
+        })
+
+    return render_template("index.html", products=products, hero_slides=hero_slides, main_categories=dynamic_categories)
 
 
 def get_category_hierarchy():
@@ -919,50 +945,51 @@ def _get_cloudinary_url(image_filename):
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    """ [ВЕРСІЯ З ВИПРАВЛЕНОЮ ЛОГІКОЮ НАЯВНОСТІ ТА ЗОБРАЖЕНЬ] """
+    """ [ОНОВЛЕНА ВЕРСІЯ З ДЕТАЛЬНИМ ЛОГУВАННЯМ] """
+    app.logger.info("BAS Import: Отримано запит на імпорт.")
+
     if 'file' not in request.files:
+        app.logger.warning("BAS Import: Запит без файлу. Відхилено.")
         return "failure\nFile part is missing in the request.", 400
+
     cml_file = request.files['file']
     if cml_file.filename == '':
+        app.logger.warning("BAS Import: Надіслано порожній файл. Відхилено.")
         return "failure\nNo selected file.", 400
 
-    print(f"BAS: Отримано файл '{cml_file.filename}'. Починаю обробку...")
+    app.logger.info(f"BAS Import: Отримано файл '{cml_file.filename}'. Починаю обробку...")
 
     try:
         raw_data = cml_file.read()
         try:
+            # Спершу пробуємо стандартне кодування UTF-8
             parser = lxml_etree.XMLParser(recover=True, encoding='utf-8')
             root = lxml_etree.fromstring(raw_data, parser=parser)
+            app.logger.info("BAS Import: Файл успішно розпарсено в кодуванні UTF-8.")
         except Exception:
+            # Якщо не вийшло, пробуємо Windows-1251, що часто використовується в 1С/BAS
+            app.logger.warning("BAS Import: Не вдалося розпарсити як UTF-8. Пробую Windows-1251...")
             parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
             root = lxml_etree.fromstring(raw_data, parser=parser)
+            app.logger.info("BAS Import: Файл успішно розпарсено в кодуванні Windows-1251.")
 
+        # Видалення неймспейсів для спрощення пошуку
         for elem in root.getiterator():
             if '}' in elem.tag:
                 elem.tag = elem.tag.split('}', 1)[1]
 
         catalog_node = root.find('.//Каталог')
         if catalog_node is None:
+            app.logger.error("BAS Import: Не знайдено тег <Каталог> у файлі.")
             return "failure\nНе знайдено тег <Каталог>.", 400
 
         groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
         products_from_xml = catalog_node.findall('.//Товар')
-        print(f"В XML знайдено {len(products_from_xml)} товарів. Починаю оптимізовану обробку...")
+        app.logger.info(f"BAS Import: В XML знайдено {len(products_from_xml)} товарів. Починаю оптимізовану обробку...")
 
-        print("Оптимізація: Завантажую існуючі товари з бази даних порціями...")
-        existing_products_map = {}
-        offset = 0
-        chunk_size = 500
-        while True:
-            chunk = db.session.query(Product.id, Product.name).offset(offset).limit(chunk_size).all()
-            if not chunk:
-                break
-            for pid, name in chunk:
-                existing_products_map[name] = pid
-            offset += chunk_size
-            print(f"  - завантажено {len(existing_products_map)} товарів...")
-
-        print(f"Успішно завантажено {len(existing_products_map)} існуючих товарів з бази даних.")
+        app.logger.info("BAS Import: Завантажую існуючі товари з бази даних...")
+        existing_products_map = {p.name: p.id for p in db.session.query(Product.id, Product.name).all()}
+        app.logger.info(f"BAS Import: Успішно завантажено {len(existing_products_map)} існуючих товарів з бази даних.")
 
         products_to_update = []
         products_to_add = []
@@ -973,19 +1000,17 @@ def bas_import():
 
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
             description = (product_node.findtext('Описание') or '').strip()
+
             group_id_node = product_node.find('.//Группы/Ид')
             group_id = group_id_node.text if group_id_node is not None else None
             category = groups.get(group_id, "Різне")
 
-            # [ПОКРАЩЕНО] Логіка вибору зображення
             main_image_node = product_node.find(".//Картинка[@main_image='1']")
             if main_image_node is not None:
                 image_filename_from_xml = main_image_node.text
             else:
-                # Якщо головного немає, беремо перше-ліпше
                 image_filename_from_xml = product_node.findtext('Картинка') or ''
             image_filename_from_xml = image_filename_from_xml.strip()
-
 
             price = 0.0
             in_stock = False
@@ -996,30 +1021,28 @@ def bas_import():
                 if price_node is not None and price_node.text:
                     try:
                         price = float(re.sub(r'[^\d.]', '', price_node.text.replace(',', '.')))
-                    except (ValueError, AttributeError):
-                        pass
+                    except (ValueError, AttributeError): pass
 
                 quantity_node = offer_node.find('Количество')
                 if quantity_node is not None and quantity_node.text:
                     try:
-                        if int(float(quantity_node.text.strip())) > 0:
-                            in_stock = True
-                    except (ValueError, TypeError):
-                        pass
+                        if int(float(quantity_node.text.strip())) > 0: in_stock = True
+                    except (ValueError, TypeError): pass
 
+            # Додаткова перевірка наявності через властивості товару
             if not in_stock:
-                # [ВИПРАВЛЕНО ОПЕЧАТКУ] Значення -> Значение
                 stock_prop_node = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
                 if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.lower() == 'true':
                     in_stock = True
                 else:
-                    # [ВИПРАВЛЕНО ОПЕЧАТКУ] Значення -> Значение
                     stock_prop_node_alt = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значение")
                     if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.strip().lower() in ['true', 'да', 'є', 'yes']:
                          in_stock = True
 
             product_data = {
-                'name': name, 'price': price, 'description': description,
+                'name': name,
+                'price': price,
+                'description': description,
                 'category': category,
                 'image': _get_cloudinary_url(image_filename_from_xml),
                 'in_stock': in_stock
@@ -1033,34 +1056,34 @@ def bas_import():
 
         updated_count = len(products_to_update)
         added_count = len(products_to_add)
-        print(f"Підготовлено до оновлення: {updated_count}. Підготовлено до додавання: {added_count}.")
+        app.logger.info(f"BAS Import: Підготовлено до оновлення: {updated_count}. Підготовлено до додавання: {added_count}.")
 
         if products_to_add:
-            print(f"Виконую пакетне додавання {len(products_to_add)} нових товарів...")
+            app.logger.info(f"BAS Import: Виконую пакетне додавання {len(products_to_add)} нових товарів...")
             db.session.bulk_insert_mappings(Product, products_to_add)
-            print("Пакетне додавання завершено.")
+            app.logger.info("BAS Import: Пакетне додавання завершено.")
 
         if products_to_update:
-            print(f"Виконую пакетне оновлення {len(products_to_update)} існуючих товарів...")
+            app.logger.info(f"BAS Import: Виконую пакетне оновлення {len(products_to_update)} існуючих товарів...")
             db.session.bulk_update_mappings(Product, products_to_update)
-            print("Пакетне оновлення завершено.")
+            app.logger.info("BAS Import: Пакетне оновлення завершено.")
 
         if products_to_add or products_to_update:
-            print("Зберігаю зміни в базі даних (commit)...")
+            app.logger.info("BAS Import: Зберігаю зміни в базі даних (commit)...")
             db.session.commit()
-            print("Зміни успішно збережено.")
+            app.logger.info("BAS Import: Зміни успішно збережено.")
         else:
-            print("Немає товарів для додавання або оновлення.")
+            app.logger.info("BAS Import: Немає товарів для додавання або оновлення.")
 
         message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
-        print(message)
+        app.logger.info(f"BAS Import: {message}")
         return "success"
 
     except Exception as e:
         db.session.rollback()
-        import traceback
+        # Ось тут логуємо критичну помилку з повним шляхом, що дуже допоможе в зневадженні
         error_details = traceback.format_exc()
-        print(f"КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
+        app.logger.error(f"BAS Import: КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
         return f"failure\nВнутрішня помилка сервера: {e}", 500
 
 

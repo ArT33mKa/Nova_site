@@ -1,18 +1,28 @@
-# syntax=docker/dockerfile:1
+# Dockerfile
 
-ARG PYTHON_VERSION=3.12
+# 1. Використовуємо офіційний, легкий образ Python
+FROM python:3.11-slim
 
-FROM python:${PYTHON_VERSION}-slim
+# 2. Встановлюємо робочу директорію всередині контейнера
+WORKDIR /app
 
-LABEL fly_launch_runtime="flask"
+# 3. Встановлюємо змінні середовища для кращої роботи Python в Docker
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-WORKDIR /code
+# 4. Встановлюємо системні залежності, якщо вони потрібні
+# (може знадобитись для деяких бібліотек, але почнемо без них)
+# RUN apt-get update && apt-get install -y build-essential
 
-COPY requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt
+# 5. Копіюємо файл залежностей і встановлюємо їх
+# Це робиться окремо для кешування. Якщо requirements.txt не змінився,
+# цей крок не буде виконуватися знову, що прискорює деплой.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
+# 6. Копіюємо решту файлів нашого додатку в контейнер
 COPY . .
 
-EXPOSE 8080
-
-CMD [ "python3", "-m" , "flask", "run", "--host=0.0.0.0", "--port=8080"]
+# 7. Вказуємо команду для запуску нашого сайту через Gunicorn
+# Fly.io очікує, що додаток буде працювати на порті 8080
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "app:app"]
