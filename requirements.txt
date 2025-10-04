@@ -1,12 +1,14 @@
 Flask
-Flask-Dance
-requests
-requests-oauthlib
+Flask-SQLAlchemy
+SQLAlchemy
 python-dotenv
-gunicorn
-flask_login
-flask_sqlalchemy
-datetime
-psycopg2-binary
-lxml
+requests
+firebase-admin
+twilio
 cloudinary
+gunicorn # <-- Дуже важливий для роботи на сервері!
+psycopg2-binary # <-- Для роботи з базою даних Postgres на Fly.io
+lxml
+Flask-Dance
+Flask-Login
+Werkzeug

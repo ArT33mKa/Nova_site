@@ -8,10 +8,14 @@
         {% else %}
             <div class="stock-status out-of-stock">Немає в наявності</div>
         {% endif %}
+
+        <!-- >>> ПЕРЕВІРТЕ, ЩО ЦЕЙ БЛОК ІСНУЄ <<< -->
         <button class="favorite-btn" title="Додати в обране">
-            <i class="far fa-star"></i>
-            <i class="fas fa-star"></i>
+            <i class="far fa-star"></i> <!-- Порожня зірочка -->
+            <i class="fas fa-star"></i> <!-- Заповнена зірочка -->
         </button>
+    <!-- >>> КІНЕЦЬ БЛОКУ ПЕРЕВІРКИ <<< -->
+
         {% if current_user.is_authenticated and current_user.is_admin %}
         <div class="admin-product-actions">
             <a href="{{ url_for('edit_product', product_id=product.id) }}" class="admin-action-btn edit-btn" title="Редагувати">
@@ -29,7 +33,17 @@
         <h3 class="product-name">
             <a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a>
         </h3>
-        <p class="price">{{ "%.2f"|format(product.price) }} ₴</p>
+        <div class="product-footer">
+            <span class="price">{{ "%.2f"|format(product.price) }} ₴</span>
+            {% if product.reviews_count > 0 %}
+            <a href="{{ url_for('product_reviews', product_id=product.id) }}" class="product-card-rating" title="Рейтинг: {{ '%.1f'|format(product.rating) }} з 5">
+                <div class="stars-outer">
+                    <div class="stars-inner" style="width: {{ (product.rating / 5) * 100 }}%"></div>
+                </div>
+                <span class="review-count">({{ product.reviews_count }})</span>
+            </a>
+            {% endif %}
+        </div>
         <div class="product-card-actions">
             <button class="btn add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
                 Додати в кошик

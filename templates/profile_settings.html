@@ -1,3 +1,4 @@
+<!-- templates/profile_settings.html -->
 {% extends "base.html" %}
 {% block title %}Налаштування профілю{% endblock %}
 
@@ -9,9 +10,10 @@
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: flex-start;">
 
-        <!-- Картка з особистими даними -->
+        <!-- [ПОВНІСТЮ ОНОВЛЕНО] Картка з особистими даними -->
         <div class="profile-card">
             <h3>Особисті дані</h3>
+            <!-- Форма для імені, прізвища та email -->
             <form method="POST" action="{{ url_for('profile_settings') }}">
                 <div class="form-group">
                     <label for="first_name">Ім'я</label>
@@ -25,13 +27,26 @@
                     <label for="email">Email</label>
                     <input type="email" name="email" id="email" value="{{ current_user.email or '' }}" required>
                 </div>
-                 <div class="form-group">
-                    <label for="phone">Телефон</label>
-                    <input type="tel" name="phone" id="register_phone" value="{{ current_user.phone or '' }}" placeholder="+380 (__) ___-__-__">
-                </div>
                 <button type="submit" name="update_info" class="btn btn-primary">Зберегти зміни</button>
             </form>
+
+            <hr style="margin: 30px 0;">
+
+            <!-- Окремий блок для керування телефоном -->
+            <div id="phone-settings-container">
+                 <div class="form-group">
+                    <label for="phone">Телефон</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="tel" name="phone" id="settings_phone" class="js-phone-mask" value="{{ current_user.phone or '' }}" placeholder="+380 (__) ___-__-__" style="flex-grow: 1;">
+                        <button id="update-phone-btn" class="btn btn-outline" style="flex-shrink: 0;">
+                            {% if current_user.phone %}Змінити{% else %}Додати{% endif %}
+                        </button>
+                    </div>
+                </div>
+                <div id="phone-settings-error" class="error-message" style="display: none; text-align: left; margin-top: 10px;"></div>
+            </div>
         </div>
+
 
         <!-- Картка зміни паролю -->
         <div class="profile-card">
@@ -56,6 +71,25 @@
             </form>
             {% endif %}
         </div>
+    </div>
+</div>
+
+<!-- [НОВЕ] Модальне вікно для верифікації телефону в налаштуваннях -->
+<div id="phone-verify-modal" class="modal">
+    <div class="modal-content auth-flow-content">
+        <button class="close-modal">×</button>
+        <h3>Підтвердження номера</h3>
+        <p>Ми надіслали код в SMS на номер <br><strong id="phone-verify-display"></strong></p>
+        <form id="phone-verify-form" class="auth-form">
+            <div class="form-group">
+                <label for="phone_verify_code">Код з SMS</label>
+                <input type="text" id="phone_verify_code" inputmode="numeric" autocomplete="one-time-code" required maxlength="6">
+            </div>
+            <div id="phone-verify-error" class="error-message" style="display: none;"></div>
+            <button type="submit" class="btn btn-primary btn-block">Підтвердити номер</button>
+        </form>
+        <!-- Окремий контейнер для reCAPTCHA, щоб уникнути конфліктів -->
+        <div id="recaptcha-container-settings" style="margin-top: 15px;"></div>
     </div>
 </div>
 {% endblock %}

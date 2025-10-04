@@ -20,11 +20,9 @@
         <div class="product-info-main">
             <h1 class="product-title">{{ product.name }}</h1>
             <a href="{{ url_for('product_reviews', product_id=product.id) }}" class="reviews-summary-link">
-                <span class="rating">
-                    {% set r = product.rating|round|int %}
-                    {% for i in range(r) %}★{% endfor %}
-                    {% for i in range(5 - r) %}<span>★</span>{% endfor %}
-                </span>
+                <div class="stars-outer" style="font-size: 1.2em;">
+                    <div class="stars-inner" style="width: {{ (product.rating / 5) * 100 }}%"></div>
+                </div>
                 <span class="reviews-count-text">{{ product.reviews_count }} відгуків</span>
             </a>
             <div class="product-price-detail">{{ "%.2f"|format(product.price) }} ₴</div>

@@ -2,6 +2,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // [НОВЕ] Отримуємо елемент затемнення один раз при завантаженні
     const pageOverlay = document.getElementById('page-overlay');
 
+    // [ДОДАНО] Обробник кліку на саме затемнення для закриття панелей
+    if (pageOverlay) {
+        pageOverlay.addEventListener('click', closeAllSidebars);
+    }
+
     // [НОВЕ] Універсальна функція для закриття всіх бічних панелей та затемнення
     function closeAllSidebars() {
         document.querySelector('.cart-sidebar.active')?.classList.remove('active');
@@ -14,29 +19,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Ініціалізація всіх основних модулів
     initAuth();
-    initHeaderActions(pageOverlay, closeAllSidebars); // [ЗМІНЕНО] Передаємо залежності
+    initHeaderActions(pageOverlay, closeAllSidebars);
+    initPhonePromptBanner();
     initContactForm();
     initReviewsPage();
     initHeroSlider();
+    initProfileSettingsPhoneLogic();
     initSimilarProductsCarousel();
     initProductDescriptionToggle();
     initOptimizedCartLogic();
     initFavoritesLogic();
-    initCabinetModal(pageOverlay, closeAllSidebars); // [ЗМІНЕНО] Передаємо залежності
+    initCabinetModal(pageOverlay, closeAllSidebars);
     initAutoApplyFilters();
-    setupPhoneMaskAdvanced('#customer_phone');
-    setupPhoneMaskAdvanced('#register_phone');
+    document.querySelectorAll('.js-phone-mask').forEach(input => {
+        applyPhoneMaskToInput(input);
+    });
 
     initInfiniteScroll();
     initSearchSuggestions();
-    initSearchOverlay();
+
+    // [ОНОВЛЕНО] Єдиний виклик для оновлення всього, що стосується кошика
     updateCartView();
     updateFavoritesUI();
-
-    // [НОВЕ] Обробник кліку на саме затемнення для закриття панелей
-    if (pageOverlay) {
-        pageOverlay.addEventListener('click', closeAllSidebars);
-    }
 });
 
 
@@ -48,45 +52,369 @@ function initAuth() {
     const authModal = document.getElementById('auth-modal');
     if (!authModal) return;
 
-    document.getElementById('open-auth-modal-login')?.addEventListener('click', () => {
-        switchAuthTab('login');
-        authModal.classList.add('active');
-    });
+    // Ініціалізація Firebase reCAPTCHA
+    let recaptchaVerifier;
+    const initRecaptcha = () => {
+        // Запобігаємо повторній ініціалізації
+        if (recaptchaVerifier && document.getElementById('recaptcha-container').innerHTML !== '') {
+            recaptchaVerifier.render().then(widgetId => grecaptcha.reset(widgetId));
+            return;
+        }
+        recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+          'size': 'invisible',
+          'callback': (response) => { /* reCAPTCHA solved */ }
+        });
+        recaptchaVerifier.render(); // Важливо викликати render()
+    };
 
-    document.getElementById('open-auth-modal-register')?.addEventListener('click', () => {
-        switchAuthTab('register');
-        authModal.classList.add('active');
+    // Елементи UI
+    const screens = {
+        phone: document.getElementById('auth-screen-phone'),
+        register: document.getElementById('auth-screen-register'),
+        verify: document.getElementById('auth-screen-verify'),
+        emailInput: document.getElementById('auth-screen-email-input'),
+        emailVerify: document.getElementById('auth-screen-email-verify'),
+    };
+    const forms = {
+        phone: document.getElementById('phone-form'),
+        register: document.getElementById('register-form'),
+        verify: document.getElementById('verify-form'),
+        emailInput: document.getElementById('email-input-form'),
+        emailVerify: document.getElementById('email-verify-form'),
+    };
+    const errorMessages = {
+        phone: document.getElementById('phone-error'),
+        register: document.getElementById('register-error'),
+        verify: document.getElementById('verify-error'),
+        emailInput: document.getElementById('email-input-error'),
+        emailVerify: document.getElementById('email-verify-error'),
+    };
+
+    // Перемикачі
+    const toRegisterLink = document.getElementById('go-to-register');
+    const toLoginLink = document.getElementById('go-to-login');
+    const toEmailLoginBtn = document.getElementById('go-to-email-login');
+    const backToPhoneLink = document.getElementById('back-to-phone-login');
+
+    // Змінні для збереження стану
+    let intent = 'login';
+    let registrationData = {};
+    let currentPhone = '';
+    let confirmationResult = null; // Зберігаємо результат підтвердження
+
+    // --- Функції-хелпери ---
+    const showScreen = (screenName) => {
+        Object.values(screens).forEach(s => s && s.classList.remove('active'));
+        if (screens[screenName]) {
+            screens[screenName].classList.add('active');
+            if (screenName === 'phone' || screenName === 'register') {
+                initRecaptcha(); // Ініціалізуємо reCAPTCHA при показі екранів
+            }
+        }
+    };
+    const showError = (formName, message, isHtml = false) => {
+        if (errorMessages[formName]) {
+            errorMessages[formName][isHtml ? 'innerHTML' : 'textContent'] = message;
+            errorMessages[formName].style.display = 'block';
+        }
+    };
+    const hideAllErrors = () => Object.values(errorMessages).forEach(el => el && (el.style.display = 'none'));
+
+    // --- Обробники подій ---
+    document.getElementById('open-cabinet-btn')?.addEventListener('click', () => {
+         // Якщо користувач не залогінений
+        if (!document.body.classList.contains('is-admin') && !window.currentUser) {
+            initRecaptcha();
+        }
     });
 
     authModal.addEventListener('click', e => {
         if (e.target.classList.contains('close-modal') || e.target.id === 'auth-modal') {
             authModal.classList.remove('active');
+            setTimeout(() => showScreen('phone'), 300);
         }
     });
 
-    document.querySelectorAll('.auth-tab').forEach(tab => {
-        tab.addEventListener('click', () => switchAuthTab(tab.dataset.tab));
+    toRegisterLink?.addEventListener('click', (e) => { e.preventDefault(); showScreen('register'); });
+    toLoginLink?.addEventListener('click', (e) => { e.preventDefault(); showScreen('phone'); });
+    toEmailLoginBtn?.addEventListener('click', (e) => { e.preventDefault(); showScreen('emailInput'); });
+    backToPhoneLink?.addEventListener('click', (e) => { e.preventDefault(); showScreen('phone'); });
+
+    authModal.addEventListener('click', e => {
+        if (e.target.id === 'error-link-to-register') { e.preventDefault(); showScreen('register'); }
+        if (e.target.id === 'error-link-to-login') { e.preventDefault(); showScreen('phone'); }
     });
 
-    const handleFormSubmit = (formId, url, errorElId) => {
-        const form = document.getElementById(formId);
-        if(!form) return;
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(this).entries());
-            fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-            .then(res => res.json()).then(result => {
-                if (result.status === 'success') window.location.reload();
-                else {
-                    const errorEl = document.getElementById(errorElId);
-                    errorEl.textContent = result.message;
-                    errorEl.style.display = 'block';
-                }
-            });
+
+    setupCode
+    Input(
+        document.getElementById('verify_code_input'),
+        document.getElementById('verify_code_display')
+    );
+    setupCodeInput(
+        document.getElementById('email_verify_code_input'),
+        document.getElementById('email_verify_code_display')
+    );
+
+    // --- Логіка відправки форм ---
+
+    // ФОРМА ВХОДУ (ТЕЛЕФОН)
+    forms.phone?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        hideAllErrors();
+        intent = 'login';
+        currentPhone = document.getElementById('auth_phone').value;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        fetch('/api/auth/check_user_exists', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: currentPhone })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.exists) {
+                firebase.auth().signInWithPhoneNumber(currentPhone, recaptchaVerifier)
+                    .then((result) => {
+                        confirmationResult = result;
+                        document.getElementById('verify-phone-display').textContent = currentPhone;
+                        document.getElementById('verify-title').textContent = 'Вхід в кабінет';
+                        showScreen('verify');
+                    }).catch((error) => {
+                        console.error("Firebase SMS Error:", error);
+                        showError('phone', "Не вдалося надіслати SMS. Спробуйте пізніше або оновіть сторінку.");
+                        initRecaptcha(); // Скидаємо reCAPTCHA
+                    }).finally(() => { submitBtn.disabled = false; });
+            } else {
+                showError('phone', `Користувача не знайдено. <a href="#" id="error-link-to-register">Зареєструватись?</a>`, true);
+                submitBtn.disabled = false;
+            }
         });
+    });
+
+// main.js - ЗАМІНІТЬ СТАРИЙ БЛОК НА ЦЕЙ
+
+    // ФОРМА РЕЄСТРАЦІЇ
+    forms.register?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        hideAllErrors();
+        intent = 'register';
+        currentPhone = document.getElementById('register_phone').value;
+        registrationData = {
+            first_name: document.getElementById('register_first_name').value,
+            last_name: document.getElementById('register_last_name').value
+        };
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        // Просто відправляємо SMS. Бекенд сам перевірить, чи існує користувач, ПІСЛЯ підтвердження коду.
+        firebase.auth().signInWithPhoneNumber(currentPhone, recaptchaVerifier)
+            .then((result) => {
+                confirmationResult = result;
+                document.getElementById('verify-phone-display').textContent = currentPhone;
+                document.getElementById('verify-title').textContent = 'Завершення реєстрації';
+                showScreen('verify');
+            }).catch((error) => {
+                console.error("Firebase SMS Error:", error);
+                // Firebase може повернути помилку, якщо номер недійсний.
+                if (error.code === 'auth/invalid-phone-number') {
+                    showError('register', 'Невірний формат номеру телефону.');
+                } else {
+                    showError('register', "Не вдалося надіслати SMS. Спробуйте пізніше або оновіть сторінку.");
+                }
+                initRecaptcha();
+            }).finally(() => {
+                submitBtn.disabled = false;
+            });
+    });
+
+    // ФОРМА ПІДТВЕРДЖЕННЯ КОДУ (УНІВЕРСАЛЬНА ДЛЯ ТЕЛЕФОНУ)
+    forms.verify?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        hideAllErrors();
+        // [ЗМІНЕНО] Беремо значення з нового прихованого поля
+        const code = document.getElementById('verify_code_input').value;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        if (!confirmationResult) {
+            showError('verify', 'Термін дії сесії минув. Спробуйте знову.');
+            submitBtn.disabled = false;
+            return;
+        }
+
+        confirmationResult.confirm(code).then((result) => {
+            const user = result.user;
+            return user.getIdToken();
+        }).then((idToken) => {
+            let body = { token: idToken, intent, ...registrationData };
+            return fetch('/api/auth/firebase_verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+        }).then(res => res.json()).then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                showError('verify', data.message || 'Сталася помилка.');
+                submitBtn.disabled = false;
+            }
+        }).catch((error) => {
+            console.error('Verification error', error);
+            showError('verify', 'Невірний код або помилка сервера.');
+            submitBtn.disabled = false;
+        });
+    });
+}
+
+function initProfileSettingsPhoneLogic() {
+    const container = document.getElementById('phone-settings-container');
+    if (!container) return; // Виконувати тільки на сторінці налаштувань
+
+    const updateBtn = document.getElementById('update-phone-btn');
+    const phoneInput = document.getElementById('settings_phone');
+    const errorContainer = document.getElementById('phone-settings-error');
+
+    const modal = document.getElementById('phone-verify-modal');
+    const modalForm = document.getElementById('phone-verify-form');
+    // [ЗМІНЕНО] Отримуємо доступ до нових елементів
+    const modalCodeHiddenInput = document.getElementById('phone_verify_code_input');
+    const modalCodeDisplay = document.getElementById('phone_verify_code_display');
+    const modalErrorContainer = document.getElementById('phone-verify-error');
+    const phoneDisplay = document.getElementById('phone-verify-display');
+
+    let confirmationResult = null;
+    let recaptchaVerifier = null;
+
+    const showError = (el, message) => {
+        el.textContent = message;
+        el.style.display = 'block';
     };
-    handleFormSubmit('loginForm', '/login', 'loginError');
-    handleFormSubmit('registerForm', '/register', 'registerError');
+    const hideErrors = () => {
+        errorContainer.style.display = 'none';
+        modalErrorContainer.style.display = 'none';
+    };
+
+    const initRecaptcha = () => {
+        if (recaptchaVerifier) {
+            const recaptchaContainer = document.getElementById('recaptcha-container-settings');
+            if (recaptchaContainer) recaptchaContainer.innerHTML = '';
+        }
+        recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container-settings', {
+            'size': 'invisible'
+        });
+        return recaptchaVerifier.render();
+    };
+
+    // [НОВА ФУНКЦІЯ] для оновлення дисплею коду
+    const updateCodeDisplay = (value) => {
+        const displaySpans = modalCodeDisplay.querySelectorAll('span');
+        for (let i = 0; i < 6; i++) {
+            if (i < value.length) {
+                displaySpans[i].textContent = value[i];
+                displaySpans[i].classList.add('entered');
+            } else {
+                displaySpans[i].textContent = '_';
+                displaySpans[i].classList.remove('entered');
+            }
+        }
+    };
+
+    // [НОВА ЛОГІКА] для взаємодії з полем коду
+    if (modalCodeDisplay) {
+        modalCodeDisplay.addEventListener('click', () => modalCodeHiddenInput.focus());
+        modalCodeHiddenInput.addEventListener('input', (e) => {
+            // Фільтруємо, щоб були тільки цифри
+            e.target.value = e.target.value.replace(/\D/g, '');
+            updateCodeDisplay(e.target.value);
+        });
+    }
+
+    updateBtn.addEventListener('click', async () => {
+        hideErrors();
+        const phoneNumber = phoneInput.value;
+        const phoneDigits = phoneNumber.replace(/\D/g, '');
+
+        if (phoneDigits.length !== 12) {
+            showError(errorContainer, 'Будь ласка, введіть повний номер телефону.');
+            return;
+        }
+
+        updateBtn.disabled = true;
+        updateBtn.textContent = 'Чекайте...';
+
+        try {
+            await initRecaptcha();
+            confirmationResult = await firebase.auth().signInWithPhoneNumber(phoneNumber, recaptchaVerifier);
+            phoneDisplay.textContent = phoneNumber;
+            // [НОВЕ] Скидаємо поле вводу перед відкриттям
+            modalCodeHiddenInput.value = '';
+            updateCodeDisplay('');
+            modal.classList.add('active');
+            // Робимо фокус на приховане поле
+            setTimeout(() => modalCodeHiddenInput.focus(), 100);
+        } catch (error) {
+            console.error("Firebase SMS Error:", error);
+            showError(errorContainer, "Не вдалося надіслати SMS. Спробуйте пізніше або оновіть сторінку.");
+        } finally {
+            updateBtn.disabled = false;
+            updateBtn.textContent = phoneInput.value.replace(/\D/g, '').length > 0 ? 'Змінити' : 'Додати';
+        }
+    });
+
+    modalForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideErrors();
+        const code = modalCodeHiddenInput.value; // [ЗМІНЕНО] Беремо значення з прихованого поля
+        const submitBtn = modalForm.querySelector('button[type="submit"]');
+
+        if (code.length < 6) {
+            showError(modalErrorContainer, 'Код має складатися з 6 цифр.');
+            return;
+        }
+
+        if (!confirmationResult) {
+             showError(modalErrorContainer, 'Термін дії сесії минув. Закрийте вікно та спробуйте знову.');
+             return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Перевірка...';
+
+        try {
+            const credential = await confirmationResult.confirm(code);
+            const idToken = await credential.user.getIdToken();
+
+            const response = await fetch('/api/settings/update_phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: idToken })
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                modal.classList.remove('active');
+                showToast(data.message, 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showError(modalErrorContainer, data.message || 'Сталася помилка.');
+            }
+
+        } catch (error) {
+            console.error("Code verification error:", error);
+            showError(modalErrorContainer, 'Невірний код або помилка сервера.');
+        } finally {
+             submitBtn.disabled = false;
+             submitBtn.textContent = 'Підтвердити номер';
+        }
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('close-modal') || e.target.id === 'phone-verify-modal') {
+            modal.classList.remove('active');
+        }
+    });
 }
 
 function switchAuthTab(tabId) {
@@ -95,11 +423,71 @@ function switchAuthTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
 }
 
+function initPhonePromptBanner() {
+    const banner = document.getElementById('phone-prompt-banner');
+    const closeBtn = document.getElementById('close-phone-prompt');
+
+    if (banner && closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            // Ховаємо банер з анімацією
+            banner.style.transition = 'opacity 0.3s, transform 0.3s';
+            banner.style.opacity = '0';
+            banner.style.transform = 'translateY(-100%)';
+
+            // Надсилаємо запит на сервер, щоб запам'ятати вибір у сесії
+            fetch('/api/hide_phone_prompt', { method: 'POST' })
+                .catch(err => console.error("Could not hide prompt:", err));
+
+            // Видаляємо елемент з DOM після анімації
+            setTimeout(() => banner.remove(), 300);
+        });
+    }
+}
+
+function setupCodeInput(hiddenInput, displayContainer) {
+    if (!hiddenInput || !displayContainer) return;
+
+    const displaySpans = displayContainer.querySelectorAll('span');
+    const MAX_DIGITS = 6;
+
+    const updateDisplay = () => {
+        const value = hiddenInput.value;
+        for (let i = 0; i < MAX_DIGITS; i++) {
+            const span = displaySpans[i];
+            if (i < value.length) {
+                span.textContent = value[i];
+                span.classList.add('entered');
+            } else {
+                span.textContent = '_';
+                span.classList.remove('entered');
+            }
+            // Керування курсором
+            span.classList.toggle('cursor', i === value.length);
+        }
+    };
+
+    hiddenInput.addEventListener('input', () => {
+        // Залишаємо тільки цифри і обрізаємо до 6
+        hiddenInput.value = hiddenInput.value.replace(/\D/g, '').substring(0, MAX_DIGITS);
+        updateDisplay();
+    });
+
+    hiddenInput.addEventListener('focus', () => displayContainer.classList.add('focused'));
+    hiddenInput.addEventListener('blur', () => displayContainer.classList.remove('focused'));
+
+    displayContainer.addEventListener('click', () => hiddenInput.focus());
+
+    // Ініціалізація
+    updateDisplay();
+}
+
 function initCabinetModal(pageOverlay, closeAllSidebars) {
     const cabinetModal = document.getElementById('cabinet-modal');
+    const authModal = document.getElementById('auth-modal');
     if (!cabinetModal) return;
 
-    document.getElementById('open-cabinet-modal')?.addEventListener('click', () => {
+    // Відкриття кабінету
+    document.getElementById('open-cabinet-btn')?.addEventListener('click', () => {
         cabinetModal.classList.add('active');
         if (pageOverlay) {
             pageOverlay.classList.add('active');
@@ -107,12 +495,34 @@ function initCabinetModal(pageOverlay, closeAllSidebars) {
         }
     });
 
+    // Закриття кабінету
     cabinetModal.addEventListener('click', e => {
         if (e.target.classList.contains('cabinet-close') || e.target.id === 'cabinet-modal') {
             closeAllSidebars();
         }
     });
 
+    // Кнопка "Увійти" в гостьовому кабінеті
+    document.getElementById('cabinet-action-login')?.addEventListener('click', () => {
+        closeAllSidebars();
+        setTimeout(() => {
+            if (authModal) authModal.classList.add('active');
+        }, 300);
+    });
+
+    // Посилання, що вимагають логіну
+    document.querySelectorAll('[data-requires-login="true"]').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeAllSidebars();
+            setTimeout(() => {
+                if (authModal) authModal.classList.add('active');
+                showToast('Будь ласка, увійдіть, щоб продовжити', 'info');
+            }, 300);
+        });
+    });
+
+    // Посилання на "Обране"
     document.getElementById('cabinet-open-favorites')?.addEventListener('click', (e) => {
         e.preventDefault();
         closeAllSidebars();
@@ -123,11 +533,14 @@ function initCabinetModal(pageOverlay, closeAllSidebars) {
     });
 }
 
+
 function initHeaderActions(pageOverlay, closeAllSidebars) {
     const cartModal = document.getElementById('cart-modal');
     if(!cartModal) return;
 
     document.getElementById('open-cart-btn')?.addEventListener('click', () => {
+        // Ми вже оновлюємо кошик при кожній дії, тому тут додатковий виклик не потрібен,
+        // але залишимо на випадок, якщо користувач просто відкриває панель
         updateCartView();
         cartModal.classList.add('active');
         if (pageOverlay) {
@@ -178,6 +591,8 @@ function initInfiniteScroll() {
             .then(html => {
                 if (html.trim() !== "") {
                     productsGrid.insertAdjacentHTML('beforeend', html);
+                    // Після додавання нових товарів, потрібно оновити стан їх кнопок
+                    updateCartView();
                 }
             })
             .catch(error => console.error('Error loading more products:', error))
@@ -203,6 +618,25 @@ function initInfiniteScroll() {
 }
 
 function initOptimizedCartLogic() {
+    let debounceTimer;
+
+    const updateServerQuantity = (productId, quantity) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            fetch(`/update_cart_quantity/${productId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({quantity: quantity})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    updateCartView();
+                }
+            });
+        }, 500);
+    };
+
     document.body.addEventListener('click', e => {
         const button = e.target.closest('button');
         if (!button) return;
@@ -211,23 +645,23 @@ function initOptimizedCartLogic() {
         if (!productId) return;
 
         if (button.matches('.add-to-cart-btn') && !button.classList.contains('in-cart')) {
+             const originalButtonHTML = button.innerHTML;
             setButtonAsInCart(button, true);
-            updateCartCounter(1);
             showToast('Товар додано до кошика', 'success', `<a href="/checkout" class="btn btn-sm btn-primary">Оформити</a>`);
             fetch('/add_to_cart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: productId })})
             .then(res => res.json())
             .then(data => {
                 if (data.status !== 'success') {
-                    setButtonAsInCart(button, false);
-                    updateCartCounter(-1);
+                    button.classList.remove('in-cart');
+                    button.innerHTML = originalButtonHTML;
                     showToast(data.message || 'Помилка додавання товару', 'error');
-                } else {
-                    updateCartView();
                 }
+                updateCartView();
             }).catch(() => {
-                setButtonAsInCart(button, false);
-                updateCartCounter(-1);
+                button.classList.remove('in-cart');
+                button.innerHTML = originalButtonHTML;
                 showToast('Мережева помилка', 'error');
+                updateCartView();
             });
         }
 
@@ -237,16 +671,16 @@ function initOptimizedCartLogic() {
         }
 
         if (button.matches('.qty-btn')) {
-             const cartItemRow = button.closest('.cart-item');
-             if (!cartItemRow) return;
-             const quantityDisplay = cartItemRow.querySelector('.quantity-display');
-             const currentQuantity = parseInt(quantityDisplay.textContent);
-             const newQuantity = button.classList.contains('plus') ? currentQuantity + 1 : currentQuantity - 1;
+            const cartItemRow = button.closest('.cart-item');
+            if (!cartItemRow) return;
+            const quantityInput = cartItemRow.querySelector('.quantity-input');
+            const currentQuantity = parseInt(quantityInput.value);
+            const newQuantity = button.classList.contains('plus') ? currentQuantity + 1 : currentQuantity - 1;
 
-             if (newQuantity >= 1) {
-                updateCartView(); // Optimistic update
-                fetch(`/update_cart_quantity/${productId}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({quantity: newQuantity}) });
-             }
+            if (newQuantity >= 1) {
+                quantityInput.value = newQuantity;
+                updateServerQuantity(productId, newQuantity);
+            }
         }
 
         if (button.matches('.remove-item')) {
@@ -255,19 +689,28 @@ function initOptimizedCartLogic() {
                 cartItemRow.style.transition = 'opacity 0.3s, transform 0.3s';
                 cartItemRow.style.opacity = '0';
                 cartItemRow.style.transform = 'translateX(50px)';
-                setTimeout(() => updateCartView(), 300);
-                fetch(`/remove_from_cart/${productId}`, { method: 'POST' });
+                setTimeout(() => {
+                    fetch(`/remove_from_cart/${productId}`, { method: 'POST' })
+                        .then(() => updateCartView());
+                }, 300);
             }
         }
     });
-}
 
-function updateCartCounter(change) {
-    const counter = document.getElementById('cart-count');
-    if (counter) {
-        const currentValue = parseInt(counter.textContent, 10) || 0;
-        counter.textContent = Math.max(0, currentValue + change);
-    }
+    document.body.addEventListener('change', e => {
+        if (e.target.matches('.quantity-input')) {
+            const input = e.target;
+            const productId = input.dataset.id;
+            let newQuantity = parseInt(input.value);
+
+            if (isNaN(newQuantity) || newQuantity < 1) {
+                newQuantity = 1;
+                input.value = newQuantity;
+            }
+
+            updateServerQuantity(productId, newQuantity);
+        }
+    });
 }
 
 function setButtonAsInCart(button, isInCart) {
@@ -280,8 +723,7 @@ function setButtonAsInCart(button, isInCart) {
     }
 }
 
-function setupPhoneMaskAdvanced(selector) {
-    const phoneInput = document.querySelector(selector);
+function applyPhoneMaskToInput(phoneInput) {
     if (!phoneInput) return;
     const matrix = "+380 (__) ___-__-__";
     const prefixNumber = "380";
@@ -334,43 +776,53 @@ function initProductDescriptionToggle() {
 }
 
 function updateCartView() {
-    fetch('/get_cart').then(res => res.json()).then(data => {
-        document.getElementById('cart-count').textContent = data.items.reduce((sum, item) => sum + item.quantity, 0);
-        const itemsContainer = document.querySelector('.cart-items-container');
-        const totalEl = document.getElementById('cart-modal-total');
-        const checkoutLink = document.getElementById('checkout-link');
-        if (!itemsContainer || !totalEl || !checkoutLink) return;
-        itemsContainer.innerHTML = '';
-        if (data.items.length > 0) {
-            checkoutLink.style.display = 'block';
-            data.items.forEach(item => {
-                const stockClass = item.in_stock ? 'in-stock' : 'out-of-stock';
-                const stockText = item.in_stock ? '✔ В наявності' : '✖ Немає в наявності';
-                itemsContainer.insertAdjacentHTML('beforeend', `
-                <div class="cart-item" data-id="${item.id}">
-                    <a href="${item.url}" class="cart-item-link"><img src="${item.image}" alt="${item.name}" class="cart-item-img"></a>
-                    <div class="cart-item-info">
-                        <a href="${item.url}" class="cart-item-link"><h4>${item.name}</h4></a>
-                        <p class="cart-item-price">${item.price.toFixed(2)} ₴</p>
-                        <p class="cart-item-stock ${stockClass}">${stockText}</p>
-                    </div>
-                    <div class="cart-item-sidebar-controls">
-                        <div class="cart-item-quantity-controls">
-                            <button class="qty-btn minus" data-id="${item.id}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
-                            <span class="quantity-display">${item.quantity}</span>
-                            <button class="qty-btn plus" data-id="${item.id}">+</button>
+    fetch('/get_cart', { cache: 'no-cache' })
+        .then(res => res.json())
+        .then(data => {
+            const totalQuantity = data.items.reduce((sum, item) => sum + item.quantity, 0);
+
+            const counter = document.getElementById('cart-count');
+            if (counter) {
+                counter.textContent = totalQuantity;
+            }
+
+            updateAllProductButtonStates(data.items);
+
+            const itemsContainer = document.querySelector('.cart-items-container');
+            const totalEl = document.getElementById('cart-modal-total');
+            const checkoutLink = document.getElementById('checkout-link');
+            if (!itemsContainer || !totalEl || !checkoutLink) return;
+
+            itemsContainer.innerHTML = '';
+            if (data.items.length > 0) {
+                checkoutLink.style.display = 'block';
+                data.items.forEach(item => {
+                    const stockClass = item.in_stock ? 'in-stock' : 'out-of-stock';
+                    const stockText = item.in_stock ? '✔ В наявності' : '✖ Немає в наявності';
+                    itemsContainer.insertAdjacentHTML('beforeend', `
+                    <div class="cart-item" data-id="${item.id}">
+                        <a href="${item.url}" class="cart-item-link"><img src="${item.image}" alt="${item.name}" class="cart-item-img"></a>
+                        <div class="cart-item-info">
+                            <a href="${item.url}" class="cart-item-link"><h4>${item.name}</h4></a>
+                            <p class="cart-item-price">${item.price.toFixed(2)} ₴</p>
+                            <p class="cart-item-stock ${stockClass}">${stockText}</p>
                         </div>
-                        <button class="remove-item" data-id="${item.id}" title="Видалити"><i class="fas fa-trash-alt"></i></button>
-                    </div>
-                </div>`);
-            });
-        } else {
-            checkoutLink.style.display = 'none';
-            itemsContainer.innerHTML = '<div class="empty-cart-message"><i class="fas fa-shopping-cart"></i><p>Ваш кошик порожній</p></div>';
-        }
-        totalEl.textContent = `${data.total.toFixed(2)} ₴`;
-        updateAllProductButtonStates(data.items);
-    });
+                        <div class="cart-item-sidebar-controls">
+                            <div class="cart-item-quantity-controls">
+                                <button class="qty-btn minus" data-id="${item.id}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
+                                <input type="number" class="quantity-input" value="${item.quantity}" data-id="${item.id}" min="1" aria-label="Кількість">
+                                <button class="qty-btn plus" data-id="${item.id}">+</button>
+                            </div>
+                            <button class="remove-item" data-id="${item.id}" title="Видалити"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </div>`);
+                });
+            } else {
+                checkoutLink.style.display = 'none';
+                itemsContainer.innerHTML = '<div class="empty-cart-message"><i class="fas fa-shopping-cart"></i><p>Ваш кошик порожній</p></div>';
+            }
+            totalEl.textContent = `${data.total.toFixed(2)} ₴`;
+        });
 }
 
 function updateAllProductButtonStates(cartItems) {
@@ -391,17 +843,24 @@ function updateAllProductButtonStates(cartItems) {
 }
 
 function initFavoritesLogic() {
+    // Обробник кліків для додавання/видалення з обраного
     document.body.addEventListener('click', e => {
         const favoriteBtn = e.target.closest('.favorite-btn');
         if (favoriteBtn) {
             const productId = favoriteBtn.closest('[data-id]')?.dataset.id;
-            if (productId) toggleFavorite(productId);
+            if (productId) {
+                toggleFavorite(productId);
+            }
         }
     });
+
+    // Відкриття модального вікна обраного
     document.getElementById('open-favorites-btn')?.addEventListener('click', () => {
-        renderFavoritesModal();
+        renderFavoritesModal(); // Функція, що малює товари в модалці
         document.getElementById('favorites-modal')?.classList.add('active');
     });
+
+    // Закриття модального вікна
     const favModal = document.getElementById('favorites-modal');
     favModal?.addEventListener('click', e => {
         if (e.target.id === 'favorites-modal' || e.target.classList.contains('close-modal')) {
@@ -410,25 +869,45 @@ function initFavoritesLogic() {
     });
 }
 
+// Функція для перемикання статусу "Обране" для товару
 function toggleFavorite(productId) {
+    // Отримуємо поточний список обраних з пам'яті браузера
     let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+
     if (favorites.includes(productId)) {
+        // Якщо товар вже є, видаляємо його
         favorites = favorites.filter(id => id !== productId);
         showToast('Видалено з обраного');
     } else {
+        // Якщо товару немає, додаємо його
         favorites.push(productId);
         showToast('Додано до обраного');
     }
+
+    // Зберігаємо оновлений список назад у пам'ять
     localStorage.setItem('favorites', JSON.stringify(favorites));
+
+    // Оновлюємо вигляд всіх кнопок на сторінці
     updateFavoritesUI();
 }
 
+// Функція для оновлення всіх іконок-зірочок та лічильника
 function updateFavoritesUI() {
     const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-    document.getElementById('favorites-count').textContent = favorites.length;
+    const counter = document.getElementById('favorites-count');
+
+    // Оновлюємо лічильник в хедері
+    if (counter) {
+        counter.textContent = favorites.length;
+    }
+
+    // Проходимо по всіх кнопках "Обране" на сторінці
     document.querySelectorAll('.favorite-btn').forEach(btn => {
         const productId = btn.closest('[data-id]')?.dataset.id;
-        btn.classList.toggle('active', favorites.includes(productId));
+        if (productId) {
+            // Додаємо або видаляємо клас .active в залежності від того, чи є товар в списку
+            btn.classList.toggle('active', favorites.includes(productId));
+        }
     });
 }
 
@@ -443,37 +922,51 @@ function renderFavoritesModal() {
     }
     fetch('/get_products_by_ids', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: favoriteIds })})
     .then(res => res.json()).then(products => {
-        fetch('/get_cart').then(r => r.json()).then(cartData => {
-            products.forEach(p => {
-                const stockStatus = p.in_stock ? `<div class="stock-status in-stock">Є в наявності</div>` : `<div class="stock-status out-of-stock">Немає в наявності</div>`;
-                let adminActionsHtml = window.isAdmin ? `
-                <div class="admin-product-actions">
-                    <a href="/admin/edit_product/${p.id}" class="admin-action-btn edit-btn" title="Редагувати"><i class="fas fa-pencil-alt"></i></a>
-                    <form action="/admin/delete_product/${p.id}" method="POST" onsubmit="return confirm('Ви впевнені?');"><button type="submit" class="admin-action-btn delete-btn" title="Видалити"><i class="fas fa-trash-alt"></i></button></form>
-                </div>` : '';
-                container.insertAdjacentHTML('beforeend', `
-                <div class="product-card" data-id="${p.id}">
-                    <div class="product-image">
-                        <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
-                        ${stockStatus}
-                        <button class="favorite-btn active" title="Видалити з обраного"><i class="fas fa-star"></i></button>
-                        ${adminActionsHtml}
+        products.forEach(p => {
+            const stockStatus = p.in_stock ? `<div class="stock-status in-stock">Є в наявності</div>` : `<div class="stock-status out-of-stock">Немає в наявності</div>`;
+            let adminActionsHtml = window.isAdmin ? `
+            <div class="admin-product-actions">
+                <a href="/admin/edit_product/${p.id}" class="admin-action-btn edit-btn" title="Редагувати"><i class="fas fa-pencil-alt"></i></a>
+                <form action="/admin/delete_product/${p.id}" method="POST" onsubmit="return confirm('Ви впевнені?');"><button type="submit" class="admin-action-btn delete-btn" title="Видалити"><i class="fas fa-trash-alt"></i></button></form>
+            </div>` : '';
+            container.insertAdjacentHTML('beforeend', `
+            <div class="product-card" data-id="${p.id}">
+                <div class="product-image">
+                    <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
+                    ${stockStatus}
+                    <button class="favorite-btn active" title="Видалити з обраного"><i class="far fa-star"></i><i class="fas fa-star"></i></button>
+                    ${adminActionsHtml}
+                </div>
+                <div class="product-info">
+                    <h3 class="product-name"><a href="${p.url}">${p.name}</a></h3>
+                     <div class="product-footer">
+                        <span class="price">${p.price.toFixed(2)} ₴</span>
                     </div>
-                    <div class="product-info">
-                        <h3><a href="${p.url}">${p.name}</a></h3>
-                        <div class="product-footer">
-                            <span class="price">${p.price.toFixed(2)} ₴</span>
-                            <button class="btn btn-sm add-to-cart-btn" data-id="${p.id}" ${p.in_stock ? '' : 'disabled'}>Додати в кошик</button>
-                        </div>
+                    <div class="product-card-actions">
+                        <button class="btn add-to-cart-btn" data-id="${p.id}" ${p.in_stock ? '' : 'disabled'}>Додати в кошик</button>
                     </div>
-                </div>`);
-            });
-            updateAllProductButtonStates(cartData.items);
+                </div>
+            </div>`);
         });
+        updateFavoritesUI();
+        updateCartView();
     });
 }
 
+let activeToast = null;
+let toastTimeout = null;
+
 function showToast(message, type = 'success', actions = '') {
+    if (activeToast) {
+        clearTimeout(toastTimeout);
+        activeToast.classList.remove('show');
+        setTimeout(() => {
+            if (document.body.contains(activeToast)) {
+                activeToast.remove();
+            }
+        }, 500);
+    }
+
     const toast = document.createElement('div');
     toast.className = `toast-notification ${type}`;
     const messageSpan = document.createElement('span');
@@ -486,11 +979,21 @@ function showToast(message, type = 'success', actions = '') {
         toast.appendChild(actionsDiv);
     }
     document.body.appendChild(toast);
+
+    activeToast = toast;
+
     setTimeout(() => {
         toast.classList.add('show');
-        setTimeout(() => {
+        toastTimeout = setTimeout(() => {
             toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 500);
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    toast.remove();
+                }
+                if (activeToast === toast) {
+                    activeToast = null;
+                }
+            }, 500);
         }, 3000);
     }, 10);
 }
@@ -500,32 +1003,24 @@ function initContactForm() {
     if (contactForm) {
         contactForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            fetch('/send_message', { method: 'POST', body: new FormData(this) }).then(response => response.json()).then(data => {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Надсилання...';
+
+            fetch('/send_message', { method: 'POST', body: new FormData(this) })
+            .then(response => response.json())
+            .then(data => {
                 showToast(data.message, data.status === 'success' ? 'success' : 'error');
                 if (data.status === 'success') this.reset();
-            }).catch(() => showToast('Сталася помилка при відправці.', 'error'));
+            })
+            .catch(() => showToast('Сталася помилка при відправці.', 'error'))
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            });
         });
-    }
-}
-
-function initCatalogFilters() {
-    const showMoreBtn = document.getElementById('show-more-brands-btn');
-    if (showMoreBtn) {
-        showMoreBtn.addEventListener('click', function() {
-            const list = this.previousElementSibling;
-            const isExpanded = this.dataset.expanded === 'true';
-            if (isExpanded) {
-                list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
-                this.textContent = 'Показати більше';
-                this.dataset.expanded = 'false';
-            } else {
-                list.querySelectorAll('.brand-item.hidden').forEach(item => item.classList.remove('hidden'));
-                this.textContent = 'Приховати';
-                this.dataset.expanded = 'true';
-            }
-        });
-        const list = showMoreBtn.previousElementSibling;
-        list.querySelectorAll('.brand-item').forEach((item, index) => { if (index >= 5) item.classList.add('hidden'); });
     }
 }
 
@@ -554,6 +1049,7 @@ function initHeroSlider() {
     const slider = document.querySelector('.card-slider');
     if (!slider) return;
 
+    const sliderWrapper = document.querySelector('.card-slider-wrapper');
     const slides = Array.from(slider.querySelectorAll('.hero-slide'));
     const prevBtn = document.querySelector('.card-slider-wrapper .prev-btn');
     const nextBtn = document.querySelector('.card-slider-wrapper .next-btn');
@@ -570,48 +1066,33 @@ function initHeroSlider() {
     let currentIndex = 0;
     let autoPlayInterval;
 
-    dotsContainer.innerHTML = '';
-    slides.forEach((_, i) => {
-        const dot = document.createElement('button');
-        dot.classList.add('dot');
-        dot.addEventListener('click', () => {});
-        dotsContainer.appendChild(dot);
-    });
-    const dots = dotsContainer.querySelectorAll('.dot');
+    if (dotsContainer) {
+        dotsContainer.innerHTML = '';
+        slides.forEach((_, i) => {
+            const dot = document.createElement('button');
+            dot.classList.add('dot');
+            dot.addEventListener('click', () => goToSlide(i));
+            dotsContainer.appendChild(dot);
+        });
+    }
+    const dots = dotsContainer ? dotsContainer.querySelectorAll('.dot') : [];
+
+    function goToSlide(index) {
+        if (index === currentIndex) return;
+        clearInterval(autoPlayInterval);
+        currentIndex = index;
+        updateInitialPositions();
+        updateDots();
+        startAutoPlay();
+    }
 
     function updateSlider(direction = 'next') {
         clearInterval(autoPlayInterval);
-        const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
-        const nextIndexFromCurrent = (currentIndex + 1) % totalSlides;
-        const currentCenterSlide = slides[currentIndex];
-        const currentLeftSlide = slides[prevIndex];
-        const currentRightSlide = slides[nextIndexFromCurrent];
-        slides.forEach(s => s.className = 'hero-slide');
 
         if (direction === 'next') {
             currentIndex = (currentIndex + 1) % totalSlides;
-            const newRightIndex = (currentIndex + 1) % totalSlides;
-            currentLeftSlide.classList.add('slide-exit');
-            currentCenterSlide.classList.add('slide-left');
-            currentRightSlide.classList.add('slide-center');
-            if (totalSlides > 3) {
-                slides[newRightIndex].classList.add('slide-new');
-                setTimeout(() => { slides[newRightIndex].classList.remove('slide-new'); slides[newRightIndex].classList.add('slide-right'); }, 50);
-            } else {
-                 slides[newRightIndex].classList.add('slide-right');
-            }
         } else {
             currentIndex = (currentIndex - 1 + totalSlides) % totalSlides;
-            const newLeftIndex = (currentIndex - 1 + totalSlides) % totalSlides;
-            currentRightSlide.classList.add('slide-exit');
-            currentCenterSlide.classList.add('slide-right');
-            currentLeftSlide.classList.add('slide-center');
-            if (totalSlides > 3) {
-                 slides[newLeftIndex].classList.add('slide-new');
-                 setTimeout(() => { slides[newLeftIndex].classList.remove('slide-new'); slides[newLeftIndex].classList.add('slide-left'); }, 50);
-            } else {
-                 slides[newLeftIndex].classList.add('slide-left');
-            }
         }
         updateInitialPositions();
         updateDots();
@@ -622,6 +1103,7 @@ function initHeroSlider() {
         slides.forEach(s => s.className = 'hero-slide');
         const leftIndex = (currentIndex - 1 + totalSlides) % totalSlides;
         const rightIndex = (currentIndex + 1) % totalSlides;
+
         if (totalSlides === 2) {
             slides[currentIndex].classList.add('slide-center');
             slides[rightIndex].classList.add('slide-right');
@@ -635,15 +1117,23 @@ function initHeroSlider() {
     }
 
     function updateDots() {
-        dots.forEach((dot, i) => dot.classList.toggle('active', i === currentIndex));
+        if(dots.length > 0) {
+            dots.forEach((dot, i) => dot.classList.toggle('active', i === currentIndex));
+        }
     }
 
     function startAutoPlay() {
-        autoPlayInterval = setInterval(() => updateSlider('next'), 5000);
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = setInterval(() => updateSlider('next'), 10000);
     }
 
-    nextBtn.addEventListener('click', () => updateSlider('next'));
-    prevBtn.addEventListener('click', () => updateSlider('prev'));
+    if(nextBtn) nextBtn.addEventListener('click', () => updateSlider('next'));
+    if(prevBtn) prevBtn.addEventListener('click', () => updateSlider('prev'));
+
+    if (sliderWrapper) {
+        sliderWrapper.addEventListener('mouseenter', () => clearInterval(autoPlayInterval));
+        sliderWrapper.addEventListener('mouseleave', () => startAutoPlay());
+    }
 
     updateInitialPositions();
     updateDots();
@@ -685,7 +1175,6 @@ function initAutoApplyFilters() {
     const filtersForm = document.getElementById('filters-form');
     if (!filtersForm) return;
 
-    // Функція-затримувач, щоб не відправляти запит на кожне натискання клавіші
     const debounce = (func, delay) => {
         let timeout;
         return function(...args) {
@@ -695,7 +1184,6 @@ function initAutoApplyFilters() {
     };
 
     const submitForm = () => {
-        // Додаємо search query до форми, щоб не втратити його при фільтрації
         const searchInput = document.getElementById('search-input');
         if (searchInput && searchInput.value) {
             let hiddenSearch = filtersForm.querySelector('input[name="search"]');
@@ -710,18 +1198,15 @@ function initAutoApplyFilters() {
         filtersForm.submit();
     };
 
-    // Обробник для полів ціни з затримкою
     const debouncedSubmit = debounce(submitForm, 800);
 
     filtersForm.addEventListener('change', (e) => {
-        // Застосовуємо відразу для чекбоксів
         if (e.target.type === 'checkbox') {
             submitForm();
         }
     });
 
     filtersForm.addEventListener('keyup', (e) => {
-        // Застосовуємо з затримкою для полів вводу (ціна)
         if (e.target.type === 'number') {
             debouncedSubmit();
         }
@@ -731,22 +1216,15 @@ function initAutoApplyFilters() {
 function initSearchSuggestions() {
     const searchInput = document.getElementById('search-input');
     const suggestionsContainer = document.getElementById('search-suggestions-container');
-    const searchWrapper = searchInput.closest('.search-input-wrapper');
-    // [НОВЕ] Знаходимо нашу кнопку очищення
+    const searchWrapper = searchInput ? searchInput.closest('.search-input-wrapper') : null;
     const clearButton = document.getElementById('clear-search-btn');
 
     if (!searchInput || !suggestionsContainer || !searchWrapper || !clearButton) return;
 
     let searchTimeout;
 
-    // [НОВЕ] Функція для показу/приховування хрестика
     const toggleClearButton = () => {
-        // Якщо в полі є текст - показуємо кнопку, якщо ні - ховаємо
-        if (searchInput.value.length > 0) {
-            clearButton.classList.add('visible');
-        } else {
-            clearButton.classList.remove('visible');
-        }
+        clearButton.classList.toggle('visible', searchInput.value.length > 0);
     };
 
     const showSuggestions = () => {
@@ -769,10 +1247,15 @@ function initSearchSuggestions() {
         localStorage.setItem('searchHistory', JSON.stringify(history.slice(0, 5)));
     };
 
+    // [ОНОВЛЕНО] Функція тепер додає заголовок з кнопкою закриття
     const renderInitialState = () => {
         const history = getSearchHistory();
-        const popularSearches = ['насос', 'змішувач', 'шланг для поливу', 'бойлер', 'радіатор', 'витяжка'];
-        let html = '<div class="search-suggestions-body">';
+        let html = `
+            <div class="suggestions-header">
+                <h4 class="suggestions-main-title">Пошук товарів</h4>
+                <button class="suggestions-close-btn" title="Закрити">&times;</button>
+            </div>
+            <div class="search-suggestions-body">`;
 
         if (history.length > 0) {
             html += `
@@ -782,32 +1265,48 @@ function initSearchSuggestions() {
                         <button class="clear-history-btn">Очистити все</button>
                     </div>
                     ${history.map(term => `
-                        <a href="/catalog?search=${encodeURIComponent(term)}" class="suggestion-item">
-                            <span class="suggestion-icon"><i class="fas fa-history"></i></span>
-                            <span class="suggestion-text">${term}</span>
+                        <div class="suggestion-item">
+                            <a href="/catalog?search=${encodeURIComponent(term)}" class="suggestion-item-link">
+                                <span class="suggestion-icon"><i class="fas fa-history"></i></span>
+                                <span class="suggestion-text">${term}</span>
+                            </a>
                             <button class="remove-history-btn" data-term="${term}" title="Видалити">&times;</button>
-                        </a>
+                        </div>
                     `).join('')}
                 </div>`;
         }
 
-        html += `
-            <div class="suggestions-section">
-                <div class="suggestions-section-header">
-                    <h4 class="suggestions-section-title">Популярні запити</h4>
-                </div>
-                <div class="popular-searches">
-                    ${popularSearches.map(term => `<a href="/catalog?search=${encodeURIComponent(term)}">${term}</a>`).join('')}
-                </div>
-            </div>`;
-
         html += '</div>';
         suggestionsContainer.innerHTML = html;
+
+        fetch('/api/popular_searches')
+            .then(res => res.json())
+            .then(popular => {
+                if (popular && popular.length > 0) {
+                    const popularHtml = `
+                        <div class="suggestions-section">
+                            <div class="suggestions-section-header">
+                                <h4 class="suggestions-section-title">Популярні запити</h4>
+                            </div>
+                            <div class="popular-searches">
+                                ${popular.map(cat => `<a href="/catalog/${cat.slug}">${cat.name}</a>`).join('')}
+                            </div>
+                        </div>`;
+                    suggestionsContainer.querySelector('.search-suggestions-body').insertAdjacentHTML('beforeend', popularHtml);
+                }
+            });
+
         showSuggestions();
     };
 
+    // [ОНОВЛЕНО] Функція тепер додає заголовок з кнопкою закриття
     const renderResults = (data) => {
-        let html = '<div class="search-suggestions-body">';
+        let html = `
+            <div class="suggestions-header">
+                 <h4 class="suggestions-main-title">Результати пошуку</h4>
+                 <button class="suggestions-close-btn" title="Закрити">&times;</button>
+            </div>
+            <div class="search-suggestions-body">`;
 
         if (data.categories.length > 0) {
             html += `
@@ -828,12 +1327,15 @@ function initSearchSuggestions() {
                     ${data.products.map(p => `
                         <a href="${p.url}" class="suggestion-item">
                             <span class="suggestion-icon"><i class="fas fa-box-open"></i></span>
-                            <span class="suggestion-text">${p.name}</span>
+                            <div class="suggestion-text-group">
+                                <span class="suggestion-main-text">${p.name}</span>
+                                ${p.category ? `<span class="suggestion-sub-text">в категорії: ${p.category}</span>` : ''}
+                            </div>
                         </a>`).join('')}
                 </div>`;
         }
 
-        if (html === '<div class="search-suggestions-body">') {
+        if (html.endsWith('<div class="search-suggestions-body">')) { // Перевірка, чи не додано жодних результатів
             html += `<p style="text-align: center; color: var(--gray-color); padding: 20px 0;">За вашим запитом нічого не знайдено</p>`;
         }
 
@@ -851,15 +1353,11 @@ function initSearchSuggestions() {
     searchInput.addEventListener('input', () => {
         const query = searchInput.value.trim();
         clearTimeout(searchTimeout);
-
-        // [ОНОВЛЕНО] Перевіряємо видимість хрестика при кожному вводі
         toggleClearButton();
-
         if (query.length < 2) {
             renderInitialState();
             return;
         }
-
         searchTimeout = setTimeout(() => {
             fetch(`/api/search_suggestions?q=${encodeURIComponent(query)}`)
                 .then(res => res.json())
@@ -867,27 +1365,31 @@ function initSearchSuggestions() {
         }, 250);
     });
 
-    document.addEventListener('click', (e) => {
+    // [ВИДАЛЕНО] Цей блок закривав вікно при кліку поза ним, що заважало виділенню тексту.
+    /* document.addEventListener('click', (e) => {
         if (!searchWrapper.contains(e.target)) {
             hideSuggestions();
         }
-    });
+    }); */
 
-    searchInput.form.addEventListener('submit', () => {
-        addToSearchHistory(searchInput.value.trim());
-    });
+    if(searchInput.form) {
+        searchInput.form.addEventListener('submit', () => {
+            addToSearchHistory(searchInput.value.trim());
+        });
+    }
 
-    // [НОВЕ] Обробник кліку на хрестик
     clearButton.addEventListener('click', () => {
-        searchInput.value = '';         // Очищуємо поле
-        toggleClearButton();            // Ховаємо хрестик
-        searchInput.focus();            // Повертаємо фокус в поле для зручності
-        renderInitialState();           // Показуємо початковий стан підказок (історію)
+        searchInput.value = '';
+        toggleClearButton();
+        searchInput.focus();
+        renderInitialState();
     });
 
+    // [ОНОВЛЕНО] Універсальний обробник кліків всередині контейнера підказок
     suggestionsContainer.addEventListener('click', (e) => {
         const clearBtn = e.target.closest('.clear-history-btn');
         const removeBtn = e.target.closest('.remove-history-btn');
+        const closeBtn = e.target.closest('.suggestions-close-btn'); // [НОВЕ]
 
         if (clearBtn) {
             e.preventDefault();
@@ -902,9 +1404,27 @@ function initSearchSuggestions() {
             localStorage.setItem('searchHistory', JSON.stringify(history));
             removeBtn.closest('.suggestion-item').remove();
         }
+        // [НОВЕ] Обробник для нової кнопки закриття
+        if (closeBtn) {
+            e.preventDefault();
+            hideSuggestions();
+        }
     });
 
-    // [НОВЕ] Перевіряємо стан кнопки при завантаженні сторінки
-    // (на випадок, якщо сторінка перезавантажилась із заповненим полем пошуку)
     toggleClearButton();
 }
+
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+        updateCartView();
+        updateFavoritesUI();
+
+        fetch('/get_cart', { cache: 'no-cache' })
+            .then(res => res.json())
+            .then(data => {
+                if (typeof updateAllProductButtonStates === 'function') {
+                    updateAllProductButtonStates(data.items);
+                }
+            });
+    }
+});

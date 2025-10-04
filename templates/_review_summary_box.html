@@ -2,9 +2,8 @@
 <div class="summary-box">
     <div class="overall-rating text-center">
         <div class="rating-value">{{ "%.1f"|format(product.rating) }}</div>
-        <div class="rating-stars">
-            {% set r = product.rating|round|int %}
-            {% for i in range(5) %}{% if i < r %}★{% else %}<span>★</span>{% endif %}{% endfor %}
+        <div class="stars-outer" style="font-size: 1.5em; margin: 5px 0;">
+            <div class="stars-inner" style="width: {{ (product.rating / 5) * 100 }}%"></div>
         </div>
         <div class="reviews-count">{{ review_only_count }} відгуків</div>
     </div>

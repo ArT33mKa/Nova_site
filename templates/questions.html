@@ -33,10 +33,11 @@
                     {% for question in questions %}
                     <div class="review-item" id="review-{{ question.id }}">
                         <div class="review-header">
-                            <strong class="review-author">{{ question.author_name or (question.author and question.author.username) }}</strong>
-                            <span class="review-type-badge">Питання</span>
+                            <div class="review-author-info">
+                                <strong class="review-author">{{ question.author_name or (question.author and question.author.username) }}</strong>
+                                <span class="review-type-badge">Питання</span>
+                            </div>
                             <small class="review-date">{{ question.timestamp.strftime('%d.%m.%Y') }}</small>
-                            <!-- [НОВЕ] Кнопка видалення для адміна -->
                             {% if current_user.is_authenticated and current_user.is_admin %}
                             <form class="delete-review-form" action="{{ url_for('delete_review', review_id=question.id) }}" method="POST" onsubmit="return confirm('Видалити цей запис?');">
                                 <button type="submit" class="btn-delete-review" title="Видалити"><i class="fas fa-trash-alt"></i></button>
@@ -49,19 +50,20 @@
                         <div class="replies-container">
                             {% for reply in question.replies %}
                             <div class="review-item reply {% if reply.author and reply.author.is_admin %}admin-reply{% endif %}">
-                                <div class="review-header">
-                                    <strong class="review-author">{{ reply.author_name or (reply.author and reply.author.username) }}</strong>
-                                    {% if reply.author and reply.author.is_admin %}
-                                        <span class="owner-badge"><i class="fas fa-shield-alt"></i> Власник магазину</span>
-                                    {% endif %}
-                                    <small class="review-date">{{ question.timestamp.strftime('%d.%m.%Y') }}</small>
-                                     <!-- [НОВЕ] Кнопка видалення для адміна (для відповідей) -->
-                                    {% if current_user.is_authenticated and current_user.is_admin %}
-                                    <form class="delete-review-form" action="{{ url_for('delete_review', review_id=reply.id) }}" method="POST" onsubmit="return confirm('Видалити цю відповідь?');">
-                                        <button type="submit" class="btn-delete-review" title="Видалити"><i class="fas fa-trash-alt"></i></button>
-                                    </form>
-                                    {% endif %}
-                                </div>
+                                    <div class="review-header">
+                                        <div class="review-author-info">
+                                            <strong class="review-author">{{ reply.author_name or (reply.author and reply.author.username) }}</strong>
+                                            {% if reply.author and reply.author.is_admin %}
+                                                <span class="owner-badge"><i class="fas fa-shield-alt"></i> Власник магазину</span>
+                                            {% endif %}
+                                        </div>
+                                        <small class="review-date">{{ reply.timestamp.strftime('%d.%m.%Y') }}</small>
+                                        {% if current_user.is_authenticated and current_user.is_admin %}
+                                        <form class="delete-review-form" action="{{ url_for('delete_review', review_id=reply.id) }}" method="POST" onsubmit="return confirm('Видалити цю відповідь?');">
+                                            <button type="submit" class="btn-delete-review" title="Видалити"><i class="fas fa-trash-alt"></i></button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
                                 <p class="review-text">{{ reply.text }}</p>
                             </div>
                             {% endfor %}

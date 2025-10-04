@@ -1,111 +1,147 @@
-<!-- templates/_modals.html (ПОВНІСТЮ ОНОВЛЕНА ВЕРСІЯ) -->
 <div id="auth-modal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content auth-flow-content">
         <button class="close-modal">×</button>
-        <div class="auth-tabs">
-            <button class="auth-tab active" data-tab="login">Вхід</button>
-            <button class="auth-tab" data-tab="register">Реєстрація</button>
-        </div>
 
-        <!-- ВКЛАДКА "ВХІД" -->
-        <div id="login" class="tab-content active">
-            <form id="loginForm" class="auth-form">
-                <div class="form-group"><input type="email" name="email" placeholder="Email" required></div>
-                <div class="form-group"><input type="password" name="password" placeholder="Пароль" required></div>
-                <div id="loginError" class="error-message" style="display: none;"></div>
-                <button type="submit" class="btn btn-primary btn-block">Увійти</button>
+        <!-- Екран 1: Вхід за номером телефону (початковий) -->
+        <div class="auth-screen active" id="auth-screen-phone">
+            <h3>Вхід в кабінет</h3>
+            <form id="phone-form" class="auth-form">
+                <div class="form-group"><label for="auth_phone">Введіть телефон</label><input type="tel" id="auth_phone" class="js-phone-mask" placeholder="+380 (__) ___-__-__" required></div>
+                <div id="phone-error" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary btn-block">Отримати код</button>
             </form>
-            <!-- [ЗМІНЕНО] Новий блок для входу через соцмережі -->
-            <div class="social-login-header">Або увійдіть за допомогою:</div>
-            <div class="social-login-container">
-                <a href="{{ url_for('google.login') }}" class="social-login-btn google">
-                    <img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google">
-                </a>
+            <div class="social-login-divider"><span>Або увійдіть за допомогою:</span></div>
+            <div class="social-login-buttons">
+                 <a href="{{ url_for('google.login') }}" class="social-btn google-btn"><img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google"></a>
+                <button class="social-btn email-btn" id="go-to-email-login" title="Вхід за Email"><i class="fas fa-envelope"></i></button>
             </div>
+            <p class="auth-switcher">Немає профілю? <a href="#" id="go-to-register">Зареєструйтесь</a></p>
         </div>
 
-        <!-- ВКЛАДКА "РЕЄСТРАЦІЯ" -->
-        <div id="register" class="tab-content">
-            <form id="registerForm" class="auth-form">
-                <div class="form-group-inline" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group"><input type="text" name="first_name" placeholder="Ім'я" required></div>
-                    <div class="form-group"><input type="text" name="last_name" placeholder="Прізвище"></div>
+        <!-- Екран 2: Реєстрація -->
+        <div class="auth-screen" id="auth-screen-register">
+            <h3>Створення профілю</h3>
+            <form id="register-form" class="auth-form">
+                <div class="form-group"><label for="register_first_name">Ваше ім'я</label><input type="text" id="register_first_name" required></div>
+                <div class="form-group"><label for="register_last_name">Ваше прізвище</label><input type="text" id="register_last_name" required></div>
+                 <div class="form-group"><label for="register_phone">Номер телефону</label><input type="tel" id="register_phone" class="js-phone-mask" placeholder="+380 (__) ___-__-__" required></div>
+                <div id="register-error" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary btn-block">Отримати код для реєстрації</button>
+            </form>
+             <p class="auth-switcher">Вже є профіль? <a href="#" id="go-to-login">Увійдіть</a></p>
+        </div>
+
+        <!-- Екран 3: Введення коду (універсальний) -->
+        <div class="auth-screen" id="auth-screen-verify">
+            <h3 id="verify-title">Підтвердження номера</h3>
+            <p>Ми надіслали код на номер <strong id="verify-phone-display"></strong>. <br> <small>(Якщо SMS не прийшло, перевірте консоль браузера)</small></p>
+            <form id="verify-form" class="auth-form">
+                <!-- [ОНОВЛЕНО] Уніфікована структура -->
+                <div class="form-group">
+                    <label for="verify_code_input">Код з SMS</label>
+                    <div class="code-input-container">
+                        <input type="tel" id="verify_code_input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" class="code-input-hidden">
+                        <div class="code-input-display" id="verify_code_display">
+                            <span>_</span><span>_</span><span>_</span><span>_</span><span>_</span><span>_</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group"><input type="tel" name="phone" id="register_phone" placeholder="Номер телефону"></div>
-                <div class="form-group"><input type="email" name="email" placeholder="Email" required></div>
-                <div class="form-group"><input type="password" name="password" placeholder="Пароль" required></div>
-                <div id="registerError" class="error-message" style="display: none;"></div>
-                <button type="submit" class="btn btn-primary btn-block">Зареєструватися</button>
+                <div id="verify-error" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary btn-block">Підтвердити</button>
             </form>
-            <!-- [ЗМІНЕНО] Новий блок для реєстрації через соцмережі -->
-            <div class="social-login-header">Або зареєструйтесь за допомогою:</div>
-            <div class="social-login-container">
-                <a href="{{ url_for('google.login') }}" class="social-login-btn google">
-                    <img src="{{ url_for('static', filename='img/google-icon.svg') }}" alt="Google">
-                </a>
-            </div>
         </div>
+
+        <!-- [НОВИЙ ЕКРАН 4]: Введення Email -->
+        <div class="auth-screen" id="auth-screen-email-input">
+            <h3>Вхід за Email</h3>
+            <p>Введіть вашу електронну пошту, щоб отримати код для входу.</p>
+            <form id="email-input-form" class="auth-form">
+                <div class="form-group"><label for="auth_email">Email</label><input type="email" id="auth_email" required></div>
+                <div id="email-input-error" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary btn-block">Надіслати код</button>
+            </form>
+            <p class="auth-switcher"><a href="#" id="back-to-phone-login">« Повернутись до входу за телефоном</a></p>
+        </div>
+
+        <!-- [НОВИЙ ЕКРАН 5]: Введення коду з Email -->
+        <div class="auth-screen" id="auth-screen-email-verify">
+            <h3>Підтвердження пошти</h3>
+            <p>Ми надіслали код на <strong id="verify-email-display"></strong></p>
+            <form id="email-verify-form" class="auth-form">
+                <!-- [ОНОВЛЕНО] Уніфікована структура -->
+                <div class="form-group">
+                    <label for="email_verify_code_input">Код з листа</label>
+                    <div class="code-input-container">
+                         <input type="tel" id="email_verify_code_input" inputmode="numeric" maxlength="6" class="code-input-hidden">
+                         <div class="code-input-display" id="email_verify_code_display">
+                            <span>_</span><span>_</span><span>_</span><span>_</span><span>_</span><span>_</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="email-verify-error" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary btn-block">Підтвердити та увійти</button>
+            </form>
+        </div>
+        <div id="recaptcha-container"></div>
     </div>
 </div>
 
-<!-- Модальне вікно особистого кабінету (без змін) -->
-<div id="cabinet-modal" class="cabinet-sidebar">
+
+<!-- [НОВЕ] Модалка для старого входу за Email/паролем -->
+<div id="legacy-auth-modal" class="modal">
+     <div class="modal-content" style="max-width: 400px;">
+        <button class="close-modal">×</button>
+        <h3>Вхід за Email</h3>
+        <form id="loginForm" class="auth-form" style="margin-top: 20px;">
+            <div class="form-group">
+                <label for="loginEmail">Email</label>
+                <input type="email" name="email" id="loginEmail" required>
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Пароль</label>
+                <input type="password" name="password" id="loginPassword" required>
+            </div>
+            <div id="loginError" class="error-message" style="display: none;"></div>
+            <button type="submit" class="btn btn-primary btn-block">Увійти</button>
+        </form>
+    </div>
+</div>
+
+
+
+<!-- [ОНОВЛЕНО] Модальне вікно особистого кабінету (світла тема) -->
+<div id="cabinet-modal" class="cabinet-sidebar light-theme">
     <div class="cabinet-header">
         {% if current_user.is_authenticated %}
-        <img src="{{ current_user.avatar_url or url_for('static', filename='img/default_avatar.png') }}" alt="Avatar" class="user-avatar">
-        <h4>{{ current_user.first_name or current_user.username }}</h4>
+            <img src="{{ current_user.avatar_url or url_for('static', filename='img/default_avatar.png') }}" alt="Avatar" class="user-avatar">
+            <div class="user-info">
+                <h4>{{ current_user.first_name or current_user.username }}</h4>
+                {% if current_user.phone %}<p>{{ current_user.phone }}</p>{% endif %}
+            </div>
+        {% else %}
+             <div class="guest-prompt">
+                <h4>Ви не авторизовані</h4>
+                <button id="cabinet-action-login" class="btn btn-primary btn-block">Увійти або зареєструватись</button>
+            </div>
         {% endif %}
         <button class="close-modal cabinet-close">×</button>
     </div>
     <div class="cabinet-body">
         <nav class="cabinet-nav">
             <ul>
-                <li class="nav-item-dropdown">
-                    <a href="#" class="cabinet-nav-item">
-                        <i class="fas fa-globe"></i>
-                        <span>Українська</span>
-                        <i class="fas fa-chevron-down"></i>
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ url_for('my_orders') }}" class="cabinet-nav-item">
-                        <i class="fas fa-receipt"></i>
-                        <span>Мої замовлення</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" id="cabinet-open-favorites" class="cabinet-nav-item">
-                        <i class="fas fa-heart"></i>
-                        <span>Обране</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ url_for('my_reviews') }}" class="cabinet-nav-item">
-                        <i class="fas fa-star"></i>
-                        <span>Мої відгуки</span>
-                    </a>
-                </li>
-                 <li>
-                    <a href="{{ url_for('profile_settings') }}" class="cabinet-nav-item">
-                        <i class="fas fa-cog"></i>
-                        <span>Налаштування</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ url_for('index', _anchor='contacts') }}" class="cabinet-nav-item">
-                        <i class="fas fa-question-circle"></i>
-                        <span>Довідка</span>
-                    </a>
-                </li>
+                <li><a href="{{ url_for('my_orders') }}" class="cabinet-nav-item" {% if not current_user.is_authenticated %}data-requires-login="true"{% endif %}><i class="fas fa-receipt"></i><span>Мої замовлення</span></a></li>
+                <li><a href="#" id="cabinet-open-favorites" class="cabinet-nav-item"><i class="fas fa-heart"></i><span>Обране</span></a></li>
+                <li><a href="{{ url_for('my_reviews') }}" class="cabinet-nav-item" {% if not current_user.is_authenticated %}data-requires-login="true"{% endif %}><i class="fas fa-star"></i><span>Мої відгуки</span></a></li>
+                <li><a href="{{ url_for('profile_settings') }}" class="cabinet-nav-item" {% if not current_user.is_authenticated %}data-requires-login="true"{% endif %}><i class="fas fa-cog"></i><span>Налаштування</span></a></li>
+                <li><a href="{{ url_for('index', _anchor='contacts') }}" class="cabinet-nav-item"><i class="fas fa-question-circle"></i><span>Довідка</span></a></li>
             </ul>
         </nav>
     </div>
+    {% if current_user.is_authenticated %}
     <div class="cabinet-footer">
-         <a href="{{ url_for('logout') }}" class="cabinet-nav-item logout-link">
-            <i class="fas fa-sign-out-alt"></i>
-            <span>Вийти</span>
-        </a>
+         <a href="{{ url_for('logout') }}" class="cabinet-nav-item logout-link"><i class="fas fa-sign-out-alt"></i><span>Вийти</span></a>
     </div>
+    {% endif %}
 </div>
 
 

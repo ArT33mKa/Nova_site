@@ -25,7 +25,7 @@
                     <div class="form-group">
                         <label for="customer_phone">Номер телефону</label>
                         <!-- >>> ЗМІНІТЬ ЦЕЙ INPUT -->
-                        <input type="tel" name="customer_phone" id="customer_phone" required placeholder="+380 (__) ___-__-__" value="{% if current_user.is_authenticated and current_user.phone %}{{ current_user.phone }}{% endif %}">
+                        <input type="tel" name="customer_phone" id="customer_phone" class="js-phone-mask" required placeholder="+380 (__) ___-__-__" value="{% if current_user.is_authenticated and current_user.phone %}{{ current_user.phone }}{% endif %}">
                     </div>
                 </section>
 
@@ -34,15 +34,15 @@
                         <span class="icon">2</span><h4>Доставка</h4>
                     </div>
                     <div class="radio-group" id="delivery-method-group">
-                        <label class="radio-option active">
-                            <input type="radio" name="delivery_method" value="Самовивіз з магазину" checked>
+                        <label class="radio-option">
+                            <input type="radio" name="delivery_method" value="Самовивіз з магазину" required>
                             <div>
                                 <strong>Самовивіз з магазину</strong>
                                 <p>Безкоштовно за адресою: {{ shop.city }}, {{ shop.address }}</p>
                             </div>
                         </label>
                         <label class="radio-option">
-                            <input type="radio" name="delivery_method" value="Нова Пошта">
+                            <input type="radio" name="delivery_method" value="Нова Пошта" required>
                              <div>
                                 <strong>Нова Пошта</strong>
                                 <p>Доставка у відділення або поштомат по Україні.</p>
@@ -74,15 +74,15 @@
                         <span class="icon">3</span><h4>Оплата</h4>
                     </div>
                     <div class="radio-group">
-                        <label class="radio-option active">
-                            <input type="radio" name="payment_method" value="Післяплата" checked>
+                        <label class="radio-option">
+                            <input type="radio" name="payment_method" value="Післяплата" required>
                             <div>
                                 <strong>Післяплата (при отриманні)</strong>
                                 <p>Оплата готівкою або карткою у відділенні "Нової Пошти".</p>
                             </div>
                         </label>
                         <label class="radio-option">
-                            <input type="radio" name="payment_method" value="Оплата на рахунок">
+                            <input type="radio" name="payment_method" value="Оплата на рахунок" required>
                              <div>
                                 <strong>Оплата на рахунок</strong>
                                 <p>Реквізити для оплати будуть надіслані після підтвердження замовлення.</p>
@@ -169,58 +169,43 @@ document.addEventListener('DOMContentLoaded', function() {
     setupDeliveryLogic();
     setupEnterKeyNavigation();
     setupCommentField();
+    setupFormValidation();
 
-    // Нова, покращена маска для телефону
-    const phoneInput = document.getElementById('customer_phone');
-    if (phoneInput) {
-        // Застосовуємо маску, якщо в полі вже є номер (наприклад, з профілю користувача)
-        if (phoneInput.value) {
-            phoneInput.value = formatPhoneNumber(phoneInput.value);
-        }
-        phoneInput.addEventListener('input', handlePhoneInput, false);
-        phoneInput.addEventListener('focus', handlePhoneInput, false);
-        phoneInput.addEventListener('blur', (e) => {
-            if (e.target.value === '+380') {
-                e.target.value = '';
+    function setupFormValidation() {
+        const form = document.getElementById('checkout-form');
+        const phoneInput = document.getElementById('customer_phone');
+        const submitBtn = document.getElementById('submit-checkout-btn'); // [ДОДАНО] Знаходимо кнопку
+
+        if (!form || !phoneInput || !submitBtn) return;
+
+        form.addEventListener('submit', function(event) {
+            const originalBtnText = submitBtn.innerHTML;
+
+            // Перевірка повноти номеру телефону
+            const phoneValue = phoneInput.value;
+            const digitsOnly = phoneValue.replace(/\D/g, '');
+
+            if (digitsOnly.length !== 12) {
+                event.preventDefault();
+                alert('Будь ласка, введіть повний номер телефону у форматі +380 (XX) XXX-XX-XX.');
+                phoneInput.focus();
+                return false;
             }
+
+            // Перевірка, чи обрано спосіб доставки і оплати
+            const deliveryMethod = form.querySelector('input[name="delivery_method"]:checked');
+            const paymentMethod = form.querySelector('input[name="payment_method"]:checked');
+
+            if (!deliveryMethod || !paymentMethod) {
+                event.preventDefault();
+                alert('Будь ласка, оберіть спосіб доставки та оплати.');
+                return false;
+            }
+
+            // [ДОДАНО] Якщо всі перевірки пройдено, блокуємо кнопку
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `Обробка... <span class="btn-spinner" style="display: inline-block; border-color: white; border-top-color: transparent; width: 20px; height: 20px; border-width: 2px;"></span>`;
         });
-    }
-
-    // --- ФУНКЦІЇ ---
-
-    function formatPhoneNumber(value) {
-        if (!value) return value;
-        const phoneNumber = value.replace(/[^\d]/g, '');
-        // Нормалізація номера
-        let normalized = '';
-        if (phoneNumber.startsWith('380') && phoneNumber.length > 3) {
-            normalized = phoneNumber.substring(3);
-        } else if (phoneNumber.startsWith('0') && phoneNumber.length > 1) {
-            normalized = phoneNumber.substring(1);
-        } else {
-            normalized = phoneNumber;
-        }
-
-        const phoneNumberLength = normalized.length;
-        let formatted = '+380';
-
-        if (phoneNumberLength > 0) {
-            formatted += ' (' + normalized.substring(0, 2);
-        }
-        if (phoneNumberLength > 2) {
-            formatted += ') ' + normalized.substring(2, 5);
-        }
-        if (phoneNumberLength > 5) {
-            formatted += '-' + normalized.substring(5, 7);
-        }
-        if (phoneNumberLength > 7) {
-            formatted += '-' + normalized.substring(7, 9);
-        }
-        return formatted;
-    }
-
-    function handlePhoneInput(e) {
-        e.target.value = formatPhoneNumber(e.target.value);
     }
 
     function setupCommentField() {

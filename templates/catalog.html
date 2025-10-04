@@ -7,9 +7,9 @@
         <a href="{{ url_for('index') }}">Головна</a> /
         <a href="{{ url_for('catalog') }}">Каталог</a>
         {% if main_category_of_current and main_category_of_current != current_category %}
-            / <a href="{{ url_for('catalog', category_slug=main_category_of_current.replace(' ', '-').replace('/', '-')) }}">{{ main_category_of_current }}</a>
+            / <a href="{{ url_for('catalog', category_slug=main_category_of_current.replace(' ' , '-').replace('/' , '-')) }}">{{ main_category_of_current | capitalize }}</a>
         {% endif %}
-        {% if current_category %}/ <span>{{ current_category }}</span>{% endif %}
+        {% if current_category %}/ <span>{{ current_category | capitalize }}</span>{% endif %}
     </div>
 
     <div class="catalog-content">
@@ -30,7 +30,7 @@
                         <div class="subcategory-list">
                             {% for subcat_name, count in subcategories.items()|sort %}
                                 <a href="{{ url_for('catalog', category_slug=subcat_name.replace(' ', '-').replace('/', '-'), **current_filters) }}" class="filter-category-link">
-                                    <span>{{ subcat_name }}</span><span class="filter-count">{{ count }}</span></a>
+                                    <span>{{ subcat_name | capitalize }}</span><span class="filter-count">{{ count }}</span></a>
                             {% endfor %}
                         </div>
                         {% endif %}
@@ -39,7 +39,7 @@
                         <div class="filter-options-list">
                             {% for cat_name, data in hierarchy.items()|sort %}
                                 <a href="{{ url_for('catalog', category_slug=cat_name.replace(' ', '-').replace('/', '-'), **current_filters) }}" class="filter-category-link">
-                                    <span>{{ cat_name }}</span><span class="filter-count">{{ data.count }}</span></a>
+                                    <span>{{ cat_name | capitalize }}</span><span class="filter-count">{{ data.count }}</span></a>
                             {% endfor %}
                         </div>
                     {% endif %}
@@ -47,9 +47,11 @@
 
                 <div class="filter-group">
                     <h4 class="filter-title always-open">Ціна, ₴</h4>
-                    <div class="price-inputs">
-                        <input type="number" name="min_price" placeholder="Від {{ min_price_available|int }}" value="{{ request.args.get('min_price', '') }}">
-                        <input type="number" name="max_price" placeholder="До {{ max_price_available|int }}" value="{{ request.args.get('max_price', '') }}">
+                    <!-- [ОНОВЛЕНО] Нова структура для фільтру цін -->
+                    <div class="price-filter-container">
+                        <input type="number" name="min_price" placeholder="{{ min_price_available|int }}" value="{{ request.args.get('min_price', '') }}" aria-label="Від">
+                        <span class="price-separator">-</span>
+                        <input type="number" name="max_price" placeholder="{{ max_price_available|int }}" value="{{ request.args.get('max_price', '') }}" aria-label="До">
                         <button type="submit" class="price-ok-btn">OK</button>
                     </div>
                 </div>
@@ -71,9 +73,20 @@
             </div>
 
 
-            <h1 class="page-title">{{ current_category or 'Всі товари' }}</h1>
+            <h1 class="page-title">{{ (current_category or 'Всі товари') | capitalize }}</h1>
 
-            {% if products.items %}
+            {% set is_main_category_with_subs = current_category and current_category == main_category_of_current and hierarchy.get(main_category_of_current, {}).get('subcategories') %}
+
+            {# ВИПРАВЛЕНО: Спочатку перевіряємо, чи це головна категорія з підкатегоріями #}
+            {% if is_main_category_with_subs %}
+                <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
+                    <i class="fas fa-list-ul" style="font-size: 3rem; color: var(--primary-color); margin-bottom: 20px;"></i>
+                    <h3>Оберіть категорію</h3>
+                    <p style="font-size: 1.1rem; color: var(--gray-color);">Щоб побачити товари, будь ласка, виберіть одну з підкатегорій у меню зліва.</p>
+                </div>
+
+            {# Якщо це не головна категорія, то перевіряємо, чи є товари #}
+            {% elif products.items %}
                 <div class="products-grid" id="products-grid-container">
                     {% for product in products.items %}
                         {% include '_product_card.html' %}
@@ -91,6 +104,8 @@
                         </button>
                     </div>
                 {% endif %}
+
+            {# Якщо товарів немає, показуємо стандартне повідомлення #}
             {% else %}
                 <div style="text-align: center; padding: 50px; background-color: var(--light-color); border-radius: var(--border-radius);">
                     <h3>Товарів за вашими критеріями не знайдено.</h3>

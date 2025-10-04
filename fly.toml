@@ -1,5 +1,5 @@
 app = "nova-khvylia" # Замініть на назву вашого додатку на Fly.io
-primary_region = "waw" # Замініть на ваш регіон, якщо інший
+primary_region = "ams" # Замініть на ваш регіон, якщо інший
 kill_signal = "SIGINT"
 kill_timeout = "5s"
 

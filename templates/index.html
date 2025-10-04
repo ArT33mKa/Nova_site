@@ -35,7 +35,7 @@
                 <div class="category-icon-wrapper">
                     <img src="{{ url_for('static', filename='img/' + category.icon) }}" alt="{{ category.name }}">
                 </div>
-                <h3>{{ category.name }}</h3>
+                <h3>{{ category.name | capitalize }}</h3>
             </a>
             {% endfor %}
         </div>
