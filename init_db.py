@@ -15,7 +15,8 @@ def initialize_database():
             admin = User(
                 username='admin',
                 first_name='Артем',
-                last_name='Омельченко',  # <-- ДОДАНО ЦЕЙ РЯДОК
+                # [ЗМІНЕНО] Прізвище тепер є обов'язковим полем
+                last_name='Омельченко',
                 email='artemcool200911@gmail.com',
                 is_admin=True
             )

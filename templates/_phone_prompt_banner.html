@@ -1,36 +1,4 @@
-<!-- templates/_phone_prompt_banner.html (НОВИЙ ФАЙЛ) -->
 {% if current_user.is_authenticated and not current_user.phone and not session.get('hide_phone_prompt') %}
-<style>
-    .phone-prompt-banner {
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 15px 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 15px;
-        position: relative;
-        z-index: 1001; /* вище за хeдер */
-    }
-    .phone-prompt-banner p { margin: 0; }
-    .phone-prompt-banner a {
-        color: #856404;
-        font-weight: 600;
-        text-decoration: underline;
-    }
-    #close-phone-prompt {
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        cursor: pointer;
-        color: #856404;
-        opacity: 0.7;
-        line-height: 1;
-        padding: 0 5px;
-    }
-    #close-phone-prompt:hover { opacity: 1; }
-</style>
-
 <div class="phone-prompt-banner" id="phone-prompt-banner">
     <p>💡 Для зручності обробки замовлень, будь ласка, <a href="{{ url_for('profile_settings') }}">додайте ваш номер телефону</a>.</p>
     <button id="close-phone-prompt" title="Закрити">&times;</button>

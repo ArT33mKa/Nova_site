@@ -2667,3 +2667,76 @@ img {
     text-decoration: none;
 }
 
+.phone-prompt-banner {
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    position: relative;
+    z-index: 1001;
+}
+.phone-prompt-banner p { margin: 0; }
+.phone-prompt-banner a {
+    color: #856404;
+    font-weight: 600;
+    text-decoration: underline;
+}
+#close-phone-prompt {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #856404;
+    opacity: 0.7;
+    line-height: 1;
+    padding: 0 5px;
+}
+#close-phone-prompt:hover { opacity: 1; }
+
+/* Стилі для полів вводу OTP-коду */
+.code-input-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    cursor: text;
+}
+.code-input-hidden {
+    position: absolute;
+    top: 0;
+    left: -9999px; /* Ховаємо, але залишаємо доступним */
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+}
+.code-input-display {
+    display: flex;
+    gap: 10px;
+}
+.code-input-display span {
+    display: inline-block;
+    width: 45px;
+    height: 55px;
+    line-height: 55px;
+    text-align: center;
+    font-size: 1.8rem;
+    font-weight: 500;
+    border: 1px solid #ccc;
+    border-radius: var(--border-radius);
+    transition: all 0.2s ease;
+}
+.code-input-container.focused span {
+    border-color: var(--primary-color);
+}
+.code-input-display span.entered {
+    border-color: var(--primary-color);
+}
+.code-input-display span.cursor {
+    animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+    from, to { border-color: var(--primary-color); }
+    50% { border-color: transparent; }
+}

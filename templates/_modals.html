@@ -25,6 +25,9 @@
                 <div class="form-group"><label for="register_first_name">Ваше ім'я</label><input type="text" id="register_first_name" required></div>
                 <div class="form-group"><label for="register_last_name">Ваше прізвище</label><input type="text" id="register_last_name" required></div>
                  <div class="form-group"><label for="register_phone">Номер телефону</label><input type="tel" id="register_phone" class="js-phone-mask" placeholder="+380 (__) ___-__-__" required></div>
+                <!-- [ДОДАНО] Поля для пароля -->
+                <div class="form-group"><label for="register_password">Пароль (мін. 6 символів)</label><input type="password" id="register_password" required minlength="6"></div>
+                <div class="form-group"><label for="register_confirm_password">Підтвердіть пароль</label><input type="password" id="register_confirm_password" required></div>
                 <div id="register-error" class="error-message" style="display: none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">Отримати код для реєстрації</button>
             </form>
@@ -36,7 +39,6 @@
             <h3 id="verify-title">Підтвердження номера</h3>
             <p>Ми надіслали код на номер <strong id="verify-phone-display"></strong>. <br> <small>(Якщо SMS не прийшло, перевірте консоль браузера)</small></p>
             <form id="verify-form" class="auth-form">
-                <!-- [ОНОВЛЕНО] Уніфікована структура -->
                 <div class="form-group">
                     <label for="verify_code_input">Код з SMS</label>
                     <div class="code-input-container">
@@ -51,7 +53,7 @@
             </form>
         </div>
 
-        <!-- [НОВИЙ ЕКРАН 4]: Введення Email -->
+        <!-- Екран 4: Введення Email -->
         <div class="auth-screen" id="auth-screen-email-input">
             <h3>Вхід за Email</h3>
             <p>Введіть вашу електронну пошту, щоб отримати код для входу.</p>
@@ -63,12 +65,11 @@
             <p class="auth-switcher"><a href="#" id="back-to-phone-login">« Повернутись до входу за телефоном</a></p>
         </div>
 
-        <!-- [НОВИЙ ЕКРАН 5]: Введення коду з Email -->
+        <!-- Екран 5: Введення коду з Email -->
         <div class="auth-screen" id="auth-screen-email-verify">
             <h3>Підтвердження пошти</h3>
             <p>Ми надіслали код на <strong id="verify-email-display"></strong></p>
             <form id="email-verify-form" class="auth-form">
-                <!-- [ОНОВЛЕНО] Уніфікована структура -->
                 <div class="form-group">
                     <label for="email_verify_code_input">Код з листа</label>
                     <div class="code-input-container">
@@ -87,7 +88,7 @@
 </div>
 
 
-<!-- [НОВЕ] Модалка для старого входу за Email/паролем -->
+<!-- Модалка для старого входу за Email/паролем -->
 <div id="legacy-auth-modal" class="modal">
      <div class="modal-content" style="max-width: 400px;">
         <button class="close-modal">×</button>
@@ -104,12 +105,16 @@
             <div id="loginError" class="error-message" style="display: none;"></div>
             <button type="submit" class="btn btn-primary btn-block">Увійти</button>
         </form>
+        <!-- [ДОДАНО] Посилання на відновлення пароля -->
+        <p style="text-align: center; margin-top: 15px;">
+            <a href="{{ url_for('forgot_password') }}" class="btn-link">Забули пароль?</a>
+        </p>
     </div>
 </div>
 
 
 
-<!-- [ОНОВЛЕНО] Модальне вікно особистого кабінету (світла тема) -->
+<!-- Модальне вікно особистого кабінету -->
 <div id="cabinet-modal" class="cabinet-sidebar light-theme">
     <div class="cabinet-header">
         {% if current_user.is_authenticated %}
@@ -145,7 +150,7 @@
 </div>
 
 
-<!-- Бокова панель кошика (без змін) -->
+<!-- Бокова панель кошика -->
 <div id="cart-modal" class="cart-sidebar">
     <div class="cart-header">
         <h3>Ваш кошик</h3>
@@ -161,7 +166,7 @@
     </div>
 </div>
 
-<!-- Модальне вікно обраного (без змін) -->
+<!-- Модальне вікно обраного -->
 <div id="favorites-modal" class="modal">
     <div class="modal-content" id="favorites-modal-content">
         <button class="close-modal">×</button>

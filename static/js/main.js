@@ -1,23 +1,19 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // [НОВЕ] Отримуємо елемент затемнення один раз при завантаженні
     const pageOverlay = document.getElementById('page-overlay');
 
-    // [ДОДАНО] Обробник кліку на саме затемнення для закриття панелей
     if (pageOverlay) {
         pageOverlay.addEventListener('click', closeAllSidebars);
     }
 
-    // [НОВЕ] Універсальна функція для закриття всіх бічних панелей та затемнення
     function closeAllSidebars() {
         document.querySelector('.cart-sidebar.active')?.classList.remove('active');
         document.querySelector('.cabinet-sidebar.active')?.classList.remove('active');
         if (pageOverlay) {
             pageOverlay.classList.remove('active');
-            pageOverlay.classList.remove('dark'); // Скидаємо модифікатор темного фону
+            pageOverlay.classList.remove('dark');
         }
     }
 
-    // Ініціалізація всіх основних модулів
     initAuth();
     initHeaderActions(pageOverlay, closeAllSidebars);
     initPhonePromptBanner();
@@ -38,36 +34,43 @@ document.addEventListener('DOMContentLoaded', function() {
     initInfiniteScroll();
     initSearchSuggestions();
 
-    // [ОНОВЛЕНО] Єдиний виклик для оновлення всього, що стосується кошика
     updateCartView();
     updateFavoritesUI();
 });
 
 
-// ===================================================================
-//  ЛОГІКА КАБІНЕТУ ТА АВТОРИЗАЦІЇ
-// ===================================================================
-
 function initAuth() {
     const authModal = document.getElementById('auth-modal');
     if (!authModal) return;
 
-    // Ініціалізація Firebase reCAPTCHA
     let recaptchaVerifier;
+    // [ВИПРАВЛЕНО] Повністю перероблена функція ініціалізації reCAPTCHA
+    // Коментар: Ця функція тепер безпечна для повторних викликів. Вона спочатку
+    // намагається очистити попередній екземпляр reCAPTCHA, перш ніж створювати новий.
+    // Це вирішує поширену помилку "reCAPTCHA container is already rendered".
     const initRecaptcha = () => {
-        // Запобігаємо повторній ініціалізації
-        if (recaptchaVerifier && document.getElementById('recaptcha-container').innerHTML !== '') {
-            recaptchaVerifier.render().then(widgetId => grecaptcha.reset(widgetId));
-            return;
+        const container = document.getElementById('recaptcha-container');
+        if (!container) return;
+
+        // Якщо верифікатор вже існує, очищуємо його
+        if (recaptchaVerifier) {
+            try {
+                recaptchaVerifier.clear();
+            } catch (e) {
+                console.warn("Recaptcha clear failed, likely already removed.", e);
+            }
         }
+        // Також очищуємо сам контейнер про всяк випадок
+        container.innerHTML = '';
+
+        // Створюємо новий екземпляр
         recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
           'size': 'invisible',
-          'callback': (response) => { /* reCAPTCHA solved */ }
+          'callback': (response) => {} // reCAPTCHA solved
         });
-        recaptchaVerifier.render(); // Важливо викликати render()
+        recaptchaVerifier.render();
     };
 
-    // Елементи UI
     const screens = {
         phone: document.getElementById('auth-screen-phone'),
         register: document.getElementById('auth-screen-register'),
@@ -90,25 +93,23 @@ function initAuth() {
         emailVerify: document.getElementById('email-verify-error'),
     };
 
-    // Перемикачі
     const toRegisterLink = document.getElementById('go-to-register');
     const toLoginLink = document.getElementById('go-to-login');
     const toEmailLoginBtn = document.getElementById('go-to-email-login');
     const backToPhoneLink = document.getElementById('back-to-phone-login');
 
-    // Змінні для збереження стану
     let intent = 'login';
     let registrationData = {};
     let currentPhone = '';
-    let confirmationResult = null; // Зберігаємо результат підтвердження
+    let currentEmail = '';
+    let confirmationResult = null;
 
-    // --- Функції-хелпери ---
     const showScreen = (screenName) => {
         Object.values(screens).forEach(s => s && s.classList.remove('active'));
         if (screens[screenName]) {
             screens[screenName].classList.add('active');
             if (screenName === 'phone' || screenName === 'register') {
-                initRecaptcha(); // Ініціалізуємо reCAPTCHA при показі екранів
+                initRecaptcha(); // Цей виклик тепер безпечний
             }
         }
     };
@@ -120,12 +121,9 @@ function initAuth() {
     };
     const hideAllErrors = () => Object.values(errorMessages).forEach(el => el && (el.style.display = 'none'));
 
-    // --- Обробники подій ---
-    document.getElementById('open-cabinet-btn')?.addEventListener('click', () => {
-         // Якщо користувач не залогінений
-        if (!document.body.classList.contains('is-admin') && !window.currentUser) {
-            initRecaptcha();
-        }
+    document.querySelector('[data-action="open-auth"]')?.addEventListener('click', () => {
+        authModal.classList.add('active');
+        initRecaptcha();
     });
 
     authModal.addEventListener('click', e => {
@@ -145,20 +143,9 @@ function initAuth() {
         if (e.target.id === 'error-link-to-login') { e.preventDefault(); showScreen('phone'); }
     });
 
+    setupCodeInput(document.getElementById('verify_code_input'), document.getElementById('verify_code_display'));
+    setupCodeInput(document.getElementById('email_verify_code_input'), document.getElementById('email_verify_code_display'));
 
-    setupCode
-    Input(
-        document.getElementById('verify_code_input'),
-        document.getElementById('verify_code_display')
-    );
-    setupCodeInput(
-        document.getElementById('email_verify_code_input'),
-        document.getElementById('email_verify_code_display')
-    );
-
-    // --- Логіка відправки форм ---
-
-    // ФОРМА ВХОДУ (ТЕЛЕФОН)
     forms.phone?.addEventListener('submit', (e) => {
         e.preventDefault();
         hideAllErrors();
@@ -183,7 +170,7 @@ function initAuth() {
                     }).catch((error) => {
                         console.error("Firebase SMS Error:", error);
                         showError('phone', "Не вдалося надіслати SMS. Спробуйте пізніше або оновіть сторінку.");
-                        initRecaptcha(); // Скидаємо reCAPTCHA
+                        initRecaptcha();
                     }).finally(() => { submitBtn.disabled = false; });
             } else {
                 showError('phone', `Користувача не знайдено. <a href="#" id="error-link-to-register">Зареєструватись?</a>`, true);
@@ -192,22 +179,33 @@ function initAuth() {
         });
     });
 
-// main.js - ЗАМІНІТЬ СТАРИЙ БЛОК НА ЦЕЙ
-
-    // ФОРМА РЕЄСТРАЦІЇ
     forms.register?.addEventListener('submit', (e) => {
         e.preventDefault();
         hideAllErrors();
         intent = 'register';
+
+        // [ЗМІНЕНО] Отримуємо та перевіряємо паролі
+        const password = document.getElementById('register_password').value;
+        const confirmPassword = document.getElementById('register_confirm_password').value;
+
+        if (password.length < 6) {
+            showError('register', 'Пароль має бути не менше 6 символів.');
+            return;
+        }
+        if (password !== confirmPassword) {
+            showError('register', 'Паролі не співпадають.');
+            return;
+        }
+
         currentPhone = document.getElementById('register_phone').value;
         registrationData = {
             first_name: document.getElementById('register_first_name').value,
-            last_name: document.getElementById('register_last_name').value
+            last_name: document.getElementById('register_last_name').value,
+            password: password // [ДОДАНО] Зберігаємо пароль для відправки на сервер
         };
         const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
 
-        // Просто відправляємо SMS. Бекенд сам перевірить, чи існує користувач, ПІСЛЯ підтвердження коду.
         firebase.auth().signInWithPhoneNumber(currentPhone, recaptchaVerifier)
             .then((result) => {
                 confirmationResult = result;
@@ -216,7 +214,6 @@ function initAuth() {
                 showScreen('verify');
             }).catch((error) => {
                 console.error("Firebase SMS Error:", error);
-                // Firebase може повернути помилку, якщо номер недійсний.
                 if (error.code === 'auth/invalid-phone-number') {
                     showError('register', 'Невірний формат номеру телефону.');
                 } else {
@@ -228,11 +225,9 @@ function initAuth() {
             });
     });
 
-    // ФОРМА ПІДТВЕРДЖЕННЯ КОДУ (УНІВЕРСАЛЬНА ДЛЯ ТЕЛЕФОНУ)
     forms.verify?.addEventListener('submit', (e) => {
         e.preventDefault();
         hideAllErrors();
-        // [ЗМІНЕНО] Беремо значення з нового прихованого поля
         const code = document.getElementById('verify_code_input').value;
         const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
@@ -244,8 +239,7 @@ function initAuth() {
         }
 
         confirmationResult.confirm(code).then((result) => {
-            const user = result.user;
-            return user.getIdToken();
+            return result.user.getIdToken();
         }).then((idToken) => {
             let body = { token: idToken, intent, ...registrationData };
             return fetch('/api/auth/firebase_verify', {
@@ -266,11 +260,59 @@ function initAuth() {
             submitBtn.disabled = false;
         });
     });
+
+    forms.emailInput?.addEventListener('submit', e => {
+        e.preventDefault();
+        hideAllErrors();
+        currentEmail = document.getElementById('auth_email').value;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Надсилаємо...';
+
+        fetch('/api/auth/start_email_login', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email: currentEmail})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.getElementById('verify-email-display').textContent = currentEmail;
+                showScreen('emailVerify');
+            } else {
+                showError('emailInput', data.message || 'Сталася помилка');
+            }
+        }).finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Надіслати код';
+        });
+    });
+
+    forms.emailVerify?.addEventListener('submit', e => {
+        e.preventDefault();
+        hideAllErrors();
+        const code = document.getElementById('email_verify_code_input').value;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        fetch('/api/auth/verify_email_code', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code: code})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                showError('emailVerify', data.message || 'Сталася помилка');
+                submitBtn.disabled = false;
+            }
+        });
+    });
 }
 
 function initProfileSettingsPhoneLogic() {
     const container = document.getElementById('phone-settings-container');
-    if (!container) return; // Виконувати тільки на сторінці налаштувань
+    if (!container) return;
 
     const updateBtn = document.getElementById('update-phone-btn');
     const phoneInput = document.getElementById('settings_phone');
@@ -278,7 +320,6 @@ function initProfileSettingsPhoneLogic() {
 
     const modal = document.getElementById('phone-verify-modal');
     const modalForm = document.getElementById('phone-verify-form');
-    // [ЗМІНЕНО] Отримуємо доступ до нових елементів
     const modalCodeHiddenInput = document.getElementById('phone_verify_code_input');
     const modalCodeDisplay = document.getElementById('phone_verify_code_display');
     const modalErrorContainer = document.getElementById('phone-verify-error');
@@ -296,40 +337,27 @@ function initProfileSettingsPhoneLogic() {
         modalErrorContainer.style.display = 'none';
     };
 
-    const initRecaptcha = () => {
+    // [ВИПРАВЛЕНО] Аналогічна логіка очищення для сторінки налаштувань
+        const initRecaptcha = () => {
+        const recaptchaContainer = document.getElementById('recaptcha-container-settings');
+        if (!recaptchaContainer) return Promise.reject("Container not found");
+
         if (recaptchaVerifier) {
-            const recaptchaContainer = document.getElementById('recaptcha-container-settings');
-            if (recaptchaContainer) recaptchaContainer.innerHTML = '';
+            try {
+                recaptchaVerifier.clear();
+            } catch(e) {
+                console.warn("Settings recaptcha clear failed", e);
+            }
         }
+        recaptchaContainer.innerHTML = '';
+
         recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container-settings', {
             'size': 'invisible'
         });
         return recaptchaVerifier.render();
     };
 
-    // [НОВА ФУНКЦІЯ] для оновлення дисплею коду
-    const updateCodeDisplay = (value) => {
-        const displaySpans = modalCodeDisplay.querySelectorAll('span');
-        for (let i = 0; i < 6; i++) {
-            if (i < value.length) {
-                displaySpans[i].textContent = value[i];
-                displaySpans[i].classList.add('entered');
-            } else {
-                displaySpans[i].textContent = '_';
-                displaySpans[i].classList.remove('entered');
-            }
-        }
-    };
-
-    // [НОВА ЛОГІКА] для взаємодії з полем коду
-    if (modalCodeDisplay) {
-        modalCodeDisplay.addEventListener('click', () => modalCodeHiddenInput.focus());
-        modalCodeHiddenInput.addEventListener('input', (e) => {
-            // Фільтруємо, щоб були тільки цифри
-            e.target.value = e.target.value.replace(/\D/g, '');
-            updateCodeDisplay(e.target.value);
-        });
-    }
+    setupCodeInput(modalCodeHiddenInput, modalCodeDisplay);
 
     updateBtn.addEventListener('click', async () => {
         hideErrors();
@@ -348,11 +376,9 @@ function initProfileSettingsPhoneLogic() {
             await initRecaptcha();
             confirmationResult = await firebase.auth().signInWithPhoneNumber(phoneNumber, recaptchaVerifier);
             phoneDisplay.textContent = phoneNumber;
-            // [НОВЕ] Скидаємо поле вводу перед відкриттям
             modalCodeHiddenInput.value = '';
-            updateCodeDisplay('');
+            setupCodeInput(modalCodeHiddenInput, modalCodeDisplay); // Reset display
             modal.classList.add('active');
-            // Робимо фокус на приховане поле
             setTimeout(() => modalCodeHiddenInput.focus(), 100);
         } catch (error) {
             console.error("Firebase SMS Error:", error);
@@ -366,7 +392,7 @@ function initProfileSettingsPhoneLogic() {
     modalForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         hideErrors();
-        const code = modalCodeHiddenInput.value; // [ЗМІНЕНО] Беремо значення з прихованого поля
+        const code = modalCodeHiddenInput.value;
         const submitBtn = modalForm.querySelector('button[type="submit"]');
 
         if (code.length < 6) {
@@ -417,28 +443,19 @@ function initProfileSettingsPhoneLogic() {
     });
 }
 
-function switchAuthTab(tabId) {
-    document.querySelectorAll('.auth-tab, .tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelector(`.auth-tab[data-tab="${tabId}"]`)?.classList.add('active');
-    document.getElementById(tabId)?.classList.add('active');
-}
-
 function initPhonePromptBanner() {
     const banner = document.getElementById('phone-prompt-banner');
     const closeBtn = document.getElementById('close-phone-prompt');
 
     if (banner && closeBtn) {
         closeBtn.addEventListener('click', () => {
-            // Ховаємо банер з анімацією
             banner.style.transition = 'opacity 0.3s, transform 0.3s';
             banner.style.opacity = '0';
             banner.style.transform = 'translateY(-100%)';
 
-            // Надсилаємо запит на сервер, щоб запам'ятати вибір у сесії
             fetch('/api/hide_phone_prompt', { method: 'POST' })
                 .catch(err => console.error("Could not hide prompt:", err));
 
-            // Видаляємо елемент з DOM після анімації
             setTimeout(() => banner.remove(), 300);
         });
     }
@@ -461,23 +478,26 @@ function setupCodeInput(hiddenInput, displayContainer) {
                 span.textContent = '_';
                 span.classList.remove('entered');
             }
-            // Керування курсором
-            span.classList.toggle('cursor', i === value.length);
+            span.classList.toggle('cursor', i === value.length && document.activeElement === hiddenInput);
         }
     };
 
     hiddenInput.addEventListener('input', () => {
-        // Залишаємо тільки цифри і обрізаємо до 6
         hiddenInput.value = hiddenInput.value.replace(/\D/g, '').substring(0, MAX_DIGITS);
         updateDisplay();
     });
 
-    hiddenInput.addEventListener('focus', () => displayContainer.classList.add('focused'));
-    hiddenInput.addEventListener('blur', () => displayContainer.classList.remove('focused'));
+    hiddenInput.addEventListener('focus', () => {
+        displayContainer.classList.add('focused');
+        updateDisplay();
+    });
+    hiddenInput.addEventListener('blur', () => {
+        displayContainer.classList.remove('focused');
+        updateDisplay();
+    });
 
     displayContainer.addEventListener('click', () => hiddenInput.focus());
 
-    // Ініціалізація
     updateDisplay();
 }
 
@@ -486,7 +506,6 @@ function initCabinetModal(pageOverlay, closeAllSidebars) {
     const authModal = document.getElementById('auth-modal');
     if (!cabinetModal) return;
 
-    // Відкриття кабінету
     document.getElementById('open-cabinet-btn')?.addEventListener('click', () => {
         cabinetModal.classList.add('active');
         if (pageOverlay) {
@@ -495,34 +514,38 @@ function initCabinetModal(pageOverlay, closeAllSidebars) {
         }
     });
 
-    // Закриття кабінету
     cabinetModal.addEventListener('click', e => {
         if (e.target.classList.contains('cabinet-close') || e.target.id === 'cabinet-modal') {
             closeAllSidebars();
         }
     });
 
-    // Кнопка "Увійти" в гостьовому кабінеті
     document.getElementById('cabinet-action-login')?.addEventListener('click', () => {
         closeAllSidebars();
         setTimeout(() => {
-            if (authModal) authModal.classList.add('active');
+            if (authModal) {
+                authModal.classList.add('active');
+                // Ініціалізуємо reCAPTCHA при відкритті модалки
+                const recaptchaContainer = document.getElementById('recaptcha-container');
+                if (recaptchaContainer) initAuth();
+            }
         }, 300);
     });
 
-    // Посилання, що вимагають логіну
     document.querySelectorAll('[data-requires-login="true"]').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             closeAllSidebars();
             setTimeout(() => {
-                if (authModal) authModal.classList.add('active');
+                if (authModal) {
+                    authModal.classList.add('active');
+                    initAuth();
+                }
                 showToast('Будь ласка, увійдіть, щоб продовжити', 'info');
             }, 300);
         });
     });
 
-    // Посилання на "Обране"
     document.getElementById('cabinet-open-favorites')?.addEventListener('click', (e) => {
         e.preventDefault();
         closeAllSidebars();
@@ -533,14 +556,11 @@ function initCabinetModal(pageOverlay, closeAllSidebars) {
     });
 }
 
-
 function initHeaderActions(pageOverlay, closeAllSidebars) {
     const cartModal = document.getElementById('cart-modal');
     if(!cartModal) return;
 
     document.getElementById('open-cart-btn')?.addEventListener('click', () => {
-        // Ми вже оновлюємо кошик при кожній дії, тому тут додатковий виклик не потрібен,
-        // але залишимо на випадок, якщо користувач просто відкриває панель
         updateCartView();
         cartModal.classList.add('active');
         if (pageOverlay) {
@@ -591,7 +611,6 @@ function initInfiniteScroll() {
             .then(html => {
                 if (html.trim() !== "") {
                     productsGrid.insertAdjacentHTML('beforeend', html);
-                    // Після додавання нових товарів, потрібно оновити стан їх кнопок
                     updateCartView();
                 }
             })
@@ -843,7 +862,6 @@ function updateAllProductButtonStates(cartItems) {
 }
 
 function initFavoritesLogic() {
-    // Обробник кліків для додавання/видалення з обраного
     document.body.addEventListener('click', e => {
         const favoriteBtn = e.target.closest('.favorite-btn');
         if (favoriteBtn) {
@@ -854,13 +872,11 @@ function initFavoritesLogic() {
         }
     });
 
-    // Відкриття модального вікна обраного
     document.getElementById('open-favorites-btn')?.addEventListener('click', () => {
-        renderFavoritesModal(); // Функція, що малює товари в модалці
+        renderFavoritesModal();
         document.getElementById('favorites-modal')?.classList.add('active');
     });
 
-    // Закриття модального вікна
     const favModal = document.getElementById('favorites-modal');
     favModal?.addEventListener('click', e => {
         if (e.target.id === 'favorites-modal' || e.target.classList.contains('close-modal')) {
@@ -869,43 +885,32 @@ function initFavoritesLogic() {
     });
 }
 
-// Функція для перемикання статусу "Обране" для товару
 function toggleFavorite(productId) {
-    // Отримуємо поточний список обраних з пам'яті браузера
     let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
 
     if (favorites.includes(productId)) {
-        // Якщо товар вже є, видаляємо його
         favorites = favorites.filter(id => id !== productId);
         showToast('Видалено з обраного');
     } else {
-        // Якщо товару немає, додаємо його
         favorites.push(productId);
         showToast('Додано до обраного');
     }
 
-    // Зберігаємо оновлений список назад у пам'ять
     localStorage.setItem('favorites', JSON.stringify(favorites));
-
-    // Оновлюємо вигляд всіх кнопок на сторінці
     updateFavoritesUI();
 }
 
-// Функція для оновлення всіх іконок-зірочок та лічильника
 function updateFavoritesUI() {
     const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
     const counter = document.getElementById('favorites-count');
 
-    // Оновлюємо лічильник в хедері
     if (counter) {
         counter.textContent = favorites.length;
     }
 
-    // Проходимо по всіх кнопках "Обране" на сторінці
     document.querySelectorAll('.favorite-btn').forEach(btn => {
         const productId = btn.closest('[data-id]')?.dataset.id;
         if (productId) {
-            // Додаємо або видаляємо клас .active в залежності від того, чи є товар в списку
             btn.classList.toggle('active', favorites.includes(productId));
         }
     });
@@ -1247,7 +1252,6 @@ function initSearchSuggestions() {
         localStorage.setItem('searchHistory', JSON.stringify(history.slice(0, 5)));
     };
 
-    // [ОНОВЛЕНО] Функція тепер додає заголовок з кнопкою закриття
     const renderInitialState = () => {
         const history = getSearchHistory();
         let html = `
@@ -1299,7 +1303,6 @@ function initSearchSuggestions() {
         showSuggestions();
     };
 
-    // [ОНОВЛЕНО] Функція тепер додає заголовок з кнопкою закриття
     const renderResults = (data) => {
         let html = `
             <div class="suggestions-header">
@@ -1335,7 +1338,7 @@ function initSearchSuggestions() {
                 </div>`;
         }
 
-        if (html.endsWith('<div class="search-suggestions-body">')) { // Перевірка, чи не додано жодних результатів
+        if (html.endsWith('<div class="search-suggestions-body">')) {
             html += `<p style="text-align: center; color: var(--gray-color); padding: 20px 0;">За вашим запитом нічого не знайдено</p>`;
         }
 
@@ -1365,13 +1368,6 @@ function initSearchSuggestions() {
         }, 250);
     });
 
-    // [ВИДАЛЕНО] Цей блок закривав вікно при кліку поза ним, що заважало виділенню тексту.
-    /* document.addEventListener('click', (e) => {
-        if (!searchWrapper.contains(e.target)) {
-            hideSuggestions();
-        }
-    }); */
-
     if(searchInput.form) {
         searchInput.form.addEventListener('submit', () => {
             addToSearchHistory(searchInput.value.trim());
@@ -1385,11 +1381,10 @@ function initSearchSuggestions() {
         renderInitialState();
     });
 
-    // [ОНОВЛЕНО] Універсальний обробник кліків всередині контейнера підказок
     suggestionsContainer.addEventListener('click', (e) => {
         const clearBtn = e.target.closest('.clear-history-btn');
         const removeBtn = e.target.closest('.remove-history-btn');
-        const closeBtn = e.target.closest('.suggestions-close-btn'); // [НОВЕ]
+        const closeBtn = e.target.closest('.suggestions-close-btn');
 
         if (clearBtn) {
             e.preventDefault();
@@ -1404,7 +1399,6 @@ function initSearchSuggestions() {
             localStorage.setItem('searchHistory', JSON.stringify(history));
             removeBtn.closest('.suggestion-item').remove();
         }
-        // [НОВЕ] Обробник для нової кнопки закриття
         if (closeBtn) {
             e.preventDefault();
             hideSuggestions();
@@ -1413,18 +1407,3 @@ function initSearchSuggestions() {
 
     toggleClearButton();
 }
-
-window.addEventListener('pageshow', function(event) {
-    if (event.persisted) {
-        updateCartView();
-        updateFavoritesUI();
-
-        fetch('/get_cart', { cache: 'no-cache' })
-            .then(res => res.json())
-            .then(data => {
-                if (typeof updateAllProductButtonStates === 'function') {
-                    updateAllProductButtonStates(data.items);
-                }
-            });
-    }
-});

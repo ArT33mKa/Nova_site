@@ -10,10 +10,14 @@ import firebase_admin
 from firebase_admin import credentials, auth
 import json
 import random
+import secrets
+from itsdangerous import URLSafeTimedSerializer
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from twilio.rest import Client
 import cloudinary.utils
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from collections import Counter
 from sqlalchemy import func, and_, or_ as db_or, select
@@ -53,6 +57,30 @@ except Exception as e:
 load_dotenv()
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# --- [ДОДАНО] Налаштування логера для подій безпеки ---
+# Коментар: Створюємо окремий файл для логів, пов'язаних з безпекою,
+# щоб легко відстежувати спроби входу, зміни паролів тощо.
+security_logger = logging.getLogger('security')
+security_handler = logging.FileHandler('security.log')
+security_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+security_logger.addHandler(security_handler)
+security_logger.setLevel(logging.INFO)
+
+# --- [ДОДАНО] Налаштування лімітера запитів (Rate Limiter) ---
+# Коментар: Це критично важливий елемент захисту від brute-force атак.
+# Ми обмежуємо кількість спроб для чутливих ендпоінтів.
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri=os.getenv("RATELIMIT_STORAGE_URI", "memory://"), # Використовуйте Redis у production
+    strategy="fixed-window"
+)
 
 if __name__ != '__main__':
     # Якщо додаток запущено через Gunicorn (на Fly.io)
@@ -145,7 +173,9 @@ def send_telegram_notification(order, items):
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(80), nullable=False)
-    last_name = db.Column(db.String(80), nullable=True)
+    # [ЗМІНЕНО] Прізвище тепер є обов'язковим для консистентності даних.
+    last_name = db.Column(db.String(80), nullable=False)
+    is_email_verified = db.Column(db.Boolean, default=False)
     phone = db.Column(db.String(20), unique=True, nullable=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -156,10 +186,43 @@ class User(db.Model, UserMixin):
     orders = db.relationship('Order', backref='customer', lazy='dynamic')
     cart_items = db.relationship('CartItem', back_populates='user', lazy='dynamic', cascade="all, delete-orphan")
 
-    def set_password(self, password): self.password_hash = generate_password_hash(password)
+    def get_email_verify_token(self):
+        s = URLSafeTimedSerializer(app.secret_key)
+        return s.dumps({'user_id': self.id, 'email': self.email})
 
-    def check_password(self, password): return check_password_hash(self.password_hash, password)
+    # [ДОДАНО] Статичний метод для верифікації токена email
+    @staticmethod
+    def verify_email_token(token, max_age=86400):  # 24 години
+        s = URLSafeTimedSerializer(app.secret_key)
+        try:
+            data = s.loads(token, max_age=max_age)
+            user_id = data.get('user_id')
+            email = data.get('email')
+        except Exception:
+            return None, None
+        return User.query.get(user_id), email
 
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    # [ДОДАНО] Метод для генерації токена відновлення пароля
+    def get_reset_token(self):
+        s = URLSafeTimedSerializer(app.secret_key)
+        return s.dumps({'user_id': self.id})
+
+    # [ДОДАНО] Статичний метод для верифікації токена
+    @staticmethod
+    def verify_reset_token(token, max_age=1800):  # 30 хвилин
+        s = URLSafeTimedSerializer(app.secret_key)
+        try:
+            data = s.loads(token, max_age=max_age)
+            user_id = data.get('user_id')
+        except Exception:
+            return None
+        return User.query.get(user_id)
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -261,6 +324,15 @@ shop_info = {"name": "НОВА ХВИЛЯ",
 @login_manager.user_loader
 def load_user(user_id): return User.query.get(int(user_id))
 
+def email_verified_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_email_verified:
+            flash('Будь ласка, підтвердіть вашу електронну пошту, щоб продовжити.', 'warning')
+            return redirect(url_for('profile_settings'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def admin_required(f):
     @wraps(f)
@@ -316,8 +388,6 @@ def index():
 
     products = [p[0] for p in popular_products_query]  # Витягуємо тільки об'єкти Product
 
-    main_categories_hierarchy = get_category_hierarchy()
-    # >>> ДОДАЙТЕ ЦІ РЯДКИ
     main_categories_hierarchy = get_category_hierarchy()
     # Створюємо список з іконками, які у вас були в shop_info
     shop_category_icons = {cat['name'].lower(): cat.get('icon', 'gas_parts.jpg') for cat in shop_info['categories']}
@@ -573,30 +643,42 @@ def add_review(product_id):
 #  АВТЕНТИФІКАЦІЯ
 # ────────────────────────────────
 @app.route("/login", methods=["POST"])
+@limiter.limit("5 per minute") # Захист від brute-force
 def login():
     data = request.get_json()
-    user = User.query.filter_by(email=data.get('email')).first()
+    email = data.get('email')
+    user = User.query.filter_by(email=email).first()
+    ip_address = get_remote_address()
+
     if user and user.password_hash and user.check_password(data.get('password')):
         login_user(user, remember=True)
         merge_session_cart_to_db(user)
+        security_logger.info(f"Successful login for user '{email}' from IP: {ip_address}")
         return jsonify({"status": "success"})
+
+    security_logger.warning(f"Failed login attempt for email '{email}' from IP: {ip_address}")
     return jsonify({"status": "error", "message": "Невірний email або пароль"}), 401
 
 
 @app.route("/register", methods=["POST"])
+@limiter.limit("10 per hour") # Захист від спам-реєстрацій
 def register():
     data = request.get_json()
-    email, first_name, last_name, phone = data.get('email'), data.get('first_name'), data.get('last_name'), data.get(
-        'phone')
-    if not email or not first_name or not data.get('password'): return jsonify(
-        {"status": "error", "message": "Ім'я, Email та Пароль є обов'язковими"}), 400
-    if User.query.filter_by(email=email).first(): return jsonify(
-        {"status": "error", "message": "Цей email вже зареєстровано"}), 400
+    email, first_name, last_name, phone = data.get('email'), data.get('first_name'), data.get('last_name'), data.get('phone')
+
+    # [ЗМІНЕНО] Додано валідацію обов'язкових полів, включаючи last_name
+    if not all([email, first_name, last_name, data.get('password')]):
+        return jsonify({"status": "error", "message": "Ім'я, Прізвище, Email та Пароль є обов'язковими"}), 400
+
+    if User.query.filter_by(email=email).first():
+        return jsonify({"status": "error", "message": "Цей email вже зареєстровано"}), 400
+
     username_base = first_name.strip()
     username, counter = username_base, 1
     while User.query.filter_by(username=username).first():
         username = f"{username_base}_{counter}"
         counter += 1
+
     new_user = User(first_name=first_name, last_name=last_name, phone=phone, email=email, username=username)
     new_user.set_password(data.get('password'))
     db.session.add(new_user)
@@ -605,12 +687,15 @@ def register():
     merge_session_cart_to_db(new_user)
     send_email(new_user.email, f"Вітаємо у {shop_info['name']}!",
                render_template("email/welcome.html", user=new_user, shop=shop_info))
+
+    security_logger.info(f"New user registered: '{email}' from IP: {get_remote_address()}")
     return jsonify({"status": "success"})
 
 
 @app.route("/logout")
 @login_required
 def logout():
+    security_logger.info(f"User '{current_user.email}' logged out.")
     logout_user()
     flash("Ви успішно вийшли з акаунту.", "success")
     return redirect(url_for('index'))
@@ -631,9 +716,10 @@ def google_logged_in(blueprint, token):
     user = User.query.filter_by(email=email).first()
     if not user:
         first_name = google_info.get("given_name", "User")
-        last_name = google_info.get("family_name")
+        last_name = google_info.get("family_name", "Google")
         username_base = first_name.lower().strip()
         username, counter = username_base, 1
+        user.is_email_verified = True # [ДОДАНО]
         while User.query.filter_by(username=username).first():
             username = f"{username_base}{counter}"
             counter += 1
@@ -649,11 +735,55 @@ def google_logged_in(blueprint, token):
         if not user.avatar_url and google_info.get('picture'):
             user.avatar_url = google_info.get('picture')
             db.session.commit()
+        user.is_email_verified = True  # [ДОДАНО]
+        db.session.commit()
         flash("Ви успішно увійшли через Google!", category="success")
     login_user(user, remember=True)
     merge_session_cart_to_db(user)
     return redirect(url_for("index"))
 
+@app.route('/forgot-password', methods=['GET', 'POST'])
+@limiter.limit("5 per hour")
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+        ip_address = get_remote_address()
+
+        if user:
+            token = user.get_reset_token()
+            html_body = render_template('email/password_reset.html', user=user, token=token, shop=shop_info)
+            send_email(user.email, f"Відновлення пароля для {shop_info['name']}", html_body)
+            security_logger.info(f"Password reset requested for '{email}' from IP: {ip_address}")
+            flash('Інструкції для відновлення пароля надіслано на вашу пошту.', 'info')
+            return redirect(url_for('index'))
+        else:
+            security_logger.warning(f"Password reset attempt for non-existent email '{email}' from IP: {ip_address}")
+            flash('Якщо такий email існує, на нього буде надіслано лист.', 'info') # Стандартна практика для безпеки
+
+    return render_template('auth/forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def reset_password(token):
+    user = User.verify_reset_token(token)
+    if not user:
+        flash('Токен для відновлення пароля недійсний або застарілий.', 'danger')
+        return redirect(url_for('forgot_password'))
+
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        if password and password == confirm_password and len(password) >= 6:
+            user.set_password(password)
+            db.session.commit()
+            security_logger.info(f"Password successfully reset for user '{user.email}'")
+            flash('Ваш пароль успішно оновлено. Тепер ви можете увійти.', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Паролі не співпадають або занадто короткі (мінімум 6 символів).', 'danger')
+
+    return render_template('auth/reset_password.html', token=token)
 
 # ────────────────────────────────
 #  КОШИК ТА ОФОРМЛЕННЯ ЗАМОВЛЕННЯ
@@ -785,8 +915,8 @@ def start_email_login():
     code = str(random.randint(100000, 999999))
     session['verification_email'] = email
     session['verification_code'] = code
-    session.permanent = True  # Код буде жити 10 хвилин
-    app.permanent_session_lifetime = 600  # 10 хвилин
+    session.permanent = True
+    app.permanent_session_lifetime = timedelta(minutes=10)
 
     html_body = render_template("email/verification_code.html", code=code, shop=shop_info)
     if send_email(email, f"Код підтвердження для {shop_info['name']}", html_body):
@@ -810,7 +940,6 @@ def verify_email_code():
 
     user = User.query.filter_by(email=email).first()
     if not user:
-        # [ЗМІНЕНО] Створюємо користувача без імені
         username_base = email.split('@')[0]
         username, counter = username_base, 1
         while User.query.filter_by(username=username).first():
@@ -820,7 +949,7 @@ def verify_email_code():
         user = User(
             email=email,
             username=username,
-            first_name=""  # Залишаємо ім'я порожнім
+            first_name=""  # Залишаємо ім'я порожнім, користувач заповнить у профілі
         )
         db.session.add(user)
         db.session.commit()
@@ -864,28 +993,35 @@ def firebase_verify():
 
         if intent == 'login':
             if not user:
-                # Ця ситуація не повинна виникати, оскільки фронтенд вже перевірив існування
                 return jsonify(
                     {'status': 'error', 'message': 'Помилка: Користувача не знайдено, хоча він мав існувати'}), 404
 
+
         elif intent == 'register':
+
             if user:
-                # Ця ситуація також не повинна виникати
                 return jsonify({'status': 'error', 'message': 'Цей номер вже зареєстровано'}), 409
 
             first_name = request.json.get('first_name')
-            last_name = request.json.get('last_name')
-            if not all([first_name, last_name]):
-                return jsonify({'status': 'error', 'message': 'Ім\'я та прізвище є обов\'язковими'}), 400
 
-            # Генеруємо унікальний email та username
+            last_name = request.json.get('last_name')
+
+            password = request.json.get('password')  # [ДОДАНО] Отримуємо пароль
+
+            # [ЗМІНЕНО] Додаємо пароль до перевірки обов'язкових полів
+
+            if not all([first_name, last_name, password]):
+                return jsonify({'status': 'error', 'message': 'Ім\'я, прізвище та пароль є обов\'язковими'}), 400
+
+            # Генеруємо унікальний тимчасовий email
+
             base_email = f"{phone.replace('+', '')}@temp.user"
             email, counter = base_email, 1
             while User.query.filter_by(email=email).first():
                 email = f"{phone.replace('+', '')}_{counter}@temp.user"
                 counter += 1
 
-            username_base = first_name.strip()
+            username_base = first_name.strip().lower() or "user"
             username, counter = username_base, 1
             while User.query.filter_by(username=username).first():
                 username = f"{username_base}_{counter}"
@@ -898,9 +1034,10 @@ def firebase_verify():
                 email=email,
                 username=username
             )
+            new_user.set_password(password)  # [ДОДАНО] Встановлюємо пароль
             db.session.add(new_user)
             db.session.commit()
-            user = new_user  # Перепризначаємо user на щойно створеного
+            user = new_user
 
         else:
             return jsonify({'status': 'error', 'message': 'Невідома дія'}), 400
@@ -935,10 +1072,9 @@ def update_phone_number():
         if existing_user:
             return jsonify({'status': 'error', 'message': 'Цей номер телефону вже прив\'язаний до іншого акаунту'}), 409
 
-        # Все добре, оновлюємо номер
         current_user.phone = phone_from_token
         db.session.commit()
-        session.pop('hide_phone_prompt', None) # Скидаємо банер, бо телефон додано
+        session.pop('hide_phone_prompt', None)
 
         return jsonify({'status': 'success', 'message': 'Номер телефону успішно підтверджено та оновлено!'})
 
@@ -948,14 +1084,48 @@ def update_phone_number():
         app.logger.error(f"Phone update error for user {current_user.id}: {e}")
         return jsonify({'status': 'error', 'message': 'Сталася помилка на сервері'}), 500
 
+@app.route('/profile/resend-verification', methods=['POST'])
+@login_required
+def resend_verification_email():
+    if current_user.is_email_verified:
+        flash('Ваш email вже підтверджено.', 'info')
+        return redirect(url_for('profile_settings'))
+    if current_user.email.endswith('@temp.user'):
+        flash('Будь ласка, спочатку вкажіть дійсну адресу електронної пошти.', 'danger')
+        return redirect(url_for('profile_settings'))
+    try:
+        token = current_user.get_email_verify_token()
+        html_body = render_template('email/verify_email.html', user=current_user, token=token, shop=shop_info)
+        send_email(current_user.email, f"Підтвердження email для {shop_info['name']}", html_body)
+        flash('Новий лист для підтвердження надіслано на вашу пошту.', 'success')
+    except Exception as e:
+        app.logger.error(f"Error resending verification email for {current_user.email}: {e}")
+        flash('Не вдалося надіслати лист. Спробуйте пізніше.', 'danger')
+    return redirect(url_for('profile_settings'))
+
+@app.route('/verify-email/<token>')
+def verify_email(token):
+    user, email_from_token = User.verify_email_token(token)
+    if not user or user.email != email_from_token:
+        flash('Посилання для верифікації недійсне або застаріле.', 'danger')
+        return redirect(url_for('index'))
+    if user.is_email_verified:
+        flash('Цей email вже було підтверджено.', 'info')
+    else:
+        user.is_email_verified = True
+        db.session.commit()
+        flash('Дякуємо! Ваш email успішно підтверджено.', 'success')
+    if current_user.is_authenticated and current_user.id == user.id:
+        return redirect(url_for('profile_settings'))
+    else:
+        login_user(user)
+        return redirect(url_for('index'))
+
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
-    # [ОНОВЛЕНО] Перевірка кошика тепер працює для обох типів користувачів
     if current_user.is_authenticated:
-        # Для залогіненого користувача перевіряємо кошик в БД
         is_cart_empty = not db.session.query(CartItem.query.filter_by(user_id=current_user.id).exists()).scalar()
     else:
-        # Для гостя перевіряємо сесію
         is_cart_empty = not session.get('cart')
 
     if is_cart_empty:
@@ -963,7 +1133,6 @@ def checkout():
         return redirect(url_for('catalog'))
 
     if request.method == 'POST':
-        # --- БЛОК ВАЛІДАЦІЇ (без змін) ---
         errors = []
         first_name = request.form.get('customer_first_name', '').strip()
         last_name = request.form.get('customer_last_name', '').strip()
@@ -990,18 +1159,15 @@ def checkout():
                 flash(error, 'danger')
             return render_template('checkout.html')
 
-        # --- [ПОВНІСТЮ ПЕРЕРОБЛЕНО] Логіка отримання даних з кошика ---
         cart_items_to_process = []
         total_cost = 0
 
         if current_user.is_authenticated:
-            # Для залогінених: беремо дані з бази даних
             user_cart_items = current_user.cart_items.all()
             for item in user_cart_items:
                 cart_items_to_process.append({'product': item.product, 'quantity': item.quantity})
                 total_cost += item.product.price * item.quantity
         else:
-            # Для гостей: беремо дані з сесії
             cart_session = session.get('cart', {})
             product_ids = [int(pid) for pid in cart_session.keys()]
             products = Product.query.filter(Product.id.in_(product_ids)).all()
@@ -1013,7 +1179,6 @@ def checkout():
                     cart_items_to_process.append({'product': product, 'quantity': qty})
                     total_cost += product.price * qty
 
-        # --- Логіка створення замовлення (з невеликими змінами) ---
         user_id_to_assign = current_user.id if current_user.is_authenticated else None
         if not user_id_to_assign:
             user_by_phone = User.query.filter_by(phone=customer_phone).first()
@@ -1041,7 +1206,6 @@ def checkout():
             db.session.add(OrderItem(order_id=order.id, product_id=product.id, quantity=quantity, price=product.price))
             order_items_for_email_and_tg.append({'product': product, 'quantity': quantity, 'price': product.price})
 
-        # [ОНОВЛЕНО] Очищення кошика для обох типів користувачів
         if current_user.is_authenticated:
             CartItem.query.filter_by(user_id=current_user.id).delete()
         else:
@@ -1049,7 +1213,6 @@ def checkout():
 
         db.session.commit()
 
-        # --- Блок відправки сповіщень (без змін, використовуємо версію з минулого виправлення) ---
         try:
             admin_email = os.getenv("SMTP_USER")
             email_pass = os.getenv("EMAIL_PASS")
@@ -1078,7 +1241,6 @@ def checkout():
         flash('Дякуємо! Ваше замовлення прийнято.', 'success')
         return redirect(url_for('index'))
 
-    # GET-запит: просто показуємо сторінку
     return render_template('checkout.html')
 
 
@@ -1105,45 +1267,44 @@ def my_reviews():
     return render_template('my_reviews.html', reviews=reviews)
 
 
-# app.py
-
 @app.route('/profile/settings', methods=['GET', 'POST'])
 @login_required
 def profile_settings():
     if request.method == 'POST':
-        # --- БЛОК ОНОВЛЕННЯ ІНФОРМАЦІЇ ---
         if 'update_info' in request.form:
             current_user.first_name = request.form.get('first_name')
             current_user.last_name = request.form.get('last_name')
+            new_email = request.form.get('email', '').strip().lower()
+            email_changed = new_email and new_email != current_user.email
 
-            # [ОНОВЛЕНО] Додано перевірку унікальності номера телефону
-            new_phone = request.form.get('phone')
-            if new_phone and new_phone != current_user.phone:
-                # Перевіряємо, чи інший користувач вже використовує цей номер
-                existing_user = User.query.filter(User.phone == new_phone, User.id != current_user.id).first()
-                if existing_user:
-                    flash('Цей номер телефону вже використовується іншим користувачем.', 'danger')
-                    return redirect(url_for('profile_settings'))
-            current_user.phone = new_phone
-
-            new_email = request.form.get('email')
-            if new_email != current_user.email:
-                if User.query.filter_by(email=new_email).first():
+            if email_changed:
+                if User.query.filter(User.email == new_email, User.id != current_user.id).first():
                     flash('Цей email вже використовується іншим користувачем.', 'danger')
                     return redirect(url_for('profile_settings'))
+
                 current_user.email = new_email
+                current_user.is_email_verified = False
+                try:
+                    token = current_user.get_email_verify_token()
+                    html_body = render_template('email/verify_email.html', user=current_user, token=token,
+                                                shop=shop_info)
+                    send_email(current_user.email, f"Підтвердження email для {shop_info['name']}", html_body)
+                    flash('Дані оновлено. На вашу нову пошту надіслано лист для підтвердження.', 'info')
+                except Exception as e:
+                    app.logger.error(f"Error sending verification email for {new_email}: {e}")
+                    flash('Дані оновлено, але не вдалося надіслати лист. Спробуйте пізніше.', 'warning')
+            else:
+                flash('Ваші дані успішно оновлено.', 'success')
 
             db.session.commit()
-            flash('Ваші дані успішно оновлено.', 'success')
 
-        # --- БЛОК ЗМІНИ ПАРОЛЮ (без змін) ---
         elif 'change_password' in request.form:
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
             confirm_password = request.form.get('confirm_password')
 
             if not current_user.password_hash:
-                flash('Неможливо змінити пароль, оскільки ви увійшли через соціальну мережу.', 'warning')
+                flash('Неможливо змінити пароль, оскільки ви увійшли через соціальну мережу або телефон.', 'warning')
             elif not current_user.check_password(current_password):
                 flash('Невірний поточний пароль.', 'danger')
             elif not new_password or len(new_password) < 6:
@@ -1155,14 +1316,11 @@ def profile_settings():
                 db.session.commit()
                 flash('Пароль успішно змінено.', 'success')
 
-        # [НОВЕ] Очищуємо сесійну змінну, якщо користувач оновив телефон
-        session.pop('hide_phone_prompt', None)
         return redirect(url_for('profile_settings'))
 
     return render_template('profile_settings.html')
 
 
-# [НОВЕ] Додайте цей маршрут в кінець файлу, перед запуском додатку
 @app.route('/api/hide_phone_prompt', methods=['POST'])
 @login_required
 def hide_phone_prompt():
@@ -1747,12 +1905,4 @@ def search_suggestions():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        if not User.query.filter_by(is_admin=True).first():
-            print(">>> Створення адміністратора...")
-            admin = User(username='admin', first_name='Admin', last_name='User', email='artemcool200911@gmail.com',
-                         is_admin=True)
-            admin.set_password('admin123')
-            db.session.add(admin);
-            db.session.commit()
-            print(">>> Адміністратора створено. Логін: admin, Пароль: admin123")
     app.run(debug=True, port=5000)

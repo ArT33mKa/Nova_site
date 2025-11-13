@@ -10,5 +10,6 @@ gunicorn # <-- Дуже важливий для роботи на сервері
 psycopg2-binary # <-- Для роботи з базою даних Postgres на Fly.io
 lxml
 Flask-Dance
+flask_limiter
 Flask-Login
 Werkzeug
