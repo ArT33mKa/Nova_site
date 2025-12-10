@@ -29,6 +29,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initAutoApplyFilters();
     document.querySelectorAll('.js-phone-mask').forEach(input => {
         applyPhoneMaskToInput(input);
+        // [ВИПРАВЛЕНО] Примусове форматування при завантаженні, якщо значення вже є
+        if (input.value) {
+            input.dispatchEvent(new Event('input'));
+        }
     });
 
     initInfiniteScroll();

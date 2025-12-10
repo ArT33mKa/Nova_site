@@ -118,6 +118,65 @@ app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET
 
 db = SQLAlchemy(app)
 
+
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    # Зовнішній ID з 1С (GUID), щоб не дублювати категорії при повторному імпорті
+    external_id = db.Column(db.String(64), unique=True, nullable=True)
+    name = db.Column(db.String(100), nullable=False)
+    slug = db.Column(db.String(100), index=True)  # Для URL (наприклад, nasosy)
+    parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
+
+    # Зв'язок для отримання підкатегорій
+    children = db.relationship('Category',
+                               backref=db.backref('parent', remote_side=[id]),
+                               lazy='dynamic')
+    # Зв'язок з товарами
+    products = db.relationship('Product', backref='category_rel', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<Category {self.name}>'
+
+
+# Допоміжна функція для транслітерації (створення slug для URL)
+def slugify(text):
+    """
+    Транслітерація українських назв в URL-friendly формат.
+    """
+    if not text:
+        return ""
+
+    # Словник для транслітерації
+    translit_map = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e',
+        'є': 'ye', 'ж': 'zh', 'з': 'z', 'и': 'y', 'і': 'i', 'ї': 'yi', 'й': 'y',
+        'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r',
+        'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch',
+        'ш': 'sh', 'щ': 'shch', 'ь': '', 'ю': 'yu', 'я': 'ya',
+        'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'H', 'Ґ': 'G', 'Д': 'D', 'Е': 'E',
+        'Є': 'Ye', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y', 'І': 'I', 'Ї': 'Yi', 'Й': 'Y',
+        'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R',
+        'С': 'S', 'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch',
+        'Ш': 'Sh', 'Щ': 'Shch', 'Ь': '', 'Ю': 'Yu', 'Я': 'Ya',
+        'ы': 'y', 'э': 'e', 'ё': 'yo', 'ъ': ''  # Для російських літер про всяк випадок
+    }
+
+    result = []
+    for char in text:
+        if char in translit_map:
+            result.append(translit_map[char])
+        elif char.isalnum():
+            result.append(char)
+        elif char.isspace() or char == '-':
+            result.append('-')
+
+    text = "".join(result)
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9-]', '', text)
+    text = re.sub(r'-+', '-', text).strip('-')
+
+    return text
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Будь ласка, увійдіть, щоб виконати цю дію."
@@ -224,13 +283,20 @@ class User(db.Model, UserMixin):
             return None
         return User.query.get(user_id)
 
+
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
     image = db.Column(db.String(255), nullable=True)
+
+    # Старе поле залишаємо як текстовий кеш назви категорії
     category = db.Column(db.String(100))
+
+    # НОВЕ ПОЛЕ: Зв'язок з динамічною категорією
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
+
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
     reviews_count = db.Column(db.Integer, default=0)
@@ -404,43 +470,60 @@ def index():
 
 
 def get_category_hierarchy():
-    MAIN_CATEGORIES = {
-        "Поливочна система": ["полив", "зрошення", "шланг", "конектор", "розпилювач", "краплинн", "дощувач", "іригац", "крапельн", "система"],
-        "Насоси та гідрофори": ["насос", "помпа", "гідрофор", "дренажн", "фекальн", "циркуляційн", "свердловин"],
-        "Водонагрівачі": ["бойлер", "водонагрівач", "тен"],
-        "Змішувачі та сифони": ["змішувач", "кран", "сифон", "душов", "лійка"],
-        "Вентиляція та витяжки": ["витяжк", "вентилятор", "решітка", "канал"],
-        "Газове обладнання": ["колонк", "газов", "конвектор"],
-        "Опалення та водопостачання": ["опален", "радіатор", "рушникосуш", "котел", "фітинг", "труба", "крани",
-                                       "тепла підлога"],
-        "Запчастини та комплектуючі": ["запчастин", "комплектуюч", "термопар", "автоматика", "реле", "мембрана"]
-    }
-    products = db.session.query(Product.category) \
-        .filter(Product.category.isnot(None), Product.category != '', Product.in_stock == True) \
-        .all()
+    """
+    Будує ієрархію категорій.
+    Відображає тільки ті категорії, де сумарно (разом з підкатегоріями) є товари > 0.
+    """
+    # Отримуємо кореневі категорії
+    root_categories = Category.query.filter_by(parent_id=None).order_by(Category.name).all()
+
     hierarchy = {}
-    other_category_name = "Різне"
-    for category_tuple in products:
-        category_name = category_tuple[0].strip()
-        if not category_name:
-            continue
-        assigned_main_category = None
-        for main_cat, keywords in MAIN_CATEGORIES.items():
-            if category_name.lower() == main_cat.lower():
-                assigned_main_category = main_cat
-                break
-            if any(keyword in category_name.lower() for keyword in keywords):
-                assigned_main_category = main_cat
-                break
-        if not assigned_main_category:
-            assigned_main_category = other_category_name
-        if assigned_main_category not in hierarchy:
-            hierarchy[assigned_main_category] = {'count': 0, 'subcategories': {}}
-        hierarchy[assigned_main_category]['count'] += 1
-        if category_name.lower() != assigned_main_category.lower():
-            if category_name not in hierarchy[assigned_main_category]['subcategories']:
-                hierarchy[assigned_main_category]['subcategories'][category_name] = 0
-            hierarchy[assigned_main_category]['subcategories'][category_name] += 1
+
+    DEFAULT_ICONS = {
+        'Поливочна система': 'irrigation.jpg',
+        'Насоси та гідрофори': 'pumps.jpg',
+        'Водонагрівачі': 'boilers.jpg',
+        'Змішувачі та сифони': 'faucets.jpg',
+        'Вентиляція та витяжки': 'hoods.jpg',
+        'Газове обладнання': 'gas_columns.jpg',
+        'Опалення та водопостачання': 'towel_dryers.jpg',
+        'Запчастини та комплектуючі': 'gas_parts.jpg'
+    }
+
+    for parent in root_categories:
+        subcats = {}
+        children_total_items = 0
+
+        # 1. Обробляємо підкатегорії
+        children = parent.children.order_by(Category.name).all()
+
+        for child in children:
+            # Рахуємо товари тільки в наявності (або приберіть filter_by, якщо треба всі)
+            child_count = child.products.filter_by(in_stock=True).count()
+
+            if child_count > 0:
+                subcats[child.name] = {
+                    'slug': child.slug,
+                    'count': child_count
+                }
+                children_total_items += child_count
+
+        # 2. Рахуємо товари в самій батьківській категорії
+        parent_direct_count = parent.products.filter_by(in_stock=True).count()
+
+        # 3. Загальна сума
+        total_category_count = parent_direct_count + children_total_items
+
+        # 4. ДОДАЄМО В МЕНЮ ТІЛЬКИ ЯКЩО Є ТОВАРИ ( > 0 )
+        if total_category_count > 0:
+            hierarchy[parent.name] = {
+                'slug': parent.slug,
+                'icon': DEFAULT_ICONS.get(parent.name, 'gas_parts.jpg'),
+                'subcategories': subcats,
+                'count': total_category_count,
+                'direct_count': parent_direct_count
+            }
+
     return hierarchy
 
 
@@ -448,117 +531,97 @@ def get_category_hierarchy():
 @app.route('/catalog/<path:category_slug>/')
 def catalog(category_slug):
     page = request.args.get('page', 1, type=int)
-    hierarchy = get_category_hierarchy()
-    min_price_str = request.args.get('min_price', '')
-    max_price_str = request.args.get('max_price', '')
+    min_price = request.args.get('min_price', type=float)
+    max_price = request.args.get('max_price', type=float)
     search_query = request.args.get('search', '').strip()
-    min_price = float(min_price_str) if min_price_str.isdigit() else None
-    max_price = float(max_price_str) if max_price_str.isdigit() else None
 
-    # Логіка редіректу тепер коректно обробляє пошук з існуючої категорії
-    if search_query:
-        found_product = Product.query.filter(
-            Product.name.ilike(f'%{search_query}%'),
-            Product.in_stock == True,
-            Product.description.isnot(None),
-            Product.description != ''
-        ).first()
-
-        if found_product and found_product.category:
-            product_main_category = None
-            MAIN_CATEGORIES_FOR_REDIRECT = {
-                "Поливочна система": ["полив", "зрошення", "шланг"],
-                "Насоси та гідрофори": ["насос", "помпа", "гідрофор"],
-                "Водонагрівачі": ["бойлер", "водонагрівач"], "Змішувачі та сифони": ["змішувач", "кран", "сифон"],
-                "Вентиляція та витяжки": ["витяжк", "вентилятор"], "Газове обладнання": ["колонк", "газов"],
-                "Опалення та водопостачання": ["опален", "радіатор", "котел"],
-                "Запчастини та комплектуючі": ["запчастин"]
-            }
-            for main_cat, keywords in MAIN_CATEGORIES_FOR_REDIRECT.items():
-                if any(keyword in found_product.category.lower() for keyword in keywords):
-                    product_main_category = main_cat
-                    break
-            if not product_main_category:
-                product_main_category = "Різне"
-
-            new_slug = product_main_category.replace(' ', '-').replace('/', '-')
-
-            if not category_slug or category_slug.replace('-', ' ').replace('/', ' ') != new_slug.replace('-', ' '):
-                redirect_args = request.args.copy()
-                redirect_args.pop('search', None)
-                redirect_args.pop('category_slug', None)
-                return redirect(url_for('catalog', category_slug=new_slug, search=search_query, **redirect_args))
-
+    # Базовий запит
     query = Product.query.filter(
         Product.in_stock == True,
-        Product.description.isnot(None),
-        Product.description != '',
         Product.image.notlike('default_tovar%')
     )
+
+    current_category_name = None
+    main_category_of_current = None
+    parent_category_slug = None
+
+    # Фільтрація по категорії
+    if category_slug:
+        clean_slug = category_slug.strip('/')
+        # Беремо останню частину URL (наприклад nasosy/glubinni -> glubinni)
+        target_slug = clean_slug.split('/')[-1]
+
+        # Шукаємо категорію в базі
+        category = Category.query.filter_by(slug=target_slug).first()
+
+        if category:
+            current_category_name = category.name
+
+            # Збираємо ID поточної категорії та всіх дітей
+            categories_ids = [category.id]
+            for child in category.children:
+                categories_ids.append(child.id)
+
+            query = query.filter(Product.category_id.in_(categories_ids))
+
+            # Визначаємо батьківську категорію для хлібних крихт
+            if category.parent:
+                main_category_of_current = category.parent.name
+                parent_category_slug = category.parent.slug
+            else:
+                main_category_of_current = category.name
+                parent_category_slug = category.slug
+
+            # Статистика переглядів
+            try:
+                cat_view = CategoryView.query.filter_by(name=category.name).first()
+                if not cat_view:
+                    cat_view = CategoryView(name=category.name)
+                    db.session.add(cat_view)
+                cat_view.views += 1
+                db.session.commit()
+            except:
+                db.session.rollback()
+        else:
+            # Fallback для старих посилань
+            cat_name_approx = clean_slug.replace('-', ' ').replace('/', ' ')
+            query = query.filter(Product.category.ilike(f"%{cat_name_approx}%"))
+            current_category_name = cat_name_approx.capitalize()
+
+    # Пошук
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    current_category = None
-    main_category_of_current = None
-    if category_slug:
-        category_name_from_slug = category_slug.replace('-', ' ').replace('/', ' ')
-        for main_cat, data in hierarchy.items():
-            if main_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
-                current_category = main_cat
-                main_category_of_current = main_cat
-                subcategories = list(data.get('subcategories', {}).keys())
-                all_cats_for_filter = [current_category] + subcategories
-                # [ВИПРАВЛЕНО] Зроблено фільтрацію нечутливою до регістру
-                query = query.filter(Product.category.ilike(current_category))
-                break
-            for sub_cat in data.get('subcategories', {}):
-                if sub_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
-                    current_category = sub_cat
-                    main_category_of_current = main_cat
-                    # [ВИПРАВЛЕНО] Змінено точне порівняння на нечутливе до регістру
-                    query = query.filter(Product.category.ilike(current_category))
-                    break
-            if current_category: break
-    if current_category:
-        try:
-            # Намагаємося знайти запис про категорію
-            cat_view = CategoryView.query.filter(func.lower(CategoryView.name) == func.lower(current_category)).first()
-            if cat_view:
-                cat_view.views += 1
-            else:
-                # Якщо не знайдено, створюємо новий запис
-                cat_view = CategoryView(name=current_category, views=1)
-                db.session.add(cat_view)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Помилка підрахунку переглядів категорії '{current_category}': {e}")
+    # Діапазон цін (потрібно рахувати ДО застосування фільтрів ціни)
+    price_stats_query = db.session.query(func.min(Product.price), func.max(Product.price))
+    if query.whereclause is not None:
+        price_stats_query = price_stats_query.filter(query.whereclause)
 
-    price_range_statement = select(func.min(Product.price), func.max(Product.price)).select_from(query.subquery())
-    price_range_result = db.session.execute(price_range_statement).first()
+    price_stats = price_stats_query.first()
+    min_available = math.floor(price_stats[0] or 0)
+    max_available = math.ceil(price_stats[1] or 0)
 
-    if price_range_result and price_range_result[0] is not None:
-        min_val, max_val = price_range_result
-        min_price_available = math.floor(min_val)
-        max_price_available = math.ceil(max_val)
-    else:
-        min_price_available = 0
-        max_price_available = 10000
-    if min_price:
+    # Фільтр цін користувача
+    if min_price is not None:
         query = query.filter(Product.price >= min_price)
-    if max_price:
+    if max_price is not None:
         query = query.filter(Product.price <= max_price)
 
-    # Кількість товарів на сторінці
     products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
 
-    current_filters = request.args.copy()
-    current_filters.pop('page', None)
+    hierarchy = get_category_hierarchy()
+
     return render_template(
-        'catalog.html', products=products, hierarchy=hierarchy, current_category=current_category,
-        main_category_of_current=main_category_of_current, current_filters=current_filters,
-        category_slug=category_slug, min_price_available=min_price_available,
-        max_price_available=max_price_available, search_query=search_query
+        'catalog.html',
+        products=products,
+        hierarchy=hierarchy,
+        current_category=current_category_name,
+        main_category_of_current=main_category_of_current,
+        parent_category_slug=parent_category_slug,  # Передаємо слаг батька
+        category_slug=category_slug,
+        min_price_available=min_available,
+        max_price_available=max_available,
+        search_query=search_query
     )
 
 
@@ -840,12 +903,14 @@ def update_cart_quantity(product_id):
     return jsonify(status="error", message="Товар не знайдено"), 404
 
 
+# --- Вставте цю функцію замість старої route get_cart ---
 @app.route('/get_cart')
+@limiter.exempt # Цей рядок вимикає ліміт запитів для кошика
 def get_cart():
     cart_items, total = [], 0
 
     if current_user.is_authenticated:
-        # Для залогінених: беремо з бази даних
+        # Для залогінених
         db_cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
         for item in db_cart_items:
             product = item.product
@@ -857,7 +922,7 @@ def get_cart():
                 })
                 total += product.price * item.quantity
     else:
-        # Для гостей: беремо з сесії
+        # Для гостей
         cart = session.get("cart", {})
         if cart:
             product_ids = [int(pid) for pid in cart.keys() if pid.isdigit()]
@@ -1364,21 +1429,51 @@ def admin_reviews():
 @login_required
 @admin_required
 def add_product():
+    # Отримуємо всі категорії для випадаючого списку
+    categories = Category.query.order_by(Category.name).all()
+
     if request.method == 'POST':
+        cat_id = request.form.get('category_id')
+        new_cat_name = request.form.get('new_category_name')
+
+        final_category_id = None
+        final_category_name = "Різне"
+
+        # Логіка: якщо введена нова категорія - створюємо її
+        if new_cat_name and new_cat_name.strip():
+            new_cat_name = new_cat_name.strip()
+            existing_cat = Category.query.filter_by(name=new_cat_name).first()
+            if existing_cat:
+                final_category_id = existing_cat.id
+                final_category_name = existing_cat.name
+            else:
+                # Створення нової кореневої категорії
+                new_cat = Category(name=new_cat_name, slug=slugify(new_cat_name))
+                db.session.add(new_cat)
+                db.session.commit()
+                final_category_id = new_cat.id
+                final_category_name = new_cat.name
+        elif cat_id:
+            cat = Category.query.get(cat_id)
+            if cat:
+                final_category_id = cat.id
+                final_category_name = cat.name
+
         new_product = Product(
             name=request.form['name'],
             price=float(request.form['price']),
             description=request.form['description'],
             image=_get_cloudinary_url(request.form['image'].strip()),
-            category=request.form['category'],
+            category_id=final_category_id,  # ID
+            category=final_category_name,  # Text fallback
             in_stock='in_stock' in request.form
         )
         db.session.add(new_product)
         db.session.commit()
         flash(f"Товар '{new_product.name}' додано!", "success")
         return redirect(url_for('catalog'))
-    return render_template("add_product.html")
 
+    return render_template("add_product.html", categories=categories)
 
 @app.route("/admin/edit_product/<int:product_id>", methods=['GET', 'POST'])
 @login_required
@@ -1549,146 +1644,173 @@ def _get_cloudinary_url(image_filename):
 @app.route('/api/bas_import', methods=['POST'], strict_slashes=False)
 @require_api_key
 def bas_import():
-    """ [ОНОВЛЕНА ВЕРСІЯ З ДЕТАЛЬНИМ ЛОГУВАННЯМ] """
-    app.logger.info("BAS Import: Отримано запит на імпорт.")
+    app.logger.info("BAS Import: Start dynamic categorization import.")
 
     if 'file' not in request.files:
-        app.logger.warning("BAS Import: Запит без файлу. Відхилено.")
-        return "failure\nFile part is missing in the request.", 400
+        return "failure\nFile part is missing.", 400
 
     cml_file = request.files['file']
     if cml_file.filename == '':
-        app.logger.warning("BAS Import: Надіслано порожній файл. Відхилено.")
         return "failure\nNo selected file.", 400
-
-    app.logger.info(f"BAS Import: Отримано файл '{cml_file.filename}'. Починаю обробку...")
 
     try:
         raw_data = cml_file.read()
+
+        # Спроба визначити кодування та розпарсити XML
         try:
-            # Спершу пробуємо стандартне кодування UTF-8
             parser = lxml_etree.XMLParser(recover=True, encoding='utf-8')
             root = lxml_etree.fromstring(raw_data, parser=parser)
-            app.logger.info("BAS Import: Файл успішно розпарсено в кодуванні UTF-8.")
         except Exception:
-            # Якщо не вийшло, пробуємо Windows-1251, що часто використовується в 1С/BAS
-            app.logger.warning("BAS Import: Не вдалося розпарсити як UTF-8. Пробую Windows-1251...")
             parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
             root = lxml_etree.fromstring(raw_data, parser=parser)
-            app.logger.info("BAS Import: Файл успішно розпарсено в кодуванні Windows-1251.")
 
-        # Видалення неймспейсів для спрощення пошуку
+        # Видалення неймспейсів
         for elem in root.getiterator():
             if '}' in elem.tag:
                 elem.tag = elem.tag.split('}', 1)[1]
 
+        # 1. АВТОМАТИЧНЕ СТВОРЕННЯ КАТЕГОРІЙ
+        # Знаходимо класифікатор груп
+        classifier_groups = root.findall('.//Классификатор/Группы/Группа')
+        # Якщо в класифікаторі пусто, шукаємо просто групи (іноді структура відрізняється)
+        if not classifier_groups:
+            classifier_groups = root.findall('.//Группы/Группа')
+
+        # Словник для мапінгу external_id -> db_id
+        category_map = {}
+
+        def process_groups(group_nodes, parent_db_id=None):
+            """Рекурсивна функція для обробки дерева категорій"""
+            for group in group_nodes:
+                ext_id = group.findtext('Ид')
+                name = group.findtext('Наименование')
+
+                if not ext_id or not name:
+                    continue
+
+                # Шукаємо категорію в БД або створюємо нову
+                cat = Category.query.filter_by(external_id=ext_id).first()
+                if not cat:
+                    # Перевірка, чи існує категорія з такою ж назвою (щоб уникнути дублів при ручному створенні)
+                    cat = Category.query.filter_by(name=name).first()
+                    if cat:
+                        cat.external_id = ext_id  # Прив'язуємо до ID з 1С
+                    else:
+                        cat = Category(
+                            external_id=ext_id,
+                            name=name,
+                            slug=slugify(name),
+                            parent_id=parent_db_id
+                        )
+                        db.session.add(cat)
+                else:
+                    # Оновлюємо назву та батька, якщо змінилися в 1С
+                    cat.name = name
+                    cat.parent_id = parent_db_id
+                    if not cat.slug:
+                        cat.slug = slugify(name)
+
+                db.session.flush()  # Щоб отримати cat.id
+                category_map[ext_id] = cat.id
+
+                # Рекурсивно обробляємо підгрупи
+                subgroups = group.find('Группы')
+                if subgroups is not None:
+                    process_groups(subgroups.findall('Группа'), cat.id)
+
+        # Запускаємо обробку категорій
+        process_groups(classifier_groups)
+        db.session.commit()
+        app.logger.info(f"BAS Import: Categories processed. Total categories mapped: {len(category_map)}")
+
+        # 2. ОБРОБКА ТОВАРІВ
         catalog_node = root.find('.//Каталог')
-        if catalog_node is None:
-            app.logger.error("BAS Import: Не знайдено тег <Каталог> у файлі.")
-            return "failure\nНе знайдено тег <Каталог>.", 400
+        products_from_xml = catalog_node.findall('.//Товар') if catalog_node is not None else []
 
-        groups = {g.findtext('Ид'): g.findtext('Наименование') for g in root.findall('.//Группа')}
-        products_from_xml = catalog_node.findall('.//Товар')
-        app.logger.info(f"BAS Import: В XML знайдено {len(products_from_xml)} товарів. Починаю оптимізовану обробку...")
+        existing_products_map = {p.name: p for p in db.session.query(Product).all()}
 
-        app.logger.info("BAS Import: Завантажую існуючі товари з бази даних...")
-        existing_products_map = {p.name: p.id for p in db.session.query(Product.id, Product.name).all()}
-        app.logger.info(f"BAS Import: Успішно завантажено {len(existing_products_map)} існуючих товарів з бази даних.")
-
-        products_to_update = []
-        products_to_add = []
+        updated_count = 0
+        added_count = 0
 
         for product_node in products_from_xml:
-            product_id_from_xml = product_node.findtext('Ид')
-            if not product_id_from_xml: continue
-
+            product_id_xml = product_node.findtext('Ид')  # GUID товару (поки не зберігаємо, використовуємо ім'я)
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
+
+            # Визначення категорії товару
+            group_id_node = product_node.find('.//Группы/Ид')
+            cat_ext_id = group_id_node.text if group_id_node is not None else None
+
+            # Отримуємо ID категорії з нашого мапінгу
+            db_category_id = category_map.get(cat_ext_id)
+            # Отримуємо об'єкт категорії для запису назви в старе поле
+            category_obj = Category.query.get(db_category_id) if db_category_id else None
+            category_name_str = category_obj.name if category_obj else "Різне"
+
             description = (product_node.findtext('Описание') or '').strip()
 
-            group_id_node = product_node.find('.//Группы/Ид')
-            group_id = group_id_node.text if group_id_node is not None else None
-            category = groups.get(group_id, "Різне")
-
+            # Обробка картинки
+            image_filename_xml = ''
             main_image_node = product_node.find(".//Картинка[@main_image='1']")
             if main_image_node is not None:
-                image_filename_from_xml = main_image_node.text
+                image_filename_xml = main_image_node.text
             else:
-                image_filename_from_xml = product_node.findtext('Картинка') or ''
-            image_filename_from_xml = image_filename_from_xml.strip()
+                image_filename_xml = product_node.findtext('Картинка') or ''
 
+            # Ціна та наявність
             price = 0.0
             in_stock = False
-
-            offer_node = root.find(f".//Предложение[Ид='{product_id_from_xml}']")
+            offer_node = root.find(f".//Предложение[Ид='{product_id_xml}']")
             if offer_node is not None:
                 price_node = offer_node.find('.//ЦенаЗаЕдиницу')
                 if price_node is not None and price_node.text:
                     try:
                         price = float(re.sub(r'[^\d.]', '', price_node.text.replace(',', '.')))
-                    except (ValueError, AttributeError): pass
+                    except:
+                        pass
 
-                quantity_node = offer_node.find('Количество')
-                if quantity_node is not None and quantity_node.text:
+                qty_node = offer_node.find('Количество')
+                if qty_node is not None and qty_node.text:
                     try:
-                        if int(float(quantity_node.text.strip())) > 0: in_stock = True
-                    except (ValueError, TypeError): pass
+                        if float(qty_node.text.replace(',', '.')) > 0: in_stock = True
+                    except:
+                        pass
 
-            # Додаткова перевірка наявності через властивості товару
+            # Додаткова перевірка наявності
             if not in_stock:
-                stock_prop_node = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
-                if stock_prop_node is not None and stock_prop_node.text and stock_prop_node.text.lower() == 'true':
+                stock_prop = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
+                if stock_prop is not None and stock_prop.text and stock_prop.text.lower() == 'true':
                     in_stock = True
-                else:
-                    stock_prop_node_alt = product_node.find(".//ЗначенняРеквизита[Наименование='Наличие']/Значение")
-                    if stock_prop_node_alt is not None and stock_prop_node_alt.text and stock_prop_node_alt.text.strip().lower() in ['true', 'да', 'є', 'yes']:
-                         in_stock = True
 
-            product_data = {
-                'name': name,
-                'price': price,
-                'description': description,
-                'category': category,
-                'image': _get_cloudinary_url(image_filename_from_xml),
-                'in_stock': in_stock
-            }
-
-            if name in existing_products_map:
-                product_data['id'] = existing_products_map[name]
-                products_to_update.append(product_data)
+            # Створення або оновлення товару
+            product = existing_products_map.get(name)
+            if product:
+                product.price = price
+                product.description = description
+                product.category_id = db_category_id
+                product.category = category_name_str  # Для сумісності
+                product.image = _get_cloudinary_url(image_filename_xml)
+                product.in_stock = in_stock
+                updated_count += 1
             else:
-                products_to_add.append(product_data)
+                new_product = Product(
+                    name=name,
+                    price=price,
+                    description=description,
+                    category_id=db_category_id,
+                    category=category_name_str,  # Для сумісності
+                    image=_get_cloudinary_url(image_filename_xml),
+                    in_stock=in_stock
+                )
+                db.session.add(new_product)
+                added_count += 1
 
-        updated_count = len(products_to_update)
-        added_count = len(products_to_add)
-        app.logger.info(f"BAS Import: Підготовлено до оновлення: {updated_count}. Підготовлено до додавання: {added_count}.")
-
-        if products_to_add:
-            app.logger.info(f"BAS Import: Виконую пакетне додавання {len(products_to_add)} нових товарів...")
-            db.session.bulk_insert_mappings(Product, products_to_add)
-            app.logger.info("BAS Import: Пакетне додавання завершено.")
-
-        if products_to_update:
-            app.logger.info(f"BAS Import: Виконую пакетне оновлення {len(products_to_update)} існуючих товарів...")
-            db.session.bulk_update_mappings(Product, products_to_update)
-            app.logger.info("BAS Import: Пакетне оновлення завершено.")
-
-        if products_to_add or products_to_update:
-            app.logger.info("BAS Import: Зберігаю зміни в базі даних (commit)...")
-            db.session.commit()
-            app.logger.info("BAS Import: Зміни успішно збережено.")
-        else:
-            app.logger.info("BAS Import: Немає товарів для додавання або оновлення.")
-
-        message = f"Імпорт CommerceML успішно завершено. Оновлено: {updated_count}, Додано нових: {added_count}."
-        app.logger.info(f"BAS Import: {message}")
-        return "success"
+        db.session.commit()
+        return f"success\nCategories synced. Updated: {updated_count}, Added: {added_count}"
 
     except Exception as e:
         db.session.rollback()
-        # Ось тут логуємо критичну помилку з повним шляхом, що дуже допоможе в зневадженні
-        error_details = traceback.format_exc()
-        app.logger.error(f"BAS Import: КРИТИЧНА ПОМИЛКА під час обробки файлу: {e}\n{error_details}")
-        return f"failure\nВнутрішня помилка сервера: {e}", 500
+        app.logger.error(f"BAS Import Error: {traceback.format_exc()}")
+        return f"failure\nServer error: {e}", 500
 
 
 def require_bot_api_key(f):

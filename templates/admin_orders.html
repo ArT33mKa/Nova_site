@@ -8,8 +8,6 @@
     </div>
 </header>
 <div class="container" style="padding-top: 40px; padding-bottom: 60px;">
-    {% include '_review_flash_messages.html' %}
-
     <!-- Фільтри статусів -->
     <div class="tabs" style="margin-bottom: 30px;">
         <a href="{{ url_for('admin_orders', status='all') }}" class="tab-link {% if current_status == 'all' %}active{% endif %}">Всі</a>

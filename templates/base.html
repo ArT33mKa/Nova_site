@@ -49,5 +49,25 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
     {% block extra_js %}{% endblock %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                {% for category, message in messages %}
+                    // Перетворення категорій Flask на типи Toast
+                    // 'danger' -> 'error', 'info'/'warning' -> 'info', 'success' -> 'success'
+                    var type = '{{ category }}';
+                    if (type === 'danger') type = 'error';
+                    if (type === 'warning') type = 'error';
+
+                    // Виклик твоєї JS функції showToast
+                    showToast("{{ message }}", type);
+                {% endfor %}
+            });
+        </script>
+        {% endif %}
+    {% endwith %}
+
 </body>
 </html>

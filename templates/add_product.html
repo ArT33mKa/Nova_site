@@ -22,8 +22,19 @@
             <input type="text" id="image" name="image" class="form-control" required>
         </div>
         <div class="form-group">
-            <label for="category">Категорія</label>
-            <input type="text" id="category" name="category" class="form-control" required>
+            <label for="category_id">Оберіть існуючу категорію</label>
+            <select id="category_id" name="category_id" class="form-control">
+                <option value="">-- Не обрано --</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }} {% if cat.parent %} (у {{ cat.parent.name }}){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group" style="margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;">
+            <label for="new_category_name">АБО створіть нову категорію</label>
+            <input type="text" id="new_category_name" name="new_category_name" class="form-control" placeholder="Назва нової категорії">
+            <small class="text-muted">Заповнюйте тільки якщо потрібної категорії немає у списку вище.</small>
         </div>
         <div class="form-group">
             <label class="checkbox-item">

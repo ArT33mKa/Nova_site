@@ -2740,3 +2740,74 @@ img {
     from, to { border-color: var(--primary-color); }
     50% { border-color: transparent; }
 }
+
+/* --- Файл: static/css/main.css --- */
+/* --- Додайте в кінець файлу --- */
+
+.category-item-wrapper {
+    margin-bottom: 5px;
+}
+
+.parent-category-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.filter-category-link {
+    flex-grow: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: var(--dark-color);
+    font-weight: 600; /* Жирний для батьківських */
+}
+
+.filter-category-link.active {
+    color: var(--primary-color);
+    background-color: #e9eef1;
+}
+
+/* Кнопка стрілочки */
+.toggle-subcats-btn {
+    background: none;
+    border: none;
+    padding: 0 10px;
+    cursor: pointer;
+    color: var(--gray-color);
+    transition: transform 0.3s ease;
+}
+.toggle-subcats-btn.rotated {
+    transform: rotate(180deg);
+}
+
+/* Контейнер підкатегорій */
+.subcategory-list-nested {
+    display: none; /* Приховано за замовчуванням */
+    flex-direction: column;
+    padding-left: 15px; /* Відступ зліва */
+    margin-top: 5px;
+    border-left: 2px solid #eee;
+}
+
+.subcategory-list-nested.open {
+    display: flex; /* Показуємо, якщо клас open */
+}
+
+.filter-subcategory-link {
+    padding: 6px 10px;
+    font-size: 0.95rem;
+    color: #555;
+    text-decoration: none;
+    display: flex;
+    justify-content: space-between;
+}
+
+.filter-subcategory-link:hover,
+.filter-subcategory-link.active {
+    color: var(--primary-color);
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}

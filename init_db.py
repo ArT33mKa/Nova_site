@@ -6,29 +6,17 @@ def initialize_database():
     НЕ завантажує товари.
     """
     with app.app_context():
-        print(">>> 1. Створення таблиць бази даних...")
-        db.create_all()
-        print(">>>    Таблиці успішно створено.")
+        # Шукаємо твого користувача (заміни на свій телефон АБО email)
+        me = User.query.filter_by(phone='+380667268392').first()
+        # АБО, якщо ти входив через Google:
+        # me = User.query.filter_by(email='tviy_email@gmail.com').first()
 
-        if not User.query.filter_by(username='admin').first():
-            print(">>> 2. Створення адміністратора...")
-            admin = User(
-                username='admin',
-                first_name='Артем',
-                # [ЗМІНЕНО] Прізвище тепер є обов'язковим полем
-                last_name='Омельченко',
-                email='artemcool200911@gmail.com',
-                is_admin=True
-            )
-            admin.set_password('admin123')
-            db.session.add(admin)
-            db.session.commit()
-            print(">>>    Адміністратора створено (логін: admin, пароль: admin123).")
+        if me:
+            me.is_admin = True  # Робимо адміном
+            db.session.commit()  # Зберігаємо зміни
+            print(f"Користувача {me.first_name} зроблено адміном!")
         else:
-            print(">>> 2. Адміністратор вже існує, створення пропущено.")
-
-        print("\n>>> Ініціалізацію бази даних завершено. Сайт готовий до роботи.")
-        print(">>> Тепер ви можете завантажувати товари з вашої системи BAS.")
+            print("Користувача не знайдено. Спочатку зареєструйся на сайті.")
 
 if __name__ == '__main__':
     initialize_database()
