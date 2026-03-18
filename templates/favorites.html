@@ -1,31 +1,66 @@
 {% extends "base.html" %}
+{% block title %}Обрані товари{% endblock %}
 
 {% block content %}
-<section class="container catalog-page">
-  <h2 class="catalog-title">Обрані товари</h2>
-  <div id="favoritesList" class="products"></div>
+<section class="container catalog-page" style="min-height: 60vh;">
+  <div class="breadcrumbs">
+      <a href="{{ url_for('index') }}">Головна</a> / <span>Обране</span>
+  </div>
+
+  <h1 class="page-title">Обрані товари</h1>
+
+  <div id="favoritesList" class="products-grid">
+      <!-- JavaScript populates this from LocalStorage -->
+      <div class="text-center" style="grid-column: 1/-1; padding: 60px;">
+          <span class="btn-spinner" style="border-color: #333; display: inline-block;"></span>
+      </div>
+  </div>
 </section>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const container = document.getElementById("favoritesList");
   const favorites = JSON.parse(localStorage.getItem("favorites")) || [];
 
   if (!favorites.length) {
-    container.innerHTML = "<p>У вас ще немає обраних товарів.</p>";
+    container.innerHTML = `
+        <div class="text-center" style="grid-column: 1 / -1; padding: 60px; background: white; border-radius: 12px;">
+            <i class="far fa-heart" style="font-size: 4rem; color: #cbd5e1; margin-bottom: 20px;"></i>
+            <h3>Список обраного порожній</h3>
+            <p>Додавайте товари, щоб не загубити їх.</p>
+            <a href="{{ url_for('catalog') }}" class="btn btn-primary" style="margin-top: 20px;">Перейти до каталогу</a>
+        </div>
+    `;
     return;
   }
 
-  container.innerHTML = favorites.map(p => `
-    <div class="product">
-      <a href="${p.url}">
-        <img src="${p.image}" alt="${p.name}" />
-      </a>
-      <h4>${p.name}</h4>
-      <p>${p.price} грн</p>
-      <button class="btn add-to-cart" data-id="${p.id}">Додати в кошик</button>
-    </div>
-  `).join("");
+  // Fetch product details
+  try {
+      const res = await fetch('/get_products_by_ids', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ ids: favorites })
+      });
+      const products = await res.json();
+
+      container.innerHTML = products.map(p => `
+        <div class="product-card" data-id="${p.id}">
+            <div class="product-image">
+                <button class="favorite-btn active"><i class="fas fa-heart"></i></button>
+                <a href="${p.url}"><img src="${p.image}" alt="${p.name}"></a>
+            </div>
+            <div class="product-info">
+                <h3 class="product-name"><a href="${p.url}">${p.name}</a></h3>
+                <div class="product-footer">
+                    <div class="price">${p.price.toFixed(2)} ₴</div>
+                </div>
+                <button class="btn add-to-cart-btn" data-id="${p.id}">Купити</button>
+            </div>
+        </div>
+      `).join("");
+  } catch (e) {
+      container.innerHTML = `<p>Помилка завантаження. Спробуйте оновити сторінку.</p>`;
+  }
 });
 </script>
 {% endblock %}

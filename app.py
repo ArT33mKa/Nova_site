@@ -10,12 +10,15 @@ import firebase_admin
 from firebase_admin import credentials, auth
 import json
 import random
+from datetime import timezone
 import secrets
 from itsdangerous import URLSafeTimedSerializer
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from twilio.rest import Client
+import cloudinary
 import cloudinary.utils
+import cloudinary.uploader # <--- ОБОВ'ЯЗКОВО ДОДАТИ ЦЕ
 from functools import wraps
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -63,8 +66,6 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # --- [ДОДАНО] Налаштування логера для подій безпеки ---
-# Коментар: Створюємо окремий файл для логів, пов'язаних з безпекою,
-# щоб легко відстежувати спроби входу, зміни паролів тощо.
 security_logger = logging.getLogger('security')
 security_handler = logging.FileHandler('security.log')
 security_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
@@ -72,24 +73,20 @@ security_logger.addHandler(security_handler)
 security_logger.setLevel(logging.INFO)
 
 # --- [ДОДАНО] Налаштування лімітера запитів (Rate Limiter) ---
-# Коментар: Це критично важливий елемент захисту від brute-force атак.
-# Ми обмежуємо кількість спроб для чутливих ендпоінтів.
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=os.getenv("RATELIMIT_STORAGE_URI", "memory://"), # Використовуйте Redis у production
+    storage_uri=os.getenv("RATELIMIT_STORAGE_URI", "memory://"),
     strategy="fixed-window"
 )
 
 if __name__ != '__main__':
-    # Якщо додаток запущено через Gunicorn (на Fly.io)
     gunicorn_logger = logging.getLogger('gunicorn.error')
     app.logger.handlers = gunicorn_logger.handlers
     app.logger.setLevel(gunicorn_logger.level)
     app.logger.info('>>> Логування Flask інтегровано з Gunicorn.')
 else:
-    # Якщо запущено локально (python app.py)
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     app.logger.info('>>> Запущено в режимі розробки, використано basicConfig.')
 
@@ -121,32 +118,22 @@ db = SQLAlchemy(app)
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    # Зовнішній ID з 1С (GUID), щоб не дублювати категорії при повторному імпорті
     external_id = db.Column(db.String(64), unique=True, nullable=True)
     name = db.Column(db.String(100), nullable=False)
-    slug = db.Column(db.String(100), index=True)  # Для URL (наприклад, nasosy)
+    slug = db.Column(db.String(100), index=True)
     parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
-
-    # Зв'язок для отримання підкатегорій
     children = db.relationship('Category',
                                backref=db.backref('parent', remote_side=[id]),
                                lazy='dynamic')
-    # Зв'язок з товарами
     products = db.relationship('Product', backref='category_rel', lazy='dynamic')
 
     def __repr__(self):
         return f'<Category {self.name}>'
 
 
-# Допоміжна функція для транслітерації (створення slug для URL)
 def slugify(text):
-    """
-    Транслітерація українських назв в URL-friendly формат.
-    """
     if not text:
         return ""
-
-    # Словник для транслітерації
     translit_map = {
         'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e',
         'є': 'ye', 'ж': 'zh', 'з': 'z', 'и': 'y', 'і': 'i', 'ї': 'yi', 'й': 'y',
@@ -158,9 +145,8 @@ def slugify(text):
         'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R',
         'С': 'S', 'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch',
         'Ш': 'Sh', 'Щ': 'Shch', 'Ь': '', 'Ю': 'Yu', 'Я': 'Ya',
-        'ы': 'y', 'э': 'e', 'ё': 'yo', 'ъ': ''  # Для російських літер про всяк випадок
+        'ы': 'y', 'э': 'e', 'ё': 'yo', 'ъ': ''
     }
-
     result = []
     for char in text:
         if char in translit_map:
@@ -169,12 +155,10 @@ def slugify(text):
             result.append(char)
         elif char.isspace() or char == '-':
             result.append('-')
-
     text = "".join(result)
     text = text.lower()
     text = re.sub(r'[^a-z0-9-]', '', text)
     text = re.sub(r'-+', '-', text).strip('-')
-
     return text
 
 login_manager = LoginManager(app)
@@ -230,9 +214,9 @@ def send_telegram_notification(order, items):
 
 
 class User(db.Model, UserMixin):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(80), nullable=False)
-    # [ЗМІНЕНО] Прізвище тепер є обов'язковим для консистентності даних.
     last_name = db.Column(db.String(80), nullable=False)
     is_email_verified = db.Column(db.Boolean, default=False)
     phone = db.Column(db.String(20), unique=True, nullable=True)
@@ -249,9 +233,8 @@ class User(db.Model, UserMixin):
         s = URLSafeTimedSerializer(app.secret_key)
         return s.dumps({'user_id': self.id, 'email': self.email})
 
-    # [ДОДАНО] Статичний метод для верифікації токена email
     @staticmethod
-    def verify_email_token(token, max_age=86400):  # 24 години
+    def verify_email_token(token, max_age=86400):
         s = URLSafeTimedSerializer(app.secret_key)
         try:
             data = s.loads(token, max_age=max_age)
@@ -267,14 +250,12 @@ class User(db.Model, UserMixin):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-    # [ДОДАНО] Метод для генерації токена відновлення пароля
     def get_reset_token(self):
         s = URLSafeTimedSerializer(app.secret_key)
         return s.dumps({'user_id': self.id})
 
-    # [ДОДАНО] Статичний метод для верифікації токена
     @staticmethod
-    def verify_reset_token(token, max_age=1800):  # 30 хвилин
+    def verify_reset_token(token, max_age=1800):
         s = URLSafeTimedSerializer(app.secret_key)
         try:
             data = s.loads(token, max_age=max_age)
@@ -290,13 +271,8 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
     image = db.Column(db.String(255), nullable=True)
-
-    # Старе поле залишаємо як текстовий кеш назви категорії
     category = db.Column(db.String(100))
-
-    # НОВЕ ПОЛЕ: Зв'язок з динамічною категорією
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
-
     in_stock = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Float, default=0.0)
     reviews_count = db.Column(db.Integer, default=0)
@@ -308,7 +284,7 @@ class Review(db.Model):
     rating = db.Column(db.Integer, nullable=False, default=0)
     text = db.Column(db.Text, nullable=True)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     author_name = db.Column(db.String(100), nullable=True)
     author_email = db.Column(db.String(120), nullable=True)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
@@ -321,7 +297,7 @@ class Review(db.Model):
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     status = db.Column(db.String(50), nullable=False, default='Нове')
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     customer_name = db.Column(db.String(100), nullable=False)
     customer_phone = db.Column(db.String(20), nullable=False)
     delivery_method = db.Column(db.String(50))
@@ -345,13 +321,11 @@ class OrderItem(db.Model):
 
 class CartItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-
     user = db.relationship('User', back_populates='cart_items')
     product = db.relationship('Product')
-
     __table_args__ = (db.UniqueConstraint('user_id', 'product_id', name='_user_product_uc'),)
 
 class CategoryView(db.Model):
@@ -364,7 +338,7 @@ class OAuth(db.Model):
     provider = db.Column(db.String(50), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     token = db.Column(db.JSON, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey(User.id), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     user = db.relationship(User)
 
 
@@ -373,22 +347,26 @@ google_blueprint = make_google_blueprint(scope=["openid", "https://www.googleapi
                                          storage=SQLAlchemyStorage(OAuth, db.session, user=current_user))
 app.register_blueprint(google_blueprint, url_prefix="/login")
 
-shop_info = {"name": "НОВА ХВИЛЯ",
-             "categories": [{'name': 'Поливочна система', 'icon': 'irrigation.jpg'},
-                            {'name': 'Насоси та гідрофори', 'icon': 'pumps.jpg'},
-                            {'name': 'Водонагрівачі', 'icon': 'boilers.jpg'},
-                            {'name': 'Змішувачі та сифони', 'icon': 'faucets.jpg'},
-                            {'name': 'Вентиляція та витяжки', 'icon': 'hoods.jpg'},
-                            {'name': 'Газове обладнання', 'icon': 'gas_columns.jpg'},
-                            {'name': 'Опалення та водопостачання', 'icon': 'towel_dryers.jpg'},
-                            {'name': 'Запчастини та комплектуючі', 'icon': 'gas_parts.jpg'}],
-             "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
-             "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
-             "hours": {"Пн - Пт:": "8:00 - 17:00", "Субота:": "8:00 - 15:00", "Неділя:": "8:00 - 15:00"}}
+shop_info = {
+    "name": "НОВА ХВИЛЯ",
+    "categories": [
+        {'name': 'Поливочна система', 'icon': 'fas fa-water'},
+        {'name': 'Насоси та гідрофори', 'icon': 'fas fa-cogs'},
+        {'name': 'Водонагрівачі', 'icon': 'fas fa-temperature-high'},
+        {'name': 'Змішувачі та сифони', 'icon': 'fas fa-sink'},
+        {'name': 'Вентиляція та витяжки', 'icon': 'fas fa-wind'},
+        {'name': 'Газове обладнання', 'icon': 'fas fa-burn'},
+        {'name': 'Опалення та водопостачання', 'icon': 'fas fa-fire-alt'},
+        {'name': 'Запчастини та комплектуючі', 'icon': 'fas fa-tools'}
+    ],
+    "address": "вул. Гоголя, 47/2", "city": "м. Миргород",
+    "phone": ["+38 (050) 670-62-16", "+38 (095) 752-32-58"], "email": "novakhvylia@gmail.com",
+    "hours": {"Пн - Пт:": "8:00 - 17:00", "Субота:": "8:00 - 15:00", "Неділя:": "8:00 - 15:00"}
+}
 
 
 @login_manager.user_loader
-def load_user(user_id): return User.query.get(int(user_id))
+def load_user(user_id): return db.session.get(User, int(user_id))
 
 def email_verified_required(f):
     @wraps(f)
@@ -414,36 +392,37 @@ def admin_required(f):
 def merge_session_cart_to_db(user):
     session_cart = session.get('cart')
     if not session_cart:
-        return  # Нічого об'єднувати
+        return
 
-    # Отримуємо існуючий кошик користувача з БД у вигляді словника {product_id: item}
     db_cart_items = {item.product_id: item for item in user.cart_items}
 
     for product_id_str, quantity in session_cart.items():
         product_id = int(product_id_str)
         if product_id in db_cart_items:
-            # Якщо товар вже є в кошику БД, просто додаємо кількість
             db_cart_items[product_id].quantity += quantity
         else:
-            # Якщо товару немає, створюємо новий запис
             new_item = CartItem(user_id=user.id, product_id=product_id, quantity=quantity)
             db.session.add(new_item)
 
     db.session.commit()
-    session.pop('cart', None)  # Очищуємо гостьовий кошик
+    session.pop('cart', None)
 
 
 @app.context_processor
-def inject_now(): return {'now': datetime.utcnow(), 'shop': shop_info}
+def inject_now(): return {'now': datetime.now(timezone.utc), 'shop': shop_info}
 
 
 @app.route("/")
+@app.route("/")
 def index():
-    hero_slides = [{'image': 'hero-bg.jpg', 'title': 'Професійна сантехніка та обладнання',
-                    'subtitle': 'Якісні товари для вашого дому з гарантією та доставкою'},
-                   {'image': 'hero-bg2.jpg', 'title': 'Надійні насоси для будь-яких потреб',
-                    'subtitle': 'Від найкращих виробників'}, {'image': 'kotly.jpg', 'title': 'Все для систем опалення',
-                                                              'subtitle': 'Котли, бойлери та комплектуючі'}]
+    hero_slides = [
+        {'image': 'hero-bg.jpg', 'title': 'Професійна сантехніка та обладнання',
+         'subtitle': 'Якісні товари для вашого дому з гарантією та доставкою'},
+        {'image': 'hero-bg2.jpg', 'title': 'Надійні насоси для будь-яких потреб',
+         'subtitle': 'Від найкращих виробників'},
+        {'image': 'kotly.jpg', 'title': 'Все для систем опалення', 'subtitle': 'Котли, бойлери та комплектуючі'}
+    ]
+
     popular_products_query = db.session.query(
         Product,
         func.sum(OrderItem.quantity).label('total_sold')
@@ -452,33 +431,39 @@ def index():
         .order_by(func.sum(OrderItem.quantity).desc()) \
         .limit(5).all()
 
-    products = [p[0] for p in popular_products_query]  # Витягуємо тільки об'єкти Product
+    products = [p[0] for p in popular_products_query]
 
     main_categories_hierarchy = get_category_hierarchy()
-    # Створюємо список з іконками, які у вас були в shop_info
-    shop_category_icons = {cat['name'].lower(): cat.get('icon', 'gas_parts.jpg') for cat in shop_info['categories']}
+
+    def get_icon_for_category(name):
+        n = name.lower()
+        if 'насос' in n or 'станці' in n: return 'fas fa-water'
+        if 'бойлер' in n or 'нагрівач' in n: return 'fas fa-temperature-high'
+        if 'змішувач' in n or 'кран' in n or 'сифон' in n or 'мик' in n: return 'fas fa-sink'
+        if 'вентиляц' in n or 'витяжк' in n or 'домовент' in n: return 'fas fa-fan'
+        if 'газ' in n or 'колонк' in n or 'пальник' in n: return 'fas fa-fire'
+        if 'опалення' in n or 'радіатор' in n or 'тепла підлога' in n: return 'fas fa-fire-alt'
+        if 'труб' in n or 'фітинг' in n: return 'fas fa-project-diagram'
+        if 'ванна' in n or 'душ' in n: return 'fas fa-bath'
+        if 'кухня' in n: return 'fas fa-utensils'
+        if 'автоматика' in n or 'електрика' in n: return 'fas fa-microchip'
+        if 'інструмент' in n: return 'fas fa-tools'
+        if 'полив' in n: return 'fas fa-cloud-rain'
+        return 'fas fa-box-open'
 
     dynamic_categories = []
     for cat_name in sorted(main_categories_hierarchy.keys()):
         dynamic_categories.append({
             'name': cat_name,
-            'icon': shop_category_icons.get(cat_name.lower(), 'gas_parts.jpg')
-            # Використовуємо іконку, якщо знайдено, або стандартну
+            'icon': get_icon_for_category(cat_name)
         })
 
     return render_template("index.html", products=products, hero_slides=hero_slides, main_categories=dynamic_categories)
 
 
 def get_category_hierarchy():
-    """
-    Будує ієрархію категорій.
-    Відображає тільки ті категорії, де сумарно (разом з підкатегоріями) є товари > 0.
-    """
-    # Отримуємо кореневі категорії
     root_categories = Category.query.filter_by(parent_id=None).order_by(Category.name).all()
-
     hierarchy = {}
-
     DEFAULT_ICONS = {
         'Поливочна система': 'irrigation.jpg',
         'Насоси та гідрофори': 'pumps.jpg',
@@ -489,32 +474,20 @@ def get_category_hierarchy():
         'Опалення та водопостачання': 'towel_dryers.jpg',
         'Запчастини та комплектуючі': 'gas_parts.jpg'
     }
-
     for parent in root_categories:
         subcats = {}
         children_total_items = 0
-
-        # 1. Обробляємо підкатегорії
         children = parent.children.order_by(Category.name).all()
-
         for child in children:
-            # Рахуємо товари тільки в наявності (або приберіть filter_by, якщо треба всі)
             child_count = child.products.filter_by(in_stock=True).count()
-
             if child_count > 0:
                 subcats[child.name] = {
                     'slug': child.slug,
                     'count': child_count
                 }
                 children_total_items += child_count
-
-        # 2. Рахуємо товари в самій батьківській категорії
         parent_direct_count = parent.products.filter_by(in_stock=True).count()
-
-        # 3. Загальна сума
         total_category_count = parent_direct_count + children_total_items
-
-        # 4. ДОДАЄМО В МЕНЮ ТІЛЬКИ ЯКЩО Є ТОВАРИ ( > 0 )
         if total_category_count > 0:
             hierarchy[parent.name] = {
                 'slug': parent.slug,
@@ -523,7 +496,6 @@ def get_category_hierarchy():
                 'count': total_category_count,
                 'direct_count': parent_direct_count
             }
-
     return hierarchy
 
 
@@ -535,7 +507,6 @@ def catalog(category_slug):
     max_price = request.args.get('max_price', type=float)
     search_query = request.args.get('search', '').strip()
 
-    # Базовий запит
     query = Product.query.filter(
         Product.in_stock == True,
         Product.image.notlike('default_tovar%')
@@ -545,34 +516,23 @@ def catalog(category_slug):
     main_category_of_current = None
     parent_category_slug = None
 
-    # Фільтрація по категорії
     if category_slug:
         clean_slug = category_slug.strip('/')
-        # Беремо останню частину URL (наприклад nasosy/glubinni -> glubinni)
         target_slug = clean_slug.split('/')[-1]
-
-        # Шукаємо категорію в базі
         category = Category.query.filter_by(slug=target_slug).first()
 
         if category:
             current_category_name = category.name
-
-            # Збираємо ID поточної категорії та всіх дітей
             categories_ids = [category.id]
             for child in category.children:
                 categories_ids.append(child.id)
-
             query = query.filter(Product.category_id.in_(categories_ids))
-
-            # Визначаємо батьківську категорію для хлібних крихт
             if category.parent:
                 main_category_of_current = category.parent.name
                 parent_category_slug = category.parent.slug
             else:
                 main_category_of_current = category.name
                 parent_category_slug = category.slug
-
-            # Статистика переглядів
             try:
                 cat_view = CategoryView.query.filter_by(name=category.name).first()
                 if not cat_view:
@@ -583,16 +543,13 @@ def catalog(category_slug):
             except:
                 db.session.rollback()
         else:
-            # Fallback для старих посилань
             cat_name_approx = clean_slug.replace('-', ' ').replace('/', ' ')
             query = query.filter(Product.category.ilike(f"%{cat_name_approx}%"))
             current_category_name = cat_name_approx.capitalize()
 
-    # Пошук
     if search_query:
         query = query.filter(Product.name.ilike(f'%{search_query}%'))
 
-    # Діапазон цін (потрібно рахувати ДО застосування фільтрів ціни)
     price_stats_query = db.session.query(func.min(Product.price), func.max(Product.price))
     if query.whereclause is not None:
         price_stats_query = price_stats_query.filter(query.whereclause)
@@ -601,7 +558,6 @@ def catalog(category_slug):
     min_available = math.floor(price_stats[0] or 0)
     max_available = math.ceil(price_stats[1] or 0)
 
-    # Фільтр цін користувача
     if min_price is not None:
         query = query.filter(Product.price >= min_price)
     if max_price is not None:
@@ -617,7 +573,7 @@ def catalog(category_slug):
         hierarchy=hierarchy,
         current_category=current_category_name,
         main_category_of_current=main_category_of_current,
-        parent_category_slug=parent_category_slug,  # Передаємо слаг батька
+        parent_category_slug=parent_category_slug,
         category_slug=category_slug,
         min_price_available=min_available,
         max_price_available=max_available,
@@ -706,7 +662,7 @@ def add_review(product_id):
 #  АВТЕНТИФІКАЦІЯ
 # ────────────────────────────────
 @app.route("/login", methods=["POST"])
-@limiter.limit("5 per minute") # Захист від brute-force
+@limiter.limit("5 per minute")
 def login():
     data = request.get_json()
     email = data.get('email')
@@ -724,12 +680,11 @@ def login():
 
 
 @app.route("/register", methods=["POST"])
-@limiter.limit("10 per hour") # Захист від спам-реєстрацій
+@limiter.limit("10 per hour")
 def register():
     data = request.get_json()
     email, first_name, last_name, phone = data.get('email'), data.get('first_name'), data.get('last_name'), data.get('phone')
 
-    # [ЗМІНЕНО] Додано валідацію обов'язкових полів, включаючи last_name
     if not all([email, first_name, last_name, data.get('password')]):
         return jsonify({"status": "error", "message": "Ім'я, Прізвище, Email та Пароль є обов'язковими"}), 400
 
@@ -769,41 +724,107 @@ def google_logged_in(blueprint, token):
     if not token:
         flash("Не вдалося увійти через Google.", category="error")
         return redirect(url_for("index"))
+
     resp = blueprint.session.get("/oauth2/v2/userinfo")
     if not resp.ok:
-        msg = resp.json().get("error", {}).get("message", "Невідома помилка.")
-        flash(f"Не вдалося отримати інформацію про користувача з Google: {msg}", category="error")
+        flash("Не вдалося отримати дані від Google.", category="error")
         return redirect(url_for("index"))
+
     google_info = resp.json()
     email = google_info["email"]
+
     user = User.query.filter_by(email=email).first()
-    if not user:
-        first_name = google_info.get("given_name", "User")
-        last_name = google_info.get("family_name", "Google")
-        username_base = first_name.lower().strip()
-        username, counter = username_base, 1
-        user.is_email_verified = True # [ДОДАНО]
-        while User.query.filter_by(username=username).first():
-            username = f"{username_base}{counter}"
-            counter += 1
-        user = User(email=email, username=username, first_name=first_name, last_name=last_name,
-                    avatar_url=google_info.get('picture'))
-        db.session.add(user)
+
+    if user and user.phone:
+        login_user(user, remember=True)
+        merge_session_cart_to_db(user)
+        return redirect(url_for("index"))
+
+    session['oauth_register_data'] = {
+        'email': email,
+        'first_name': google_info.get("given_name", ""),
+        'last_name': google_info.get("family_name", ""),
+        'avatar_url': google_info.get('picture'),
+        'provider': 'google'
+    }
+    return redirect(url_for('complete_registration'))
+
+
+@app.route('/complete-registration')
+def complete_registration():
+    if 'oauth_register_data' not in session:
+        return redirect(url_for('index'))
+    return render_template('index.html', show_complete_reg_modal=True)
+
+
+@app.route('/api/auth/finalize_google', methods=['POST'])
+def finalize_google_registration():
+    if 'oauth_register_data' not in session:
+        return jsonify({'status': 'error', 'message': 'Сесія Google закінчилася. Спробуйте увійти знову.'}), 400
+
+    data = request.get_json()
+    firebase_token = data.get('firebase_token')
+    password = data.get('password')
+
+    if not firebase_token or not password:
+        return jsonify({'status': 'error', 'message': 'Телефон та пароль є обов\'язковими'}), 400
+
+    if len(password) < 6:
+        return jsonify({'status': 'error', 'message': 'Пароль має бути не менше 6 символів'}), 400
+
+    try:
+        decoded_token = auth.verify_id_token(firebase_token)
+        phone = decoded_token.get('phone_number')
+
+        if not phone:
+            return jsonify({'status': 'error', 'message': 'Не вдалося підтвердити номер телефону'}), 400
+
+        if User.query.filter_by(phone=phone).first():
+            return jsonify(
+                {'status': 'error', 'message': 'Цей номер телефону вже використовується іншим акаунтом'}), 409
+
+        oauth_data = session['oauth_register_data']
+        email = oauth_data['email']
+
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            user.phone = phone
+            user.set_password(password)
+            if not user.first_name: user.first_name = oauth_data['first_name']
+            if not user.last_name: user.last_name = oauth_data['last_name']
+            if not user.avatar_url: user.avatar_url = oauth_data['avatar_url']
+            user.is_email_verified = True
+        else:
+            username_base = oauth_data['first_name'].lower().strip() or "user"
+            username, counter = username_base, 1
+            while User.query.filter_by(username=username).first():
+                username = f"{username_base}{counter}"
+                counter += 1
+
+            user = User(
+                email=email,
+                username=username,
+                first_name=oauth_data['first_name'],
+                last_name=oauth_data['last_name'],
+                phone=phone,
+                avatar_url=oauth_data['avatar_url'],
+                is_email_verified=True
+            )
+            user.set_password(password)
+            db.session.add(user)
+
         db.session.commit()
-        subject = f"Вітаємо у {shop_info['name']}!"
-        html_body = render_template("email/welcome.html", user=user, shop=shop_info)
-        send_email(user.email, subject, html_body)
-        flash("Ви успішно зареєструвалися та увійшли через Google!", category="success")
-    else:
-        if not user.avatar_url and google_info.get('picture'):
-            user.avatar_url = google_info.get('picture')
-            db.session.commit()
-        user.is_email_verified = True  # [ДОДАНО]
-        db.session.commit()
-        flash("Ви успішно увійшли через Google!", category="success")
-    login_user(user, remember=True)
-    merge_session_cart_to_db(user)
-    return redirect(url_for("index"))
+
+        login_user(user, remember=True)
+        merge_session_cart_to_db(user)
+        session.pop('oauth_register_data', None)
+
+        return jsonify({'status': 'success'})
+
+    except Exception as e:
+        app.logger.error(f"Google Finalize Error: {e}")
+        return jsonify({'status': 'error', 'message': 'Помилка сервера при реєстрації'}), 500
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 @limiter.limit("5 per hour")
@@ -822,7 +843,7 @@ def forgot_password():
             return redirect(url_for('index'))
         else:
             security_logger.warning(f"Password reset attempt for non-existent email '{email}' from IP: {ip_address}")
-            flash('Якщо такий email існує, на нього буде надіслано лист.', 'info') # Стандартна практика для безпеки
+            flash('Якщо такий email існує, на нього буде надіслано лист.', 'info')
 
     return render_template('auth/forgot_password.html')
 
@@ -856,7 +877,6 @@ def add_to_cart():
     product_id = int(request.get_json().get("product_id"))
 
     if current_user.is_authenticated:
-        # Логіка для залогінених користувачів (база даних)
         cart_item = CartItem.query.filter_by(user_id=current_user.id, product_id=product_id).first()
         if cart_item:
             cart_item.quantity += 1
@@ -866,7 +886,6 @@ def add_to_cart():
         db.session.commit()
         cart_count = sum(item.quantity for item in current_user.cart_items)
     else:
-        # Логіка для гостей (сесія)
         cart = session.get("cart", {})
         product_id_str = str(product_id)
         cart[product_id_str] = cart.get(product_id_str, 0) + 1
@@ -903,14 +922,12 @@ def update_cart_quantity(product_id):
     return jsonify(status="error", message="Товар не знайдено"), 404
 
 
-# --- Вставте цю функцію замість старої route get_cart ---
 @app.route('/get_cart')
-@limiter.exempt # Цей рядок вимикає ліміт запитів для кошика
+@limiter.exempt
 def get_cart():
     cart_items, total = [], 0
 
     if current_user.is_authenticated:
-        # Для залогінених
         db_cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
         for item in db_cart_items:
             product = item.product
@@ -922,7 +939,6 @@ def get_cart():
                 })
                 total += product.price * item.quantity
     else:
-        # Для гостей
         cart = session.get("cart", {})
         if cart:
             product_ids = [int(pid) for pid in cart.keys() if pid.isdigit()]
@@ -958,13 +974,11 @@ def buy_now():
     product_id = int(request.get_json().get("product_id"))
 
     if current_user.is_authenticated:
-        # Повністю очищуємо кошик користувача і додаємо один товар
         CartItem.query.filter_by(user_id=current_user.id).delete()
         new_item = CartItem(user_id=current_user.id, product_id=product_id, quantity=1)
         db.session.add(new_item)
         db.session.commit()
     else:
-        # Для гостя просто замінюємо кошик в сесії
         session["cart"] = {str(product_id): 1}
 
     return jsonify(status="success")
@@ -974,20 +988,25 @@ def buy_now():
 def start_email_login():
     data = request.get_json()
     email = data.get('email', '').strip().lower()
+
     if not email:
         return jsonify({'status': 'error', 'message': 'Email є обов\'язковим'}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'status': 'error',
+                        'message': 'Акаунт з такою email-адресою не знайдено. Будь ласка, зареєструйтесь.'}), 404
 
     code = str(random.randint(100000, 999999))
     session['verification_email'] = email
     session['verification_code'] = code
     session.permanent = True
-    app.permanent_session_lifetime = timedelta(minutes=10)
 
     html_body = render_template("email/verification_code.html", code=code, shop=shop_info)
-    if send_email(email, f"Код підтвердження для {shop_info['name']}", html_body):
+    if send_email(email, f"Код входу для {shop_info['name']}", html_body):
         return jsonify({'status': 'success'})
     else:
-        return jsonify({'status': 'error', 'message': 'Не вдалося надіслати лист. Спробуйте пізніше.'}), 500
+        return jsonify({'status': 'error', 'message': 'Не вдалося надіслати лист.'}), 500
 
 
 @app.route('/api/auth/verify_email_code', methods=['POST'])
@@ -1014,7 +1033,8 @@ def verify_email_code():
         user = User(
             email=email,
             username=username,
-            first_name=""  # Залишаємо ім'я порожнім, користувач заповнить у профілі
+            first_name="",
+            last_name=""
         )
         db.session.add(user)
         db.session.commit()
@@ -1029,7 +1049,6 @@ def verify_email_code():
 
 @app.route('/api/auth/check_user_exists', methods=['POST'])
 def check_user_exists():
-    """Перевіряє, чи існує користувач за номером телефону."""
     phone = request.json.get('phone')
     if not phone:
         return jsonify({'exists': False, 'error': 'Phone number is required'}), 400
@@ -1039,10 +1058,6 @@ def check_user_exists():
 
 @app.route('/api/auth/firebase_verify', methods=['POST'])
 def firebase_verify():
-    """
-    Перевіряє токен від Firebase, знаходить або створює користувача
-    і авторизує його в системі Flask-Login.
-    """
     token = request.json.get('token')
     intent = request.json.get('intent')
     if not token or not intent:
@@ -1068,17 +1083,11 @@ def firebase_verify():
                 return jsonify({'status': 'error', 'message': 'Цей номер вже зареєстровано'}), 409
 
             first_name = request.json.get('first_name')
-
             last_name = request.json.get('last_name')
-
-            password = request.json.get('password')  # [ДОДАНО] Отримуємо пароль
-
-            # [ЗМІНЕНО] Додаємо пароль до перевірки обов'язкових полів
+            password = request.json.get('password')
 
             if not all([first_name, last_name, password]):
                 return jsonify({'status': 'error', 'message': 'Ім\'я, прізвище та пароль є обов\'язковими'}), 400
-
-            # Генеруємо унікальний тимчасовий email
 
             base_email = f"{phone.replace('+', '')}@temp.user"
             email, counter = base_email, 1
@@ -1099,7 +1108,7 @@ def firebase_verify():
                 email=email,
                 username=username
             )
-            new_user.set_password(password)  # [ДОДАНО] Встановлюємо пароль
+            new_user.set_password(password)
             db.session.add(new_user)
             db.session.commit()
             user = new_user
@@ -1132,7 +1141,6 @@ def update_phone_number():
         if not phone_from_token:
             return jsonify({'status': 'error', 'message': 'Не вдалося отримати номер з токену'}), 400
 
-        # Перевірка, чи цей номер не зайнятий іншим користувачем
         existing_user = User.query.filter(User.phone == phone_from_token, User.id != current_user.id).first()
         if existing_user:
             return jsonify({'status': 'error', 'message': 'Цей номер телефону вже прив\'язаний до іншого акаунту'}), 409
@@ -1186,8 +1194,12 @@ def verify_email(token):
         login_user(user)
         return redirect(url_for('index'))
 
+
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
+    cart_items_display = []
+    total_cost = 0
+
     if current_user.is_authenticated:
         is_cart_empty = not db.session.query(CartItem.query.filter_by(user_id=current_user.id).exists()).scalar()
     else:
@@ -1196,6 +1208,34 @@ def checkout():
     if is_cart_empty:
         flash('Ваш кошик порожній.', 'info')
         return redirect(url_for('catalog'))
+
+    if current_user.is_authenticated:
+        items = current_user.cart_items.all()
+        for item in items:
+            item_total = item.product.price * item.quantity
+            total_cost += item_total
+            cart_items_display.append({
+                'product': item.product,
+                'quantity': item.quantity,
+                'item_total': item_total
+            })
+    else:
+        cart_session = session.get('cart', {})
+        if cart_session:
+            product_ids = [int(pid) for pid in cart_session.keys()]
+            products = Product.query.filter(Product.id.in_(product_ids)).all()
+            product_map = {p.id: p for p in products}
+
+            for pid_str, qty in cart_session.items():
+                product = product_map.get(int(pid_str))
+                if product:
+                    item_total = product.price * qty
+                    total_cost += item_total
+                    cart_items_display.append({
+                        'product': product,
+                        'quantity': qty,
+                        'item_total': item_total
+                    })
 
     if request.method == 'POST':
         errors = []
@@ -1209,40 +1249,23 @@ def checkout():
 
         if not all([first_name, last_name, customer_phone]):
             errors.append("Ім'я, прізвище та номер телефону є обов'язковими.")
+
         phone_digits = re.sub(r'\D', '', customer_phone)
         if len(phone_digits) != 12:
             errors.append("Будь ласка, введіть повний номер телефону.")
+
         if not delivery_method:
             errors.append("Будь ласка, оберіть спосіб доставки.")
         elif delivery_method == 'Нова Пошта' and not all([delivery_city, delivery_warehouse]):
             errors.append("Для доставки Новою Поштою необхідно вказати місто та відділення.")
+
         if not payment_method:
             errors.append("Будь ласка, оберіть спосіб оплати.")
 
         if errors:
             for error in errors:
                 flash(error, 'danger')
-            return render_template('checkout.html')
-
-        cart_items_to_process = []
-        total_cost = 0
-
-        if current_user.is_authenticated:
-            user_cart_items = current_user.cart_items.all()
-            for item in user_cart_items:
-                cart_items_to_process.append({'product': item.product, 'quantity': item.quantity})
-                total_cost += item.product.price * item.quantity
-        else:
-            cart_session = session.get('cart', {})
-            product_ids = [int(pid) for pid in cart_session.keys()]
-            products = Product.query.filter(Product.id.in_(product_ids)).all()
-            product_map = {p.id: p for p in products}
-
-            for pid, qty in cart_session.items():
-                product = product_map.get(int(pid))
-                if product:
-                    cart_items_to_process.append({'product': product, 'quantity': qty})
-                    total_cost += product.price * qty
+            return render_template('checkout.html', cart_items=cart_items_display, total_cost=total_cost)
 
         user_id_to_assign = current_user.id if current_user.is_authenticated else None
         if not user_id_to_assign:
@@ -1265,7 +1288,8 @@ def checkout():
         db.session.flush()
 
         order_items_for_email_and_tg = []
-        for item_data in cart_items_to_process:
+
+        for item_data in cart_items_display:
             product = item_data['product']
             quantity = item_data['quantity']
             db.session.add(OrderItem(order_id=order.id, product_id=product.id, quantity=quantity, price=product.price))
@@ -1289,24 +1313,18 @@ def checkout():
                 )
                 if not email_sent:
                     app.logger.error(f"Не вдалося надіслати email-сповіщення про замовлення #{order.id}.")
-                else:
-                    app.logger.info(f"Email-сповіщення про замовлення #{order.id} успішно надіслано.")
-            else:
-                app.logger.warning("Email-сповіщення не надіслано: SMTP_USER або EMAIL_PASS не налаштовано.")
         except Exception as e:
-            app.logger.error(
-                f"Критична помилка при спробі відправки email про замовлення #{order.id}: {e}\n{traceback.format_exc()}")
+            app.logger.error(f"Email Error Order #{order.id}: {e}")
 
         try:
             send_telegram_notification(order, order_items_for_email_and_tg)
         except Exception as e:
-            app.logger.error(
-                f"Критична помилка при спробі відправки Telegram-сповіщення про замовлення #{order.id}: {e}\n{traceback.format_exc()}")
+            app.logger.error(f"Telegram Error Order #{order.id}: {e}")
 
         flash('Дякуємо! Ваше замовлення прийнято.', 'success')
         return redirect(url_for('index'))
 
-    return render_template('checkout.html')
+    return render_template('checkout.html', cart_items=cart_items_display, total_cost=total_cost)
 
 
 # ────────────────────────────────
@@ -1389,7 +1407,6 @@ def profile_settings():
 @app.route('/api/hide_phone_prompt', methods=['POST'])
 @login_required
 def hide_phone_prompt():
-    """Зберігає в сесії, що користувач закрив банер."""
     session['hide_phone_prompt'] = True
     return jsonify({'status': 'success'})
 
@@ -1424,57 +1441,6 @@ def admin_reviews():
     reviews = Review.query.order_by(Review.timestamp.desc()).paginate(page=page, per_page=15, error_out=False)
     return render_template('admin_reviews.html', reviews=reviews)
 
-
-@app.route("/admin/add_product", methods=['GET', 'POST'])
-@login_required
-@admin_required
-def add_product():
-    # Отримуємо всі категорії для випадаючого списку
-    categories = Category.query.order_by(Category.name).all()
-
-    if request.method == 'POST':
-        cat_id = request.form.get('category_id')
-        new_cat_name = request.form.get('new_category_name')
-
-        final_category_id = None
-        final_category_name = "Різне"
-
-        # Логіка: якщо введена нова категорія - створюємо її
-        if new_cat_name and new_cat_name.strip():
-            new_cat_name = new_cat_name.strip()
-            existing_cat = Category.query.filter_by(name=new_cat_name).first()
-            if existing_cat:
-                final_category_id = existing_cat.id
-                final_category_name = existing_cat.name
-            else:
-                # Створення нової кореневої категорії
-                new_cat = Category(name=new_cat_name, slug=slugify(new_cat_name))
-                db.session.add(new_cat)
-                db.session.commit()
-                final_category_id = new_cat.id
-                final_category_name = new_cat.name
-        elif cat_id:
-            cat = Category.query.get(cat_id)
-            if cat:
-                final_category_id = cat.id
-                final_category_name = cat.name
-
-        new_product = Product(
-            name=request.form['name'],
-            price=float(request.form['price']),
-            description=request.form['description'],
-            image=_get_cloudinary_url(request.form['image'].strip()),
-            category_id=final_category_id,  # ID
-            category=final_category_name,  # Text fallback
-            in_stock='in_stock' in request.form
-        )
-        db.session.add(new_product)
-        db.session.commit()
-        flash(f"Товар '{new_product.name}' додано!", "success")
-        return redirect(url_for('catalog'))
-
-    return render_template("add_product.html", categories=categories)
-
 @app.route("/admin/edit_product/<int:product_id>", methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -1484,9 +1450,20 @@ def edit_product(product_id):
         product.name = request.form['name']
         product.price = float(request.form['price'])
         product.description = request.form['description']
-        product.image = _get_cloudinary_url(request.form['image'].strip())
         product.category = request.form['category']
         product.in_stock = 'in_stock' in request.form
+
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename != '':
+                try:
+                    upload_result = cloudinary.uploader.upload(
+                        file,
+                        folder="products/products"
+                    )
+                    product.image = upload_result['secure_url']
+                except Exception as e:
+                    print(f"Помилка завантаження Cloudinary: {e}")
 
         db.session.commit()
         flash(f"Товар '{product.name}' оновлено!", "success")
@@ -1495,9 +1472,7 @@ def edit_product(product_id):
     image_filename = ''
     if product.image:
         try:
-            match = re.search(r'/products/products/([^/.]+)', product.image)
-            if match:
-                image_filename = match.group(1) + '.jpg'
+            image_filename = product.image.split('/')[-1]
         except Exception:
             pass
 
@@ -1509,26 +1484,21 @@ def edit_product(product_id):
 @admin_required
 def delete_review(review_id):
     review = Review.query.get_or_404(review_id)
-    product = review.product  # Отримуємо зв'язаний товар
+    product = review.product
 
-    # Видаляємо відгук
     db.session.delete(review)
+    db.session.flush()
 
-    # Важливо! Перераховуємо рейтинг та кількість ТІЛЬКИ для відгуків (не питань)
-    # Робимо це перед фінальним комітом, щоб запит врахував видалення
-    db.session.flush()  # Застосовуємо видалення в сесії, але ще не зберігаємо в базу
-
-    # Запит для перерахунку середнього рейтингу та кількості
     result = db.session.query(func.avg(Review.rating), func.count(Review.id)).filter(
         Review.product_id == product.id,
         Review.rating > 0,
-        Review.review_type == 'review'  # Враховуємо тільки записи типу "review"
+        Review.review_type == 'review'
     ).one()
 
     product.rating = float(result[0] or 0)
     product.reviews_count = int(result[1] or 0)
 
-    db.session.commit()  # Зберігаємо і видалення, і оновлення товару
+    db.session.commit()
 
     flash("Запис видалено, рейтинг товару оновлено.", "success")
     return redirect(request.referrer or url_for('admin_reviews'))
@@ -1545,37 +1515,6 @@ def delete_product(product_id):
     return redirect(url_for('catalog'))
 
 
-@app.route('/admin/unfinished')
-@login_required
-@admin_required
-def admin_unfinished():
-    page = request.args.get('page', 1, type=int)
-    query = Product.query
-    active_filters = [k for k in request.args if k in ['no_stock', 'no_description', 'no_image']]
-    if not active_filters:
-        query = query.filter(
-            db_or(Product.in_stock == False,
-                  (Product.description == None) | (Product.description == ''),
-                  Product.image.like('default_tovar%') | (Product.image == None)))
-    else:
-        if 'no_stock' in active_filters: query = query.filter(Product.in_stock == False)
-        if 'no_description' in active_filters: query = query.filter(
-            (Product.description == None) | (Product.description == ''))
-        if 'no_image' in active_filters: query = query.filter(
-            Product.image.like('default_tovar%') | (Product.image == None))
-
-    counts = {'no_stock': Product.query.filter(Product.in_stock == False).count(),
-              'no_description': Product.query.filter(
-                  (Product.description == None) | (Product.description == '')).count(),
-              'no_image': Product.query.filter(Product.image.like('default_tovar%') | (Product.image == None)).count()}
-
-    products = query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
-    return render_template('admin_unfinished.html', products=products, counts=counts)
-
-
-# ────────────────────────────────
-#  ІНШІ МАРШРУТИ ТА API
-# ────────────────────────────────
 @app.route("/send_message", methods=["POST"])
 def send_message():
     form = request.form
@@ -1586,12 +1525,6 @@ def send_message():
         return jsonify(status="success", message="✅ Повідомлення успішно надіслано!")
     else:
         return jsonify(status="error", message="❌ Помилка сервера при відправці повідомлення."), 500
-
-
-# ────────────────────────────────
-#  API ДЛЯ ІНТЕГРАЦІЇ З BAS (1C) - НАДІЙНА ВЕРСІЯ
-# ────────────────────────────────
-
 
 
 def require_api_key(f):
@@ -1613,11 +1546,7 @@ def handle_bas_handshake():
 
 
 def _get_cloudinary_url(image_filename):
-    """
-    [ОНОВЛЕНО] Внутрішня функція для генерації повного URL зображення з Cloudinary.
-    """
     DEFAULT_IMAGE_PUBLIC_ID = "products/products/default_tovar"
-
     public_id = ""
     try:
         if image_filename and image_filename.strip():
@@ -1636,7 +1565,6 @@ def _get_cloudinary_url(image_filename):
         return url
     except Exception as e:
         print(f"!!! ПОМИЛКА генерації Cloudinary URL для ID '{public_id}': {e}")
-        # Повертаємо URL для заглушки за замовчуванням у разі помилки
         url, _ = cloudinary.utils.cloudinary_url(DEFAULT_IMAGE_PUBLIC_ID, secure=True)
         return url
 
@@ -1655,8 +1583,6 @@ def bas_import():
 
     try:
         raw_data = cml_file.read()
-
-        # Спроба визначити кодування та розпарсити XML
         try:
             parser = lxml_etree.XMLParser(recover=True, encoding='utf-8')
             root = lxml_etree.fromstring(raw_data, parser=parser)
@@ -1664,23 +1590,17 @@ def bas_import():
             parser = lxml_etree.XMLParser(recover=True, encoding='windows-1251')
             root = lxml_etree.fromstring(raw_data, parser=parser)
 
-        # Видалення неймспейсів
         for elem in root.getiterator():
             if '}' in elem.tag:
                 elem.tag = elem.tag.split('}', 1)[1]
 
-        # 1. АВТОМАТИЧНЕ СТВОРЕННЯ КАТЕГОРІЙ
-        # Знаходимо класифікатор груп
         classifier_groups = root.findall('.//Классификатор/Группы/Группа')
-        # Якщо в класифікаторі пусто, шукаємо просто групи (іноді структура відрізняється)
         if not classifier_groups:
             classifier_groups = root.findall('.//Группы/Группа')
 
-        # Словник для мапінгу external_id -> db_id
         category_map = {}
 
         def process_groups(group_nodes, parent_db_id=None):
-            """Рекурсивна функція для обробки дерева категорій"""
             for group in group_nodes:
                 ext_id = group.findtext('Ид')
                 name = group.findtext('Наименование')
@@ -1688,13 +1608,11 @@ def bas_import():
                 if not ext_id or not name:
                     continue
 
-                # Шукаємо категорію в БД або створюємо нову
                 cat = Category.query.filter_by(external_id=ext_id).first()
                 if not cat:
-                    # Перевірка, чи існує категорія з такою ж назвою (щоб уникнути дублів при ручному створенні)
                     cat = Category.query.filter_by(name=name).first()
                     if cat:
-                        cat.external_id = ext_id  # Прив'язуємо до ID з 1С
+                        cat.external_id = ext_id
                     else:
                         cat = Category(
                             external_id=ext_id,
@@ -1704,26 +1622,22 @@ def bas_import():
                         )
                         db.session.add(cat)
                 else:
-                    # Оновлюємо назву та батька, якщо змінилися в 1С
                     cat.name = name
                     cat.parent_id = parent_db_id
                     if not cat.slug:
                         cat.slug = slugify(name)
 
-                db.session.flush()  # Щоб отримати cat.id
+                db.session.flush()
                 category_map[ext_id] = cat.id
 
-                # Рекурсивно обробляємо підгрупи
                 subgroups = group.find('Группы')
                 if subgroups is not None:
                     process_groups(subgroups.findall('Группа'), cat.id)
 
-        # Запускаємо обробку категорій
         process_groups(classifier_groups)
         db.session.commit()
         app.logger.info(f"BAS Import: Categories processed. Total categories mapped: {len(category_map)}")
 
-        # 2. ОБРОБКА ТОВАРІВ
         catalog_node = root.find('.//Каталог')
         products_from_xml = catalog_node.findall('.//Товар') if catalog_node is not None else []
 
@@ -1733,22 +1647,18 @@ def bas_import():
         added_count = 0
 
         for product_node in products_from_xml:
-            product_id_xml = product_node.findtext('Ид')  # GUID товару (поки не зберігаємо, використовуємо ім'я)
+            product_id_xml = product_node.findtext('Ид')
             name = (product_node.findtext('Наименование') or 'Без назви').strip()
 
-            # Визначення категорії товару
             group_id_node = product_node.find('.//Группы/Ид')
             cat_ext_id = group_id_node.text if group_id_node is not None else None
 
-            # Отримуємо ID категорії з нашого мапінгу
             db_category_id = category_map.get(cat_ext_id)
-            # Отримуємо об'єкт категорії для запису назви в старе поле
             category_obj = Category.query.get(db_category_id) if db_category_id else None
             category_name_str = category_obj.name if category_obj else "Різне"
 
             description = (product_node.findtext('Описание') or '').strip()
 
-            # Обробка картинки
             image_filename_xml = ''
             main_image_node = product_node.find(".//Картинка[@main_image='1']")
             if main_image_node is not None:
@@ -1756,7 +1666,6 @@ def bas_import():
             else:
                 image_filename_xml = product_node.findtext('Картинка') or ''
 
-            # Ціна та наявність
             price = 0.0
             in_stock = False
             offer_node = root.find(f".//Предложение[Ид='{product_id_xml}']")
@@ -1775,19 +1684,17 @@ def bas_import():
                     except:
                         pass
 
-            # Додаткова перевірка наявності
             if not in_stock:
                 stock_prop = product_node.find(".//ЗначенияСвойства[Ид='ИД-Наличие']/Значение")
                 if stock_prop is not None and stock_prop.text and stock_prop.text.lower() == 'true':
                     in_stock = True
 
-            # Створення або оновлення товару
             product = existing_products_map.get(name)
             if product:
                 product.price = price
                 product.description = description
                 product.category_id = db_category_id
-                product.category = category_name_str  # Для сумісності
+                product.category = category_name_str
                 product.image = _get_cloudinary_url(image_filename_xml)
                 product.in_stock = in_stock
                 updated_count += 1
@@ -1797,7 +1704,7 @@ def bas_import():
                     price=price,
                     description=description,
                     category_id=db_category_id,
-                    category=category_name_str,  # Для сумісності
+                    category=category_name_str,
                     image=_get_cloudinary_url(image_filename_xml),
                     in_stock=in_stock
                 )
@@ -1849,10 +1756,8 @@ def api_get_orders():
     return jsonify({"status": "success", "orders": orders_data})
 
 
-# API ДЛЯ ІНТЕГРАЦІЇ З "НОВОЮ ПОШТОЮ"
 @app.route('/api/np/cities')
 def find_np_cities():
-    """Пошук населених пунктів."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     query = request.args.get('q', '')
 
@@ -1882,7 +1787,6 @@ def find_np_cities():
 
 @app.route('/api/np/warehouses')
 def get_np_warehouses():
-    """Отримання ВІДДІЛЕНЬ ТА ПОШТОМАТІВ для населеного пункту."""
     api_key = os.getenv('NOVA_POSHTA_API_KEY')
     city_ref = request.args.get('city_ref', '')
 
@@ -1918,72 +1822,50 @@ def page_not_found(e):
     return render_template('404.html', shop=shop_info), 404
 
 
-@app.route('/api/catalog/load_more')
-def api_load_more():
-    page = request.args.get('page', 1, type=int)
-    category_slug = request.args.get('category_slug')
-    min_price = request.args.get('min_price', type=float)
-    max_price = request.args.get('max_price', type=float)
-    search_query = request.args.get('search', '').strip()
-
-    hierarchy = get_category_hierarchy()
-    query = Product.query.filter(
-        Product.in_stock == True,
-        Product.description.isnot(None),
-        Product.description != '',
-        Product.image.notlike('default_tovar%')
-    )
-
-    if search_query:
-        query = query.filter(Product.name.ilike(f'%{search_query}%'))
-
-    if category_slug:
-        category_name_from_slug = category_slug.replace('-', ' ').replace('/', ' ')
-        current_category = None
-        for main_cat, data in hierarchy.items():
-            if main_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
-                current_category = main_cat
-                subcategories = list(data.get('subcategories', {}).keys())
-                all_cats_for_filter = [current_category] + subcategories
-                query = query.filter(Product.category.in_(all_cats_for_filter))
-                break
-
-            for sub_cat in data.get('subcategories', {}):
-                if sub_cat.lower().replace('/', ' ') == category_name_from_slug.lower():
-                    current_category = sub_cat
-                    query = query.filter(Product.category == current_category)
-                    break
-            if current_category:
-                break
-
-    if min_price:
-        query = query.filter(Product.price >= min_price)
-    if max_price:
-        query = query.filter(Product.price <= max_price)
-
-    products_pagination = query.order_by(Product.id.desc()).paginate(
-        page=page, per_page=12, error_out=False
-    )
-
-    html = render_template('_products_grid_items.html', products=products_pagination.items)
-    response = make_response(html)
-    response.headers['X-More-Available'] = 'true' if products_pagination.has_next else 'false'
-    return response
-
 @app.route('/api/popular_searches')
 def popular_searches():
-    # Отримуємо 6 найпопулярніших категорій за кількістю переглядів
     popular_cats = CategoryView.query.order_by(CategoryView.views.desc()).limit(6).all()
-    # Формуємо slug (URL-частину) для кожної
     categories_data = [{
         'name': cat.name,
         'slug': cat.name.lower().replace(' ', '-').replace('/', '-')
     } for cat in popular_cats]
     return jsonify(categories_data)
 
-# ────────────────────────────────
-#  API ДЛЯ ПОШУКОВИХ ПІДКАЗОК
-# ────────────────────────────────
+
+def normalize_text(text):
+    """Видаляє пунктуацію та переводить у нижній регістр."""
+    if not text:
+        return ""
+    # Залишаємо тільки літери та цифри
+    return re.sub(r'[^\w\s]', '', text).lower()
+
+
+def get_trigrams(text):
+    """Розбиває текст на трійки символів."""
+    text = normalize_text(text)
+    # Додаємо пробіли, щоб врахувати початок і кінець слова (опціонально, але покращує точність)
+    text = f" {text} "
+    return set([text[i:i + 3] for i in range(len(text) - 2)])
+
+
+def calculate_similarity(query, target):
+    """
+    Обчислює коефіцієнт схожості (Dice coefficient) між двома рядками.
+    0.0 - зовсім не схожі, 1.0 - ідентичні.
+    """
+    query_trigrams = get_trigrams(query)
+    target_trigrams = get_trigrams(target)
+
+    if not query_trigrams or not target_trigrams:
+        return 0.0
+
+    # Знаходимо спільні тріграми
+    intersection = len(query_trigrams.intersection(target_trigrams))
+
+    # Формула Dice: 2 * (спільні) / (кількість у першому + кількість у другому)
+    return (2.0 * intersection) / (len(query_trigrams) + len(target_trigrams))
+
+
 @app.route('/api/search_suggestions')
 def search_suggestions():
     query = request.args.get('q', '').strip()
@@ -1991,39 +1873,71 @@ def search_suggestions():
     if len(query) < 2:
         return jsonify({'products': [], 'categories': []})
 
-    # Пошук товарів (до 5 штук)
-    products_result = Product.query.filter(
-        Product.name.ilike(f'%{query}%'),
-        Product.in_stock == True,
-        Product.description.isnot(None),
-        Product.description != ''
-    ).limit(5).all()
+    # 1. Отримуємо всі товари (але тільки потрібні поля для швидкості)
+    # Ми беремо товари, які є в наявності
+    all_products = db.session.query(Product.id, Product.name, Product.category, Product.image).filter(
+        Product.in_stock == True
+    ).all()
 
-    # Пошук унікальних категорій (до 3 штук)
-    categories_result = db.session.query(Product.category).filter(
-        Product.category.ilike(f'%{query}%')
-    ).distinct().limit(3).all()
+    # 2. Шукаємо та оцінюємо схожість
+    scored_products = []
 
-    # Форматуємо результати для JSON
-    products = [
-        {'name': p.name, 'url': url_for('product_detail', product_id=p.id), 'category': p.category}
-        for p in products_result
-    ]
-    categories = []
-    for cat_tuple in categories_result:
-        cat_name = cat_tuple[0]
-        # Створюємо URL-безпечну версію назви категорії (slug)
-        cat_slug = cat_name.lower().replace(' ', '-').replace('/', '-')
-        categories.append({
-            'name': cat_name,
-            'url': url_for('catalog', category_slug=cat_slug)
+    for p in all_products:
+        # Рахуємо схожість назви товару із запитом
+        score = calculate_similarity(query, p.name)
+
+        # Також можна перевірити категорію, якщо назва не схожа
+        if score < 0.3:
+            cat_score = calculate_similarity(query, p.category or "")
+            if cat_score > score:
+                score = cat_score * 0.8  # Трохи зменшуємо вагу, якщо знайшли по категорії
+
+        # Якщо схожість більше 20% (0.2), додаємо у результати
+        if score > 0.2:
+            scored_products.append({
+                'product': p,
+                'score': score
+            })
+
+    # 3. Сортуємо: найсхожіші зверху
+    scored_products.sort(key=lambda x: x['score'], reverse=True)
+
+    # Беремо ТОП-5 результатів
+    top_results = scored_products[:5]
+
+    # 4. Формуємо відповідь JSON
+    products_data = []
+    for item in top_results:
+        p = item['product']
+        products_data.append({
+            'name': p.name,
+            'url': url_for('product_detail', product_id=p.id),
+            'category': p.category,
+            # Можна додати image, якщо ви хочете показувати фото в пошуку (це круто!)
+            'image': p.image
         })
 
-    return jsonify({'products': products, 'categories': categories})
+    # 5. Пошук категорій (за тим самим принципом)
+    all_categories = db.session.query(Category.name).all()
+    scored_categories = []
 
-# ────────────────────────────────
-#  ЗАПУСК ДОДАТКУ
-# ────────────────────────────────
+    for cat in all_categories:
+        score = calculate_similarity(query, cat.name)
+        if score > 0.3:  # Для категорій поріг вищий
+            scored_categories.append({'name': cat.name, 'score': score})
+
+    scored_categories.sort(key=lambda x: x['score'], reverse=True)
+
+    categories_data = []
+    for cat in scored_categories[:3]:
+        slug = slugify(cat['name'])  # Використовуємо вашу функцію slugify
+        categories_data.append({
+            'name': cat['name'],
+            'url': url_for('catalog', category_slug=slug)
+        })
+
+    return jsonify({'products': products_data, 'categories': categories_data})
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()

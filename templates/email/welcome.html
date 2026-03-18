@@ -1,28 +1,25 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
-        .header { background-color: #0066cc; color: white; padding: 10px; text-align: center; border-radius: 8px 8px 0 0; }
-        .content { padding: 20px; }
-        .footer { margin-top: 20px; font-size: 0.8em; text-align: center; color: #888; }
+        body { font-family: sans-serif; background-color: #f8fafc; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 30px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        h1 { color: #0f172a; }
+        p { color: #64748b; line-height: 1.6; }
+        .btn { display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 50px; font-weight: bold; margin-top: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header"><h1>{{ shop.name }}</h1></div>
-        <div class="content">
-            <h2>Вітаємо, {{ user.username }}!</h2>
-            <p>Дякуємо за реєстрацію в нашому інтернет-магазині. Тепер ви можете робити покупки, залишати відгуки та багато іншого.</p>
-            <p>Бажаємо вам приємних покупок!</p>
-            <a href="{{ url_for('index', _external=True) }}" style="display: inline-block; padding: 10px 15px; background-color: #ff6b00; color: white; text-decoration: none; border-radius: 5px;">Перейти до магазину</a>
-        </div>
-        <div class="footer">
-            <p>Це автоматичне повідомлення, будь ласка, не відповідайте на нього.</p>
-            <p>© {{ now.year }} {{ shop.name }}. Всі права захищені.</p>
-        </div>
+        <h1>Ласкаво просимо, {{ user.first_name }}! 👋</h1>
+        <p>Дякуємо за реєстрацію в магазині <strong>{{ shop.name }}</strong>.</p>
+        <p>Тепер ви можете:</p>
+        <ul style="text-align: left; color: #334155; margin-bottom: 30px;">
+            <li>🚀 Швидше оформлювати замовлення</li>
+            <li>📦 Бачити історію покупок</li>
+            <li>❤️ Зберігати товари в обране</li>
+        </ul>
+        <a href="{{ url_for('catalog', _external=True) }}" class="btn">Перейти до покупок</a>
     </div>
 </body>
 </html>

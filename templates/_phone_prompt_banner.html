@@ -1,6 +1,0 @@
-{% if current_user.is_authenticated and not current_user.phone and not session.get('hide_phone_prompt') %}
-<div class="phone-prompt-banner" id="phone-prompt-banner">
-    <p>💡 Для зручності обробки замовлень, будь ласка, <a href="{{ url_for('profile_settings') }}">додайте ваш номер телефону</a>.</p>
-    <button id="close-phone-prompt" title="Закрити">&times;</button>
-</div>
-{% endif %}

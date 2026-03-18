@@ -2,33 +2,43 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ shop.name }} - {% block title %}{% endblock %}</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon">
-    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#ffffff">
+    <title>{% block title %}{% endblock %} - {{ shop.name }}</title>
 
+    <!-- Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Main CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
     {% block extra_css %}{% endblock %}
 </head>
-<body {% if current_user.is_authenticated %}class="is-authenticated"{% endif %}>
+<body data-show-complete-reg="{{ 'true' if session.get('show_google_complete') else 'false' }}">
+    <!-- Banners -->
     {% include '_phone_prompt_banner.html' %}
-    {% include '_email_prompt_banner.html' %}
+
+    <!-- Header -->
     {% include '_header.html' %}
 
+    <!-- Main Content -->
     <main>
         {% block content %}{% endblock %}
     </main>
 
+    <!-- Footer -->
     {% include '_footer.html' %}
-    {% include '_modals.html' %}
 
+    <!-- Modals -->
+    {% include '_modals.html' %}
     <div id="page-overlay"></div>
 
-    <script>
-        window.currentUser = {{ current_user.is_authenticated|tojson }};
-    </script>
+    <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
@@ -42,32 +52,23 @@
           appId: "1:444416798631:web:d55a502b8add370dfc5082",
           measurementId: "G-CGH5RPPBJV"
         };
-
-      // Ініціалізація Firebase
-      firebase.initializeApp(firebaseConfig);
+        firebase.initializeApp(firebaseConfig);
     </script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    {% block extra_js %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         <script>
-            document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('DOMContentLoaded', () => {
                 {% for category, message in messages %}
-                    // Перетворення категорій Flask на типи Toast
-                    // 'danger' -> 'error', 'info'/'warning' -> 'info', 'success' -> 'success'
-                    var type = '{{ category }}';
-                    if (type === 'danger') type = 'error';
-                    if (type === 'warning') type = 'error';
-
-                    // Виклик твоєї JS функції showToast
-                    showToast("{{ message }}", type);
+                    UI.toast("{{ message }}", "{{ 'error' if category == 'danger' else category }}");
                 {% endfor %}
             });
         </script>
         {% endif %}
     {% endwith %}
 
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

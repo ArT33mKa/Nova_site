@@ -1,7 +1,22 @@
 {% extends 'base.html' %}
+{% block title %}Контакти{% endblock %}
+
 {% block content %}
-<h2>Зв’язатися з нами</h2>
-<p>Адреса: {{ shop.address }}, {{ shop.city }}</p>
-<p>Email: {{ shop.email }}</p>
-<p>Телефон: {{ shop.phone|join(', ') }}</p>
+<section class="container" style="padding: 60px 20px;">
+    <h1 class="page-title text-center">Зв’язатися з нами</h1>
+    <div style="max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);">
+        <ul style="font-size: 1.1rem; line-height: 2;">
+            <li><strong>Адреса:</strong> {{ shop.address }}, {{ shop.city }}</li>
+            <li><strong>Email:</strong> <a href="mailto:{{ shop.email }}" style="color: var(--color-brand-primary);">{{ shop.email }}</a></li>
+            <li><strong>Телефон:</strong>
+                {% for phone in shop.phone %}
+                    <a href="tel:{{ phone }}" style="color: var(--text-primary); white-space: nowrap;">{{ phone }}</a>{{ ", " if not loop.last else "" }}
+                {% endfor %}
+            </li>
+        </ul>
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p>Ми завжди раді допомогти вам з вибором сантехніки!</p>
+        </div>
+    </div>
+</section>
 {% endblock %}
