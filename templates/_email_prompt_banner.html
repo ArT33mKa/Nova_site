@@ -1,5 +1,0 @@
-{% if current_user.is_authenticated and not current_user.is_email_verified %}
-<div class="phone-prompt-banner" id="email-prompt-banner" style="background-color: #d1ecf1; color: #0c5460;">
-    <p>📧 Щоб робити замовлення, будь ласка, <a href="{{ url_for('profile_settings') }}" style="color: #0c5460; font-weight: 600; text-decoration: underline;">підтвердіть вашу електронну пошту</a>.</p>
-</div>
-{% endif %}

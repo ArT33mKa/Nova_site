@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Головна{% endblock %}
+
+{% block content %}
+<!-- Hero Slider -->
+<section class="container hero-container">
+    <div class="card-slider-wrapper">
+        <div class="card-slider">
+            {% for slide in hero_slides %}
+            <div class="hero-slide {{ 'active' if loop.first else '' }}" style="background-image: url('{{ url_for('static', filename='img/' + slide.image) }}');">
+                <div class="hero-content">
+                    <h2>{{ slide.title }}</h2>
+                    <p>{{ slide.subtitle }}</p>
+                    <a href="{{ url_for('main.catalog') }}" class="btn btn-primary btn-lg">Перейти до каталогу</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="slider-nav">
+            <button class="prev-btn">‹</button>
+            <button class="next-btn">›</button>
+        </div>
+    </div>
+</section>
+
+<!-- Categories -->
+<section class="categories-section">
+    <div class="container">
+        <h2 class="section-title">Категорії товарів</h2>
+        <div class="categories-grid">
+            {% for cat in main_categories %}
+            <a href="{{ url_for('main.catalog', category_slug=cat.name.lower().replace(' ','-')) }}" class="category-card">
+                <div class="category-icon-wrapper">
+                    {% if '.' in cat.icon %}
+                        <img src="{{ url_for('static', filename='img/' + cat.icon) }}">
+                    {% else %}
+                        <i class="{{ cat.icon }}"></i>
+                    {% endif %}
+                </div>
+                <h3>{{ cat.name }}</h3>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Featured Products -->
+<section class="container" style="padding: 60px 20px;">
+    <h2 class="section-title">Популярні товари</h2>
+    <div class="products-grid">
+        {% for product in products[:4] %}
+            {% include '_product_card.html' %}
+        {% endfor %}
+    </div>
+    <div class="text-center mt-4">
+        <a href="{{ url_for('main.catalog') }}" class="btn btn-outline btn-lg">Дивитись все</a>
+    </div>
+</section>
+
+<!-- About & Info -->
+<section id="about" style="background: white; padding: 80px 0;">
+    <div class="container">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center;">
+            <div>
+                <h2 class="section-title" style="text-align: left; margin-bottom: 20px;">Про {{ shop.name }}</h2>
+                <p style="font-size: 1.1rem; line-height: 1.8;">Ми пропонуємо широкий асортимент сантехніки та обладнання для вашого дому. Працюємо безпосередньо з виробниками, щоб забезпечити найкращі ціни та гарантію якості.</p>
+                <div style="margin-top: 30px; display: grid; gap: 15px;">
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <div class="icon-wrapper" style="background: #e0e7ff; color: var(--color-brand-primary); cursor: default;"><i class="fas fa-check"></i></div>
+                        <span>Офіційна гарантія на всі товари</span>
+                    </div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <div class="icon-wrapper" style="background: #e0e7ff; color: var(--color-brand-primary); cursor: default;"><i class="fas fa-truck"></i></div>
+                        <span>Швидка доставка по Україні</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <img src="{{ url_for('static', filename='img/shop.jpg') }}" alt="Shop" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-xl);">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Contacts Pre-footer -->
+<section id="contacts" class="container" style="padding: 80px 20px;">
+    <div class="profile-card" style="
+        background: linear-gradient(135deg, #0f172a 0%, #1e40af 100%);
+        color: white;
+        padding: 60px 40px;
+        text-align: center;
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+
+        <!-- Декоративна іконка на фоні -->
+        <i class="fas fa-headset" style="
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            transform: translateY(-50%) rotate(-15deg);
+            font-size: 15rem;
+            color: white;
+            opacity: 0.05;
+            pointer-events: none;">
+        </i>
+
+        <!-- Декоративне коло справа -->
+        <div style="
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 50%;
+            pointer-events: none;">
+        </div>
+
+        <div style="position: relative; z-index: 2;">
+            <h2 style="color: white; margin-bottom: 15px; font-size: 2.5rem;">Залишились питання?</h2>
+            <p style="color: #cbd5e1; margin-bottom: 40px; font-size: 1.1rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+                Не знаєте, який котел чи насос обрати? Наші менеджери нададуть професійну консультацію та допоможуть з вибором.
+            </p>
+
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <a href="tel:{{ shop.phone[0] }}" class="btn btn-primary btn-lg" style="
+                    padding: 15px 40px;
+                    font-size: 1.1rem;
+                    box-shadow: 0 4px 14px 0 rgba(0,118,255,0.39);">
+                    <i class="fas fa-phone-alt"></i> Зателефонувати
+                </a>
+                <a href="mailto:{{ shop.email }}" class="btn btn-outline btn-lg" style="
+                    color: white;
+                    border: 2px solid rgba(255,255,255,0.3);
+                    padding: 15px 40px;
+                    backdrop-filter: blur(5px);">
+                    <i class="fas fa-envelope"></i> Написати нам
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

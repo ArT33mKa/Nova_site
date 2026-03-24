@@ -1,22 +1,40 @@
-from app import app, db, User
+import sys
+from app import app
+from extensions import db
+from models import User
 
 def initialize_database():
     """
-    Створює всі таблиці та початкового адміністратора.
-    НЕ завантажує товари.
+    Створює всі таблиці та надає права адміністратора.
     """
     with app.app_context():
-        # Шукаємо твого користувача (заміни на свій телефон АБО email)
-        me = User.query.filter_by(phone='+380667268392').first()
-        # АБО, якщо ти входив через Google:
-        # me = User.query.filter_by(email='tviy_email@gmail.com').first()
+        try:
+            print(">>> Початок ініціалізації бази даних...")
 
-        if me:
-            me.is_admin = True  # Робимо адміном
-            db.session.commit()  # Зберігаємо зміни
-            print(f"Користувача {me.first_name} зроблено адміном!")
-        else:
-            print("Користувача не знайдено. Спочатку зареєструйся на сайті.")
+            # 1. Створюємо всі таблиці
+            db.create_all()
+            print(">>> Таблиці успішно створено (або вже існували).")
+
+            # 2. Шукаємо користувача, якого треба зробити адміном
+            # ВАЖЛИВО: Заміни цей номер на свій реальний, з яким ти зареєструвався на сайті!
+            admin_phone = '+380667268392'
+
+            admin_user = User.query.filter_by(phone=admin_phone).first()
+
+            if admin_user:
+                if not admin_user.is_admin:
+                    admin_user.is_admin = True
+                    db.session.commit()
+                    print(f">>> Успіх! Користувач '{admin_user.first_name}' з номером {admin_phone} тепер є адміністратором.")
+                else:
+                    print(f">>> Користувач '{admin_user.first_name}' вже є адміністратором.")
+            else:
+                print(f">>> УВАГА: Користувача з номером {admin_phone} не знайдено.")
+                print(">>> Будь ласка, спочатку зареєструйтесь на сайті, а потім запустіть цей скрипт знову.")
+
+        except Exception as e:
+            print(f">>> КРИТИЧНА ПОМИЛКА під час ініціалізації БД: {e}")
+            sys.exit(1)
 
 if __name__ == '__main__':
     initialize_database()

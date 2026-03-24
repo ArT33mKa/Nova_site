@@ -1,48 +1,26 @@
-app = "nova-khvylia" # Замініть на назву вашого додатку на Fly.io
-primary_region = "ams" # Замініть на ваш регіон, якщо інший
-kill_signal = "SIGINT"
-kill_timeout = "5s"
+app = "nova-khvylia"
+primary_region = "ams" # Переконайся, що регіон правильний (waw або ams)
+swap_size_mb = 512     # <--- ВАЖЛИВО: Це має бути тут, на самому верху!
 
 [build]
-  # Тут нічого не потрібно, оскільки ми використовуємо локальний Dockerfile
+  # Тут пусто, використовується Dockerfile
 
 [deploy]
-  # Ця команда буде виконуватися ОДИН раз при кожному деплої
-  # перед запуском нової версії сайту. Ідеально для міграцій.
   release_command = "python init_db.py"
-
-[env]
-  PORT = "8080" # Повідомляємо Fly, на якому порту працює Gunicorn
 
 [http_service]
   internal_port = 8000
+  force_https = true     # Примусовий HTTPS для безпеки (uploader.exe це підтримає)
   auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 0
   processes = ["app"]
-  # ВАЖЛИВО: Ми видалили 'force_https = true' звідси
 
-  # Обробник №1: Тільки для шляху імпорту з BAS
-  [[http_service.handlers]]
-    path = "/api/bas_import"
-    # Дозволяємо звичайний HTTP для цього шляху
-    force_https = false
-
-  # Обробник №2: Для всіх інших шляхів
-  [[http_service.handlers]]
-    # Примусово перенаправляє весь інший трафік на HTTPS
-    force_https = true
-
-# Ця секція КРИТИЧНО важлива для швидкої роботи сайту.
-# Вона каже Fly.io роздавати CSS/JS/картинки напряму,
-# не завантажуючи ваш Python-додаток.
+# Налаштування статики (CSS/JS)
 [[statics]]
-  guest_path = "/app/static" # Шлях всередині контейнера (WORKDIR + /static)
-  url_prefix = "/static/"    # URL, який використовується в шаблонах
+  guest_path = "/app/static"
+  url_prefix = "/static/"
 
 [processes]
-  # Стара команда могла бути такою:
-  # app = "gunicorn myproject.wsgi"
-
-  # Нова команда з логами доступу:
-  app = "gunicorn --bind :8000 --access-logfile - --timeout 120 app:app"
+  # Тайм-аут 120 секунд, щоб великий файл встиг обробитися
+  app = "gunicorn --bind :8000 --workers 1 --threads 2 --timeout 120 app:app"
