@@ -1,0 +1,35 @@
+def send_telegram_notification(order, items):
+    webhook_url = os.getenv("MAKE_WEBHOOK_URL") # Або прямий URL бота Telegram
+    if not webhook_url:
+        return
+
+    # Формуємо красивий список товарів
+    products_list = ""
+    for item in items:
+        products_list += f"▫️ {item.product.name} ({item.quantity} шт) - {int(item.price * item.quantity)} грн\n"
+
+    # Формуємо повідомлення
+    message = (
+        f"📦 <b>НОВЕ ЗАМОВЛЕННЯ #{order.id}</b>\n\n"
+        f"👤 <b>Клієнт:</b> {order.customer_name}\n"
+        f"📞 <b>Телефон:</b> {order.customer_phone}\n\n"
+        f"🛒 <b>Товари:</b>\n{products_list}\n"
+        f"💰 <b>Сума:</b> {int(order.total_cost)} грн\n"
+        f"🚚 <b>Доставка:</b> {order.delivery_method}\n"
+        f"💳 <b>Оплата:</b> {order.payment_method}\n"
+        f"💬 <b>Комент:</b> {order.comment or 'Немає'}"
+    )
+
+    payload = {
+        "text": message,
+        "parse_mode": "HTML"
+    }
+    
+    # Якщо це Make.com, структура може відрізнятися, але для прямого Telegram Bot API це стандарт:
+    # requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", json={"chat_id": CHAT_ID, ...})
+    
+    # Для твого поточного коду (Make.com):
+    try:
+        requests.post(webhook_url, json=payload, timeout=5)
+    except Exception as e:
+        print(f"Telegram Error: {e}")

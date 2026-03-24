@@ -1,0 +1,26 @@
+<div class="summary-box" style="background: white; padding: 25px; border-radius: var(--radius-md); border: 1px solid #f1f5f9; position: sticky; top: 100px;">
+    <h3 style="font-size: 1.1rem; margin-bottom: 20px;">Рейтинг товару</h3>
+
+    <div class="text-center mb-4">
+        <div style="font-size: 3rem; font-weight: 800; color: var(--color-brand-dark); line-height: 1;">{{ "%.1f"|format(product.rating) }}</div>
+        <div class="stars-outer" style="font-size: 1.2rem; margin: 5px 0;">
+            <div class="stars-inner" style="width: {{ (product.rating / 5) * 100 }}%"></div>
+        </div>
+        <div class="text-muted text-sm">{{ review_only_count }} відгуків</div>
+    </div>
+
+    <div class="rating-breakdown" style="margin-bottom: 25px;">
+        {% for star, count in rating_breakdown.items()|reverse %}
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 0.85rem; margin-bottom: 5px;">
+            <span style="width: 25px;">{{ star }} ★</span>
+            <div style="flex-grow: 1; background: #f1f5f9; height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; background: var(--color-accent); width: {{ (count * 100 / (total_reviews_with_rating or 1))|int }}%;"></div>
+            </div>
+            <span style="width: 20px; text-align: right; color: var(--text-secondary);">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <button id="open-review-modal-btn" class="btn btn-primary btn-block mb-2">Написати відгук</button>
+    <button id="open-question-modal-btn" class="btn btn-outline btn-block" style="margin-top: 10px;">Задати питання</button>
+</div>

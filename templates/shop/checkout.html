@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Оформлення{% endblock %}
+
+{% block content %}
+<div class="checkout-page-v2">
+    <div class="container">
+        <h1 class="page-title">Оформлення замовлення</h1>
+
+        <form action="{{ url_for('cart.checkout') }}" method="POST" id="checkout-form" class="checkout-grid-v2">
+
+            <!-- Left: Forms -->
+            <div>
+                <!-- 1. Contacts -->
+                <section class="checkout-section">
+                    <div class="checkout-section-header">
+                        <span class="icon">1</span><h4>Контактні дані</h4>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label>Ім'я</label>
+                            <input type="text" name="customer_first_name" required value="{{ current_user.first_name }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Прізвище</label>
+                            <input type="text" name="customer_last_name" required value="{{ current_user.last_name }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Телефон</label>
+                        <input type="tel" name="customer_phone" id="customer_phone" class="js-phone-mask" required value="{{ current_user.phone }}" placeholder="+380 (__) ___-__-__">
+                    </div>
+                </section>
+
+                <!-- 2. Delivery -->
+                <section class="checkout-section">
+                    <div class="checkout-section-header">
+                        <span class="icon">2</span><h4>Доставка</h4>
+                    </div>
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="delivery_method" value="Самовивіз з магазину" required>
+                            <div>
+                                <strong>Самовивіз</strong>
+                                <p class="text-muted text-sm">Безкоштовно з нашого магазину</p>
+                            </div>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="delivery_method" value="Нова Пошта" required>
+                            <div>
+                                <strong>Нова Пошта</strong>
+                                <p class="text-muted text-sm">У відділення або поштомат</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Nova Poshta Logic Container -->
+                    <div id="nova-poshta-details" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                        <div class="form-group position-relative">
+                            <label>Місто</label>
+                            <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста..." autocomplete="off">
+                            <div id="city-suggestions" class="search-suggestions-popup" style="max-height: 200px; overflow-y: auto;"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Відділення</label>
+                            <select name="delivery_warehouse" id="delivery_warehouse" class="form-control" disabled>
+                                <option value="">Спочатку оберіть місто</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. Payment -->
+                <section class="checkout-section">
+                    <div class="checkout-section-header">
+                        <span class="icon">3</span><h4>Оплата</h4>
+                    </div>
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="payment_method" value="Післяплата" required checked>
+                            <strong>Оплата при отриманні</strong>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="payment_method" value="Оплата на рахунок">
+                            <strong>Оплата на картку / рахунок</strong>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="checkout-section">
+                     <div class="form-group mb-0">
+                        <label>Коментар до замовлення (необов'язково)</label>
+                        <textarea name="order_comment" class="form-control" rows="2"></textarea>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right: Summary -->
+            <div>
+                <div class="checkout-section" style="position: sticky; top: 100px;">
+                    <h3 class="mb-4">Ваше замовлення</h3>
+                    <div id="checkout-items-list">
+                        <!-- Rendered by JS usually, or server side -->
+                        {% for item in cart_items %}
+                        <div class="summary-item">
+                            <img src="{{ item.product.image }}" alt="{{ item.product.name }}">
+                            <div class="summary-item-details">
+                                <div class="name">{{ item.product.name }}</div>
+                                <div class="price">{{ item.quantity }} x {{ "%.2f"|format(item.product.price) }}</div>
+                            </div>
+                            <div style="font-weight: 600;">{{ "%.2f"|format(item.item_total) }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="summary-totals mt-4">
+                        <div class="summary-total-row"><span>Сума:</span> <span>{{ "%.2f"|format(total_cost) }} ₴</span></div>
+                        <div class="summary-total-row"><span>Доставка:</span> <span>За тарифами перевізника</span></div>
+                        <div class="grand-total d-flex justify-between">
+                            <span>Разом:</span>
+                            <span>{{ "%.2f"|format(total_cost) }} ₴</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block btn-lg mt-4">Підтвердити замовлення</button>
+                </div>
+            </div>
+
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: sans-serif; background-color: #f8fafc; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .header { background: #0f172a; color: white; padding: 20px; text-align: center; }
+        .content { padding: 30px; color: #334155; line-height: 1.6; }
+        .order-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .order-table th { text-align: left; color: #64748b; font-size: 0.85rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+        .order-table td { padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .total { text-align: right; font-size: 1.2rem; font-weight: bold; color: #2563eb; margin-top: 20px; }
+        .footer { background: #f1f5f9; padding: 20px; text-align: center; font-size: 0.85rem; color: #94a3b8; }
+        .btn { display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2 style="margin:0;">Замовлення #{{ order.id }} прийнято! 🎉</h2>
+        </div>
+        <div class="content">
+            <p>Вітаємо, <strong>{{ order.customer_name }}</strong>!</p>
+            <p>Дякуємо, що обрали «{{ shop.name }}». Ми вже почали збирати ваше замовлення. Ось деталі:</p>
+
+            <table class="order-table">
+                <thead>
+                    <tr>
+                        <th>Товар</th>
+                        <th>К-сть</th>
+                        <th>Ціна</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items %}
+                    <tr>
+                        <td>{{ item.product.name }}</td>
+                        <td>{{ item.quantity }} шт.</td>
+                        <td>{{ "%.0f"|format(item.price * item.quantity) }} ₴</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="total">
+                Разом до сплати: {{ "%.0f"|format(order.total_cost) }} ₴
+            </div>
+
+            <p style="margin-top: 30px;">
+                <strong>Доставка:</strong> {{ order.delivery_method }}<br>
+                <strong>Оплата:</strong> {{ order.payment_method }}
+            </p>
+
+            <center>
+                <a href="{{ url_for('main.index', _external=True) }}" class="btn">Повернутися в магазин</a>
+            </center>
+        </div>
+        <div class="footer">
+            <p>Якщо у вас є питання, просто відповідайте на цей лист або телефонуйте нам: {{ shop.phone[0] }}</p>
+            <p>© {{ shop.name }}. Всі права захищені.</p>
+        </div>
+    </div>
+</body>
+</html>

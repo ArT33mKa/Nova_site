@@ -1,0 +1,56 @@
+<header class="main-header">
+    <div class="container">
+        <div class="header-inner">
+
+            <!-- ЛІВА ЧАСТИНА: Лого + Меню -->
+            <div class="header-left">
+                <a href="{{ url_for('main.index') }}" class="logo-link">
+                    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="{{ shop.name }}" class="logo-image">
+                    <span class="logo-brand">НОВА ХВИЛЯ</span>
+                </a>
+
+                <nav class="main-nav">
+                    <ul>
+                        <li><a href="{{ url_for('main.index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}">Головна</a></li>
+                        <li><a href="{{ url_for('main.catalog') }}" class="{{ 'active' if request.endpoint == 'catalog' else '' }}">Каталог</a></li>
+                        <li><a href="{{ url_for('main.index') }}#about">Про нас</a></li>
+                        <li><a href="{{ url_for('main.index') }}#contacts">Контакти</a></li>
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- ПРАВА ЧАСТИНА: Дії -->
+            <div class="header-actions">
+                <!-- Сюди можна додати іконку пошуку, якщо треба -->
+
+                <div class="icon-wrapper" id="open-favorites-btn" title="Обране">
+                    <i class="far fa-heart"></i>
+                    <!-- Додаємо клас pulse для анімації при зміні -->
+                    <span class="badge" id="favorites-count" style="display: none;">0</span>
+                </div>
+
+                <div class="icon-wrapper" id="open-cart-btn" title="Кошик">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span class="badge" id="cart-count" style="display: none;">0</span>
+                </div>
+
+                <div class="separator-vertical"></div>
+
+                <div class="user-cabinet-control" id="open-cabinet-btn">
+                    <div class="user-avatar">
+                        {% if current_user.is_authenticated %}
+                            {{ current_user.first_name[0] | upper }}
+                        {% else %}
+                            <i class="fas fa-user"></i>
+                        {% endif %}
+                    </div>
+                    <span class="cabinet-text">
+                        {{ current_user.first_name if current_user.is_authenticated else 'Увійти' }}
+                    </span>
+                    <i class="fas fa-chevron-down" style="font-size: 0.7rem; color: #94a3b8; margin-left: 2px;"></i>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</header>

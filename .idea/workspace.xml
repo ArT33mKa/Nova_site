@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="a7870cca-cff8-4539-97cf-82e342e03600" name="Изменения" comment="">
+      <change afterPath="$PROJECT_DIR$/templates/shop/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.name" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/nova_khvylia.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/nova_khvylia.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backup.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/fly.toml" beforeDir="false" afterPath="$PROJECT_DIR$/fly.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/init_db.py" beforeDir="false" afterPath="$PROJECT_DIR$/init_db.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/css/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/static/css/main.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/boilers.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/cart.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/faucets.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/favorite.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/gas_columns.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/gas_parts.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/hoods.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/irrigation.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/pumps.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/towel_dryers.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/img/unfavorite.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/js/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/static/js/main.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/404.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/404.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_email_prompt_banner.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_footer.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_header.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_modals.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_phone_prompt_banner.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_product_card.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_products_grid_items.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_review_modals.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/_review_summary_box.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/add_product.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/admin_orders.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/admin_reviews.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/admin_unfinished.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/auth/reset_password.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/auth/reset_password.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/base.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/cart.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/catalog.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/checkout.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/contact.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/edit_product.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/email/welcome.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/email/welcome.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/favorites.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/my_orders.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/my_reviews.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/product_detail.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/profile_settings.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/questions.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/reviews.html" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
+  <component name="ProjectId" id="3BJ9SjYmcXjqjyUmmKrMkjCvqQg" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.app.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/artem/PycharmProjects/nova_khvylia&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="PyConsoleOptionsProvider">
+    <option name="myPythonConsoleState">
+      <console-settings module-name="nova_khvylia" is-module-sdk="true" working-directory="$PROJECT_DIR$/.venv/Scripts">
+        <option name="myUseModuleSdk" value="true" />
+        <option name="myModuleName" value="nova_khvylia" />
+        <option name="myWorkingDirectory" value="$PROJECT_DIR$/.venv/Scripts" />
+      </console-settings>
+    </option>
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\artem\PycharmProjects\nova_khvylia\templates\shop" />
+      <recent name="C:\Users\artem\PycharmProjects\nova_khvylia\templates" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="app" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="nova_khvylia" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/app.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.app" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-2653e85de345-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.31033.139" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Задача по умолчанию">
+      <changelist id="a7870cca-cff8-4539-97cf-82e342e03600" name="Изменения" comment="" />
+      <created>1774196307513</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1774196307513</updated>
+    </task>
+    <servers />
+  </component>
+</project>

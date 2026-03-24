@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ current_category or 'Каталог' }}{% endblock %}
+
+{% block content %}
+<div class="container catalog-page"
+     style="padding-top: 30px; padding-bottom: 80px;"
+     data-category-slug="{{ category_slug if category_slug else 'all' }}">
+
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs" style="margin-bottom: 30px;">
+        <a href="{{ url_for('main.index') }}">Головна</a> /
+        <a href="{{ url_for('main.catalog') }}" class="{{ 'active' if not current_category else '' }}">Каталог</a>
+        {% if current_category %} / <span>{{ current_category }}</span>{% endif %}
+    </div>
+
+    <button id="mobile-filter-trigger" class="mobile-filter-btn">
+        <i class="fas fa-sliders-h"></i> Фільтри та Категорії
+    </button>
+    <div id="filter-overlay" class="filter-overlay"></div>
+
+    <!-- MAIN LAYOUT -->
+    <div class="catalog-content">
+        <!-- === SIDEBAR (CATEGORIES & FILTERS) === -->
+        <aside class="filters-sidebar">
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Категорії</h3>
+                <div class="categories-list-container" id="categories-box" style="max-height: none;">
+
+                    <!-- Рекурсивний макрос для виводу дерева -->
+                    {% macro render_category_tree(tree, level=0) %}
+                        <div class="category-level-wrapper" style="margin-left: {{ 0 if level == 0 else 15 }}px;">
+                            {% for cat_name, data in tree.items() %}
+                                <div class="category-item-group">
+                                    <a href="{{ url_for('main.catalog', category_slug=data.slug) }}"
+                                       class="filter-category-link {{ 'active' if current_category == cat_name else '' }}"
+                                       style="font-size: {{ 0.95 - (level * 0.05) }}rem; {{ 'font-weight: 700;' if level == 0 else '' }}">
+                                        <span>{{ cat_name }}</span>
+                                        <span class="filter-count">{{ data.count }}</span>
+                                    </a>
+
+                                    {% if data.subcategories %}
+                                        <div class="subcategory-nest">
+                                            {{ render_category_tree(data.subcategories, level + 1) }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endmacro %}
+
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <!-- Посилання "Всі товари" -->
+                        <a href="{{ url_for('main.catalog') }}"
+                           class="filter-category-link {{ 'active' if not current_category else '' }}"
+                           style="font-weight: 700; border-bottom: 1px solid #f1f5f9; margin-bottom: 10px;">
+                            <span>Всі товари</span>
+                        </a>
+
+                        {{ render_category_tree(hierarchy) }}
+                    </div>
+                </div>
+            </div>
+
+            <hr class="sidebar-divider">
+
+            <!-- Блок фільтрів -->
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Фільтри</h3>
+                <form action="{{ url_for('main.catalog', category_slug=category_slug) }}" method="GET" id="filter-form">
+                    <label class="custom-checkbox">
+                        <input type="checkbox" name="in_stock" value="1" {% if request.args.get('in_stock') %}checked{% endif %} onchange="this.form.submit()">
+                        Тільки в наявності
+                    </label>
+                    <div style="margin-top: 15px;">
+                        <h4 class="filter-subtitle">Ціна (грн)</h4>
+                        <div class="price-filter-container">
+                            <div class="price-input-wrap"><input type="number" name="min_price" placeholder="Від" value="{{ request.args.get('min_price', '') }}"></div>
+                            <span style="color: #cbd5e1; align-self: center;">-</span>
+                            <div class="price-input-wrap"><input type="number" name="max_price" placeholder="До" value="{{ request.args.get('max_price', '') }}"></div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block mt-3">Застосувати</button>
+                </form>
+            </div>
+        </aside>
+
+        <!-- === PRODUCTS AREA === -->
+        <div class="products-container">
+            <!-- SEARCH BAR -->
+            <div class="catalog-search-wrapper">
+                <form action="{{ url_for('main.catalog') }}" method="GET" style="width: 100%; display: flex; position: relative;">
+                    <i class="fas fa-search catalog-search-icon"></i>
+                    <input type="text" name="search" id="search-input" class="catalog-search-input" placeholder="Я шукаю..." value="{{ search_query or '' }}" autocomplete="off">
+                </form>
+                <!-- Контейнер для підказок пошуку -->
+                <div id="search-suggestions-container"></div>
+            </div>
+
+            {% if products.items %}
+                <div class="products-grid">
+                    {% for product in products.items %}
+                        {% include 'components/_product_card.html' %}
+                    {% endfor %}
+                </div>
+
+                <!-- PAGINATION -->
+                <div class="pagination-container">
+                    <a href="{{ url_for('main.catalog', category_slug=category_slug, page=products.prev_num, search=search_query) }}"
+                       class="pagination-btn {{ 'disabled' if not products.has_prev else '' }}">
+                       <i class="fas fa-arrow-left"></i>
+                    </a>
+
+                    <span class="pagination-info" style="margin: 0 15px; font-weight: 600; color: var(--color-brand-dark);">
+                        Стор. {{ products.page }} з {{ products.pages }}
+                    </span>
+
+                    <a href="{{ url_for('main.catalog', category_slug=category_slug, page=products.next_num, search=search_query) }}"
+                       class="pagination-btn {{ 'disabled' if not products.has_next else '' }}">
+                       <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            {% else %}
+                <div class="empty-cart-state">
+                    <div class="empty-cart-icon"><i class="fas fa-box-open"></i></div>
+                    <h3>Нічого не знайдено</h3>
+                    <p>Спробуйте змінити параметри пошуку або фільтри.</p>
+                    <a href="{{ url_for('main.catalog') }}" class="btn btn-primary mt-3">Скинути всі фільтри</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

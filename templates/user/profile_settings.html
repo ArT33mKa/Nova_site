@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Налаштування профілю{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 40px; padding-bottom: 60px;">
+
+    <!-- 1. Верхня картка профілю -->
+    <div class="profile-header-card">
+        <div class="profile-avatar-large">
+            {% if current_user.avatar_url %}
+                <img src="{{ current_user.avatar_url }}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;" referrerpolicy="no-referrer">
+            {% else %}
+                {{ current_user.first_name[0] | upper if current_user.first_name else current_user.username[0] | upper }}
+            {% endif %}
+        </div>
+        <div class="profile-info-text">
+            <h1>{{ current_user.first_name }} {{ current_user.last_name }}</h1>
+            <p>Керуйте своїми даними та безпекою</p>
+        </div>
+    </div>
+
+    <!-- 2. Основна сітка налаштувань -->
+    <div class="settings-grid">
+
+        <!-- Картка: Контактні дані -->
+        <div class="settings-card">
+            <h3><i class="fas fa-user-circle" style="color: var(--color-brand-primary);"></i> Особисті дані</h3>
+
+            <form method="POST">
+                <input type="hidden" name="update_info" value="1">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label>Ім'я</label>
+                        <div class="input-group-icon">
+                            <i class="fas fa-user"></i>
+                            <input type="text" name="first_name" value="{{ current_user.first_name }}" class="form-control" placeholder="Ваше ім'я">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Прізвище</label>
+                        <div class="input-group-icon">
+                            <i class="fas fa-user-tag"></i> <!-- Іконка для прізвища -->
+                            <input type="text" name="last_name" value="{{ current_user.last_name }}" class="form-control" placeholder="Ваше прізвище">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <div style="display: flex; gap: 10px; align-items: center; position: relative;">
+                        <!-- ЗМІНА ТУТ: Якщо email закінчується на @temp.user, ми показуємо пусте поле -->
+                        <input type="email"
+                               name="email"
+                               value="{{ '' if '@temp.user' in current_user.email else current_user.email }}"
+                               class="form-control"
+                               placeholder="Додайте email (для відновлення доступу)">
+
+                        <!-- Логіка іконки статусу -->
+                        {% if '@temp.user' in current_user.email or not current_user.email %}
+                             <!-- Якщо email технічний або відсутній - нічого не показуємо або іконку "плюс" -->
+                             <i class="fas fa-plus-circle" style="color: var(--text-tertiary);" title="Додати email"></i>
+                        {% elif current_user.is_email_verified %}
+                            <span class="badge" style="position:static; background:var(--state-success); height:auto">✔</span>
+                        {% else %}
+                             <span class="badge" style="position:static; background:var(--state-warning); height:auto; cursor:help;" title="Натисніть Зберегти, щоб отримати лист підтвердження">?</span>
+                        {% endif %}
+                    </div>
+                    {% if '@temp.user' in current_user.email %}
+                        <small class="text-muted">Вкажіть email, щоб отримувати чеки та мати можливість відновити пароль.</small>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <div class="input-group-icon">
+                        <i class="fas fa-phone"></i>
+                        <input type="tel" name="phone" value="{{ current_user.phone }}" class="form-control js-phone-mask" placeholder="+380 (__) ___-__-__">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">
+                    Зберегти зміни
+                </button>
+            </form>
+        </div>
+
+        <!-- Картка: Безпека -->
+        <div class="settings-card">
+            <h3><i class="fas fa-shield-alt" style="color: var(--color-brand-primary);"></i> Безпека</h3>
+
+            {% if not current_user.password_hash %}
+            <div class="social-login-alert">
+                <i class="fas fa-info-circle" style="font-size: 1.2rem; margin-top: 2px;"></i>
+                <div>
+                    <strong>Вхід через соцмережу</strong>
+                    <p style="margin: 5px 0 0; font-size: 0.85rem;">Встановіть пароль, щоб мати можливість входити також через Email.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <form method="POST">
+                <input type="hidden" name="change_password" value="1">
+
+                {% if current_user.password_hash %}
+                <div class="form-group">
+                    <label>Поточний пароль</label>
+                    <div class="input-group-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" name="current_password" class="form-control" placeholder="••••••">
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label>Новий пароль</label>
+                    <div class="input-group-icon">
+                        <i class="fas fa-key"></i>
+                        <input type="password" name="new_password" class="form-control" placeholder="Мінімум 6 символів">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Повторіть пароль</label>
+                    <div class="input-group-icon">
+                        <i class="fas fa-check-double"></i>
+                        <input type="password" name="confirm_password" class="form-control" placeholder="••••••">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-outline btn-block" style="margin-top: 20px;">
+                    Оновити пароль
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

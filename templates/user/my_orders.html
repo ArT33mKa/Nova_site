@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Мої замовлення{% endblock %}
+
+{% block content %}
+<div class="container profile-page-container">
+    <div class="breadcrumbs">
+        <a href="{{ url_for('main.index') }}">Головна</a> / <span>Мої замовлення</span>
+    </div>
+
+    <h1 class="page-title">Історія замовлень</h1>
+
+    {% if orders.items %}
+        <div style="display: grid; gap: 20px;">
+        {% for order in orders.items %}
+        <div class="order-card">
+            <div class="order-card-header">
+                <div>
+                    <strong>Замовлення #{{ order.id }}</strong>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">{{ order.timestamp.strftime('%d.%m.%Y в %H:%M') }}</div>
+                </div>
+                <div>
+                    <span class="badge" style="position: static; padding: 6px 12px; font-size: 0.8rem; background: {{ '#10b981' if order.status == 'Виконано' else '#64748b' }}; width: auto; height: auto;">
+                        {{ order.status }}
+                    </span>
+                </div>
+            </div>
+            <div class="order-card-body">
+                <div style="display: grid; gap: 15px; margin-bottom: 20px;">
+                {% for item in order.items %}
+                <div class="order-item-in-profile">
+                    <img src="{{ item.product.image }}" alt="{{ item.product.name }}">
+                    <div style="flex-grow: 1;">
+                        <a href="{{ url_for('main.product_detail', product_id=item.product_id) }}" style="font-weight: 600;">{{ item.product.name }}</a>
+                        <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                            {{ item.quantity }} шт. × {{ "%.2f"|format(item.price) }} ₴
+                        </div>
+                    </div>
+                    <div style="font-weight: 700;">{{ "%.2f"|format(item.price * item.quantity) }} ₴</div>
+                </div>
+                {% endfor %}
+                </div>
+                <div style="border-top: 1px solid #f1f5f9; padding-top: 15px; display: flex; justify-content: flex-end;">
+                    <div style="font-size: 1.1rem;">Всього: <strong style="color: var(--color-brand-dark);">{{ "%.2f"|format(order.total_cost) }} ₴</strong></div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" style="display: flex; justify-content: center; gap: 10px; margin-top: 40px;">
+            {% if orders.has_prev %}
+                <a href="{{ url_for('my_orders', page=orders.prev_num) }}" class="btn btn-outline btn-sm">Попередня</a>
+            {% endif %}
+            {% if orders.has_next %}
+                <a href="{{ url_for('my_orders', page=orders.next_num) }}" class="btn btn-outline btn-sm">Наступна</a>
+            {% endif %}
+        </div>
+
+    {% else %}
+        <div class="text-center" style="padding: 80px; background: white; border-radius: 12px; box-shadow: var(--shadow-sm);">
+            <i class="fas fa-receipt" style="font-size: 3rem; color: #e2e8f0; margin-bottom: 20px;"></i>
+            <h3>У вас ще немає замовлень</h3>
+            <a href="{{ url_for('main.catalog') }}" class="btn btn-primary mt-3">Почати покупки</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

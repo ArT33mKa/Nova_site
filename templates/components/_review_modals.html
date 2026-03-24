@@ -1,0 +1,89 @@
+<!-- Generic Review Modal -->
+<div id="review-modal" class="modal">
+    <div class="modal-content">
+        <button class="close-modal">×</button>
+        <h3 class="text-center mb-4">Написати відгук</h3>
+        <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
+            <input type="hidden" name="review_type" value="review">
+
+            <div class="form-group text-center">
+                <label>Ваша оцінка</label>
+                <div class="stars-input-wrapper">
+                    <!-- Simple CSS Star Rating Reverse logic -->
+                    <style>
+                        .rating-group { display: inline-flex; flex-direction: row-reverse; gap: 5px; }
+                        .rating-group input { display: none; }
+                        .rating-group label { font-size: 2rem; color: #ddd; cursor: pointer; transition: color 0.2s; }
+                        .rating-group input:checked ~ label,
+                        .rating-group label:hover,
+                        .rating-group label:hover ~ label { color: #f59e0b; }
+                    </style>
+                    <div class="rating-group">
+                        <input type="radio" id="star5" name="rating" value="5" required><label for="star5" title="5">★</label>
+                        <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4">★</label>
+                        <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3">★</label>
+                        <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2">★</label>
+                        <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1">★</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Ваш коментар</label>
+                <textarea class="form-control" name="text" placeholder="Що вам сподобалось, а що ні?" rows="4" required></textarea>
+            </div>
+
+            {% if not current_user.is_authenticated %}
+            <div class="form-group">
+                <label>Ім'я</label>
+                <input type="text" class="form-control" name="author_name" required>
+            </div>
+            <div class="form-group">
+                <label>Email (не публікується)</label>
+                <input type="email" class="form-control" name="author_email">
+            </div>
+            {% endif %}
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Опублікувати</button>
+        </form>
+    </div>
+</div>
+
+<!-- Question Modal -->
+<div id="question-modal" class="modal">
+    <div class="modal-content">
+        <button class="close-modal">×</button>
+        <h3>Поставити питання</h3>
+        <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
+            <input type="hidden" name="review_type" value="question">
+            <div class="form-group">
+                <textarea class="form-control" name="text" placeholder="Що вас цікавить про цей товар?" rows="4" required></textarea>
+            </div>
+            {% if not current_user.is_authenticated %}
+            <div class="form-group"><input type="text" class="form-control" name="author_name" placeholder="Ваше ім'я" required></div>
+            <div class="form-group"><input type="email" class="form-control" name="author_email" placeholder="Email"></div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-block">Надіслати питання</button>
+        </form>
+    </div>
+</div>
+
+<!-- Reply Modal -->
+<div id="reply-modal" class="modal">
+    <div class="modal-content">
+        <button class="close-modal">×</button>
+        <h3>Відповідь</h3>
+        <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
+            <input type="hidden" name="review_type" value="reply">
+            <input type="hidden" name="parent_id" id="reply-parent-id" value="">
+            <div class="form-group">
+                <textarea class="form-control" name="text" placeholder="Ваша відповідь..." rows="4" required></textarea>
+            </div>
+            {% if not current_user.is_authenticated %}
+            <div class="form-group"><input type="text" class="form-control" name="author_name" placeholder="Ваше ім'я" required></div>
+            <div class="form-group"><input type="email" class="form-control" name="author_email" placeholder="Email"></div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-block">Відповісти</button>
+        </form>
+    </div>
+</div>

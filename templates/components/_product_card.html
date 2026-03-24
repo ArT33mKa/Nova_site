@@ -1,0 +1,49 @@
+<div class="product-card" data-id="{{ product.id }}">
+    <div class="product-image">
+        <button class="favorite-btn" aria-label="Додати в обране">
+            <i class="far fa-heart"></i>
+            <i class="fas fa-heart"></i>
+        </button>
+
+        <a href="{{ url_for('main.product_detail', product_id=product.id) }}">
+            <!-- Цей рядок гарантує, що якщо картинки немає, завантажиться красива заглушка -->
+            <img src="{{ product.image if product.image else 'https://placehold.co/400x400/f8fafc/94a3b8?text=No+Image' }}"
+                 alt="{{ product.name }}"
+                 loading="lazy"
+                 onerror="this.onerror=null;this.src='https://placehold.co/400x400/f8fafc/94a3b8?text=No+Image';">
+        </a>
+
+        {% if not product.in_stock %}
+            <div class="stock-status out-of-stock">Закінчився</div>
+        {% endif %}
+    </div>
+
+    <div class="product-info">
+        <h3 class="product-name">
+            <a href="{{ url_for('main.product_detail', product_id=product.id) }}">{{ product.name }}</a>
+        </h3>
+
+        <div class="product-footer">
+            <div class="price">{{ "%.0f"|format(product.price) }} <small>₴</small></div>
+
+            {% if product.reviews_count > 0 %}
+            <div class="product-card-rating">
+                <i class="fas fa-star"></i>
+                <span>{{ "%.1f"|format(product.rating) }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="product-card-actions">
+            {% if product.in_stock %}
+                <button class="btn add-to-cart-btn" data-id="{{ product.id }}">
+                    <i class="fas fa-shopping-cart"></i> <span class="btn-text">В кошик</span>
+                </button>
+            {% else %}
+                <button class="btn" disabled style="width: 100%; background: #f1f5f9; color: #94a3b8;">
+                    Немає в наявності
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
