@@ -9,10 +9,11 @@ from flask_dance.contrib.google import make_google_blueprint
 from flask_dance.consumer.storage.sqla import SQLAlchemyStorage
 from dotenv import load_dotenv
 
+
 # ІМПОРТИ РОЗШИРЕНЬ ТА МОДЕЛЕЙ
 from extensions import db, login_manager, csrf
 from models import User, OAuth
-from utils import shop_info
+from utils import shop_info, _get_cloudinary_url
 
 # ІМПОРТИ BLUEPRINTS (Наші нові папки)
 from routes.api import api_bp
@@ -75,7 +76,8 @@ def inject_global_vars():
     return {
         'now': datetime.now(timezone.utc),
         'shop': shop_info,
-        'cart_ids': cart_ids
+        'cart_ids': cart_ids,
+        'get_image': _get_cloudinary_url  # <--- ДОДАЛИ ЦЕ
     }
 
 @app.errorhandler(404)

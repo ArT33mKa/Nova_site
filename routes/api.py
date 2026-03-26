@@ -77,59 +77,79 @@ def render_favorites():
             })
     return jsonify(products_data)
 
+
 def process_bas_xml_background(tmp_path, app_instance):
     with app_instance.app_context():
         try:
             tree = lxml_etree.parse(tmp_path)
             root = tree.getroot()
-            ns = {"ns": root.nsmap.get(None)} if root.nsmap.get(None) else {}
 
-            groups_map = {}
+            # Хелпер для безпечного пошуку тегів без прив'язки до просторів імен (ns)
+            def get_text(element, tag_name):
+                node = element.xpath(f"./*[local-name()='{tag_name}']")
+                return node[0].text.strip() if node and node[0].text else None
 
-            def parse_groups(groups_element, parent=None):
-                for group_elem in groups_element.xpath("ns:Группа" if ns else "Группа", namespaces=ns):
-                    g_id = group_elem.findtext("ns:Ид" if ns else "Ид", namespaces=ns)
-                    name = group_elem.findtext("ns:Наименование" if ns else "Наименование", namespaces=ns)
+            # 1. ПАРСИМО КАТЕГОРІЇ ТА ЇХ ІЄРАРХІЮ
+            groups_map = {}  # XML_ID -> Category Object
+            parent_relations = {}  # XML_ID -> Parent_XML_ID
 
-                    category = Category.query.filter_by(external_id=g_id).first()
-                    if not category:
-                        category = Category(external_id=g_id, name=name, slug=slugify(name))
-                        db.session.add(category)
-                        db.session.flush()
+            for group in root.xpath("//*[local-name()='Классификатор']//*[local-name()='Группа']"):
+                g_id = get_text(group, 'Ид')
+                name = get_text(group, 'Наименование')
+                parent_id = get_text(group, 'Родитель')
 
-                    category.parent_id = parent.id if parent else None
-                    groups_map[g_id] = category
+                category = Category.query.filter_by(external_id=g_id).first()
+                if not category:
+                    category = Category(external_id=g_id, name=name, slug=slugify(name))
+                    db.session.add(category)
+                else:
+                    category.name = name
 
-                    subgroups = group_elem.xpath("ns:Группы" if ns else "Группы", namespaces=ns)
-                    if subgroups:
-                        parse_groups(subgroups[0], parent=category)
+                groups_map[g_id] = category
+                if parent_id:
+                    parent_relations[g_id] = parent_id
 
-            groups_root = root.xpath("//ns:Классификатор/ns:Группы" if ns else "//Классификатор/Группы", namespaces=ns)
-            if groups_root:
-                parse_groups(groups_root[0])
+            db.session.commit()  # Зберігаємо, щоб отримати ID в базі
+
+            # Встановлюємо батьківські зв'язки
+            for g_id, cat_obj in groups_map.items():
+                parent_xml_id = parent_relations.get(g_id)
+                if parent_xml_id and parent_xml_id in groups_map:
+                    cat_obj.parent_id = groups_map[parent_xml_id].id
+
             db.session.commit()
+
+            # 2. ПАРСИМО ЦІНИ
             prices_map = {}
-            offers = root.xpath("//ns:Предложение" if ns else "//Предложение", namespaces=ns)
-            for offer in offers:
-                p_id = (offer.findtext("ns:Ид" if ns else "Ид", namespaces=ns) or "").split('#')[0]
-                if p_id:
-                    price_node = offer.xpath(".//ns:ЦенаЗаЕдиницу" if ns else ".//ЦенаЗаЕдиницу", namespaces=ns)
-                    price = float(price_node[0].text.replace(',', '.')) if price_node and price_node[0].text else 0.0
-                    qty_node = offer.find("ns:Количество" if ns else "Количество", namespaces=ns)
-                    in_stock = float(
-                        qty_node.text.replace(',', '.')) > 0 if qty_node is not None and qty_node.text else False
-                    prices_map[p_id] = (price, in_stock)
+            for offer in root.xpath("//*[local-name()='Предложение']"):
+                p_id = get_text(offer, 'Ид')
+                price_node = offer.xpath(".//*[local-name()='ЦенаЗаЕдиницу']")
+                if price_node and price_node[0].text:
+                    prices_map[p_id] = float(price_node[0].text.replace(',', '.'))
 
-            products = root.xpath("//ns:Товар" if ns else "//Товар", namespaces=ns)
-            for p_elem in products:
-                p_id = (p_elem.findtext("ns:Ид" if ns else "Ид", namespaces=ns) or "").split('#')[0]
-                name = (p_elem.findtext("ns:Наименование" if ns else "Наименование", namespaces=ns) or "").strip()
-                desc = (p_elem.findtext("ns:Описание" if ns else "Описание", namespaces=ns) or "").strip()
+            # 3. ПАРСИМО ТОВАРИ (НАЯВНІСТЬ ТА КАРТИНКИ)
+            for prod in root.xpath("//*[local-name()='Товар']"):
+                p_id = get_text(prod, 'Ид')
+                name = get_text(prod, 'Наименование')
+                desc = get_text(prod, 'Описание')
 
-                cat_id_xml = p_elem.xpath("ns:Группы/ns:Ид" if ns else "Группы/Ид", namespaces=ns)
-                category_obj = groups_map.get(cat_id_xml[0].text) if cat_id_xml else None
+                # Категорія
+                cat_node = prod.xpath(".//*[local-name()='Группы']/*[local-name()='Ид']")
+                category_obj = groups_map.get(cat_node[0].text) if cat_node else None
 
-                price, in_stock = prices_map.get(p_id, (0.0, False))
+                # Картинка
+                img_node = prod.xpath(".//*[local-name()='Картинка']")
+                image_filename = img_node[0].text if img_node else None
+
+                # Наявність (Шукаємо властивість ИД-Наличие)
+                in_stock = True
+                for prop in prod.xpath(".//*[local-name()='ЗначенияСвойства']"):
+                    if get_text(prop, 'Ид') == 'ИД-Наличие':
+                        val = get_text(prop, 'Значение')
+                        in_stock = (val.lower() == 'true') if val else False
+                        break
+
+                price = prices_map.get(p_id, 0.0)
 
                 if price > 1:
                     product = Product.query.filter_by(name=name).first()
@@ -140,6 +160,8 @@ def process_bas_xml_background(tmp_path, app_instance):
                     product.price = price
                     product.in_stock = in_stock
                     product.description = desc
+                    product.image = image_filename  # Зберігаємо назву файлу
+
                     if category_obj:
                         product.category_id = category_obj.id
                         product.category = category_obj.name

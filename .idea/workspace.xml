@@ -4,62 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a7870cca-cff8-4539-97cf-82e342e03600" name="Изменения" comment="">
-      <change afterPath="$PROJECT_DIR$/templates/shop/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.name" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/nova_khvylia.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/nova_khvylia.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+    <list default="true" id="a7870cca-cff8-4539-97cf-82e342e03600" name="Изменения" comment="Update">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backup.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/fly.toml" beforeDir="false" afterPath="$PROJECT_DIR$/fly.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/init_db.py" beforeDir="false" afterPath="$PROJECT_DIR$/init_db.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routes/api.py" beforeDir="false" afterPath="$PROJECT_DIR$/routes/api.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/static/css/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/static/css/main.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/boilers.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/cart.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/faucets.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/favorite.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/gas_columns.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/gas_parts.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/hoods.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/irrigation.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/pumps.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/towel_dryers.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/img/unfavorite.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/js/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/static/js/main.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/404.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/404.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_email_prompt_banner.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_footer.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_header.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_modals.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_phone_prompt_banner.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_product_card.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_products_grid_items.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_review_modals.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/_review_summary_box.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/add_product.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/admin_orders.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/admin_reviews.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/admin_unfinished.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/auth/reset_password.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/auth/reset_password.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/base.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/cart.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/catalog.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/checkout.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/contact.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/edit_product.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/email/welcome.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/email/welcome.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/favorites.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/index.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/my_orders.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/my_reviews.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/product_detail.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/profile_settings.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/questions.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/reviews.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/components/_product_card.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/components/_product_card.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/shop/catalog.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/shop/catalog.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/shop/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/shop/index.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -67,6 +19,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="Git.Settings">
+    <option name="PUSH_AUTO_UPDATE" value="true" />
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="McpProjectServerCommands">
@@ -158,6 +111,27 @@
       <option name="presentableId" value="Default" />
       <updated>1774196307513</updated>
     </task>
+    <task id="LOCAL-00001" summary="Update">
+      <option name="closed" value="true" />
+      <created>1774384263237</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1774384263237</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Update">
+      <option name="closed" value="true" />
+      <created>1774384485627</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1774384485627</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Update" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update" />
   </component>
 </project>
