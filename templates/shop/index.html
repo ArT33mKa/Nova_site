@@ -29,7 +29,7 @@
         <h2 class="section-title">Категорії товарів</h2>
         <div class="categories-grid">
             {% for cat in main_categories %}
-            <a href="{{ url_for('main.catalog', category_slug=cat.name.lower().replace(' ','-')) }}" class="category-card">
+            <a href="{{ url_for('main.catalog', category_slug=cat.slug) }}" class="category-card">
                 <div class="category-icon-wrapper">
                     {% if '.' in cat.icon %}
                         <img src="{{ url_for('static', filename='img/' + cat.icon) }}">

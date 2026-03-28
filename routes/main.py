@@ -4,13 +4,30 @@ from collections import Counter
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 from flask_login import current_user
-from sqlalchemy import func, case, or_ as db_or
+from sqlalchemy import func, case, or_ as db_or, and_
 
 from extensions import db
 from models import Product, Category, CategoryView, OrderItem, Review
 from utils import normalize_text, calculate_similarity, FakePagination, shop_info
 
 main_bp = Blueprint('main', __name__)
+
+
+def get_icon_for_category(name):
+    n = name.lower()
+    if 'насос' in n or 'станці' in n: return 'fas fa-water'
+    if 'бойлер' in n or 'нагрівач' in n: return 'fas fa-temperature-high'
+    if 'змішувач' in n or 'кран' in n or 'сифон' in n or 'мик' in n: return 'fas fa-sink'
+    if 'вентиляц' in n or 'витяжк' in n or 'домовент' in n: return 'fas fa-fan'
+    if 'газ' in n or 'колонк' in n or 'пальник' in n: return 'fas fa-fire'
+    if 'опалення' in n or 'радіатор' in n or 'тепла підлога' in n: return 'fas fa-fire-alt'
+    if 'труб' in n or 'фітинг' in n: return 'fas fa-project-diagram'
+    if 'ванна' in n or 'душ' in n: return 'fas fa-bath'
+    if 'кухня' in n: return 'fas fa-utensils'
+    if 'автоматика' in n or 'електрика' in n: return 'fas fa-microchip'
+    if 'інструмент' in n: return 'fas fa-tools'
+    if 'полив' in n: return 'fas fa-cloud-rain'
+    return 'fas fa-box'
 
 
 def get_category_hierarchy():
@@ -27,16 +44,26 @@ def get_category_hierarchy():
         return total
 
     def build_tree(parent_id=None):
-        tree = {}
         level_categories = [c for c in all_categories if c.parent_id == parent_id]
+        cat_data_list = []
         for cat in level_categories:
             total_count = get_total_count(cat, all_categories)
             if total_count > 0:
-                tree[cat.name] = {
+                subcats = build_tree(cat.id)
+                cat_data_list.append({
+                    'name': cat.name,
                     'slug': cat.slug,
                     'count': total_count,
-                    'subcategories': build_tree(cat.id)
-                }
+                    'subcategories': subcats,
+                    'has_subs': bool(subcats),
+                    'icon': get_icon_for_category(cat.name)
+                })
+
+        cat_data_list.sort(key=lambda x: (not x['has_subs'], x['name'].lower()))
+
+        tree = {}
+        for item in cat_data_list:
+            tree[item['name']] = item
         return tree
 
     return build_tree(None)
@@ -52,46 +79,44 @@ def index():
         {'image': 'kotly.jpg', 'title': 'Все для систем опалення', 'subtitle': 'Котли, бойлери та комплектуючі'}
     ]
 
-    popular_products_query = db.session.query(
-        Product, func.sum(OrderItem.quantity).label('total_sold')
-    ).join(OrderItem, OrderItem.product_id == Product.id).filter(Product.price > 1).group_by(Product.id).order_by(
-        Product.in_stock.desc(), func.sum(OrderItem.quantity).desc()).limit(8).all()
+    popular_products = Product.query.filter(
+        Product.price > 1,
+        Product.in_stock == True,
+        Product.image != None,
+        Product.image != '',
+        ~Product.image.ilike('%no_image%')
+    ).order_by(
+        Product.buy_count.desc(),
+        Product.global_score.desc()
+    ).limit(8).all()
 
-    products = [p[0] for p in popular_products_query]
-
-    if len(products) < 4:
-        products = Product.query.filter(Product.price > 1, Product.in_stock == True).order_by(
-            Product.global_score.desc()).limit(8).all()
+    if len(popular_products) < 8:
+        additional = Product.query.filter(
+            Product.price > 1,
+            Product.in_stock == True,
+            Product.image != None,
+            Product.image != '',
+            ~Product.image.ilike('%no_image%'),
+            ~Product.id.in_([p.id for p in popular_products]) if popular_products else True
+        ).order_by(Product.global_score.desc()).limit(8 - len(popular_products)).all()
+        popular_products.extend(additional)
 
     main_categories_hierarchy = get_category_hierarchy()
 
-    def get_icon_for_category(name):
-        n = name.lower()
-        if 'насос' in n or 'станці' in n: return 'fas fa-water'
-        if 'бойлер' in n or 'нагрівач' in n: return 'fas fa-temperature-high'
-        if 'змішувач' in n or 'кран' in n or 'сифон' in n or 'мик' in n: return 'fas fa-sink'
-        if 'вентиляц' in n or 'витяжк' in n or 'домовент' in n: return 'fas fa-fan'
-        if 'газ' in n or 'колонк' in n or 'пальник' in n: return 'fas fa-fire'
-        if 'опалення' in n or 'радіатор' in n or 'тепла підлога' in n: return 'fas fa-fire-alt'
-        if 'труб' in n or 'фітинг' in n: return 'fas fa-project-diagram'
-        if 'ванна' in n or 'душ' in n: return 'fas fa-bath'
-        if 'кухня' in n: return 'fas fa-utensils'
-        if 'автоматика' in n or 'електрика' in n: return 'fas fa-microchip'
-        if 'інструмент' in n: return 'fas fa-tools'
-        if 'полив' in n: return 'fas fa-cloud-rain'
-        return 'fas fa-box-open'
-
     dynamic_categories = []
-    for cat_name in sorted(main_categories_hierarchy.keys()):
-        cat_data = main_categories_hierarchy.get(cat_name)
+    for cat_name, cat_data in main_categories_hierarchy.items():
         dynamic_categories.append({
-            'name': cat_name,
-            'icon': get_icon_for_category(cat_name),
-            'slug': cat_data['slug'] if cat_data else ''
+            'name': cat_name.capitalize(),
+            'icon': cat_data['icon'],
+            'slug': cat_data['slug']
         })
 
-    return render_template("shop/index.html", products=products, hero_slides=hero_slides,
+    return render_template("shop/index.html",
+                           products=popular_products,
+                           hero_slides=hero_slides,
                            main_categories=dynamic_categories)
+
+
 @main_bp.route('/catalog/', defaults={'category_slug': None})
 @main_bp.route('/catalog/<path:category_slug>/')
 def catalog(category_slug):
@@ -123,7 +148,18 @@ def catalog(category_slug):
                 db.session.rollback()
 
     user_interest = request.cookies.get('user_top_interest')
-    order_clauses = [Product.in_stock.desc()]
+
+    # === ПРОФЕСІЙНЕ СОРТУВАННЯ В КАТАЛОЗІ ===
+    # 1. Чи є фото? (1 - є, 0 - немає)
+    has_image_sort = case(
+        (and_(Product.image != None, Product.image != '', ~Product.image.ilike('%no_image%')), 1),
+        else_=0
+    )
+
+    order_clauses = [
+        Product.in_stock.desc(),  # Спочатку ті, що в наявності
+        has_image_sort.desc()  # Спочатку ті, що з фото
+    ]
 
     if sort_option == 'price_asc':
         order_clauses.append(Product.price.asc())
@@ -132,12 +168,25 @@ def catalog(category_slug):
     elif sort_option == 'alpha':
         order_clauses.append(Product.name.asc())
     else:
-        if user_interest:
-            personalized_score = case((Category.slug == user_interest, Product.global_score + 1000), else_=Product.global_score)
+        # СОРТУВАННЯ ЗА ЗАМОВЧУВАННЯМ (SMART)
+        if user_interest and not category_slug:
+            # Якщо ми на головній каталогу і знаємо інтерес юзера - піднімаємо ці товари
             query = query.outerjoin(Category, Product.category_id == Category.id)
+            personalized_score = case((Category.slug == user_interest, Product.global_score + 10000),
+                                      else_=Product.global_score)
             order_clauses.append(personalized_score.desc())
+            # Також ховаємо дешеві дрібниці (штуцери, прокладки) вниз
+            order_clauses.append(Product.price.desc())
         else:
-            order_clauses.append(Product.global_score.desc())
+            # Якщо інтересу немає або ми вже в конкретній категорії:
+            # Спочатку показуємо товари, які купували (buy_count)
+            order_clauses.append(Product.buy_count.desc())
+            # Потім сортуємо за ціною від більшого до меншого (щоб ховати копійчані деталі в кінець списку)
+            # Але робимо це тільки для "Всі товари", в категоріях залишаємо за рейтингом
+            if not category_slug:
+                order_clauses.append(Product.price.desc())
+            else:
+                order_clauses.append(Product.global_score.desc())
 
     order_clauses.append(Product.id.desc())
 
@@ -172,6 +221,7 @@ def catalog(category_slug):
                            category_slug=category_slug,
                            search_query=search_query)
 
+
 @main_bp.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
@@ -187,6 +237,7 @@ def product_detail(product_id):
         .order_by(Product.in_stock.desc(), Product.global_score.desc()).limit(8).all()
 
     return render_template("shop/product_detail.html", product=product, similar_products=similar)
+
 
 def get_reviews_data(product_id):
     product = Product.query.get_or_404(product_id)
@@ -206,13 +257,16 @@ def get_reviews_data(product_id):
         'total_reviews_with_rating': len(reviews_with_rating)
     }
 
+
 @main_bp.route("/product/<int:product_id>/reviews")
 def product_reviews(product_id):
     return render_template("shop/reviews.html", **get_reviews_data(product_id), active_tab='reviews')
 
+
 @main_bp.route("/product/<int:product_id>/questions")
 def product_questions(product_id):
     return render_template("shop/questions.html", **get_reviews_data(product_id), active_tab='questions')
+
 
 @main_bp.route('/product/<int:product_id>/add_review', methods=['POST'])
 def add_review(product_id):

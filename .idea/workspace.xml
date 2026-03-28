@@ -4,14 +4,16 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a7870cca-cff8-4539-97cf-82e342e03600" name="Изменения" comment="Update">
+    <list default="true" id="a7870cca-cff8-4539-97cf-82e342e03600" name="Изменения" comment="Category tree update in catalog">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routes/api.py" beforeDir="false" afterPath="$PROJECT_DIR$/routes/api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routes/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/routes/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/static/css/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/static/css/main.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/components/_product_card.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/components/_product_card.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/templates/shop/catalog.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/shop/catalog.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/templates/shop/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/shop/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/shop/product_detail.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/shop/product_detail.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/shop/questions.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/shop/questions.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/shop/reviews.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/shop/reviews.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,9 +24,24 @@
     <option name="PUSH_AUTO_UPDATE" value="true" />
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;ArT33mKa&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/ArT33mKa/Nova_site.git&quot;,
+    &quot;accountId&quot;: &quot;86ed3018-9af1-444b-9e6f-1781bbf0cc4d&quot;
+  }
+}</component>
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 1
@@ -127,11 +144,20 @@
       <option name="project" value="LOCAL" />
       <updated>1774384485627</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Category tree update in catalog">
+      <option name="closed" value="true" />
+      <created>1774554876245</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1774554876245</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Update" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update" />
+    <MESSAGE value="Category tree update in catalog" />
+    <option name="LAST_COMMIT_MESSAGE" value="Category tree update in catalog" />
   </component>
 </project>

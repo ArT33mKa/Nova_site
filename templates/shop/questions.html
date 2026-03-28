@@ -10,13 +10,13 @@
     
     <div style="display: grid; grid-template-columns: 300px 1fr; gap: 40px; align-items: start;">
         <aside>
-             {% include '_review_summary_box.html' %}
+             {% include 'components/_review_summary_box.html' %}
         </aside>
         
         <main>
             <div style="display: flex; gap: 20px; border-bottom: 2px solid #f1f5f9; margin-bottom: 30px;">
-                <a href="{{ url_for('product_reviews', product_id=product.id) }}" style="padding: 10px 0; color: var(--text-secondary);">Відгуки</a>
-                <a href="{{ url_for('product_questions', product_id=product.id) }}" style="padding: 10px 0; border-bottom: 2px solid var(--color-brand-primary); font-weight: 700;">Питання</a>
+                <a href="{{ url_for('main.product_reviews', product_id=product.id) }}" style="padding: 10px 0; color: var(--text-secondary);">Відгуки</a>
+                <a href="{{ url_for('main.product_questions', product_id=product.id) }}" style="padding: 10px 0; border-bottom: 2px solid var(--color-brand-primary); font-weight: 700;">Питання</a>
             </div>
 
             {% if questions %}
@@ -48,5 +48,5 @@
         </main>
     </div>
 </div>
-{% include '_review_modals.html' %}
+{% include 'components/_review_modals.html' %}
 {% endblock %}

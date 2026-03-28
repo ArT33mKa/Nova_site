@@ -2,110 +2,171 @@
 {% block title %}{{ product.name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top: 30px; padding-bottom: 60px;">
+<div class="container" style="padding-top: 30px; padding-bottom: 80px;">
+
     <!-- Breadcrumbs -->
     <div class="breadcrumbs">
         <a href="{{ url_for('main.index') }}">Головна</a> /
         <a href="{{ url_for('main.catalog') }}">Каталог</a> /
-        <span>{{ product.name }}</span>
+        {% if product.category_rel %}
+            <a href="{{ url_for('main.catalog', category_slug=product.category_rel.slug) }}">{{ product.category_rel.name }}</a> /
+        {% elif product.category %}
+            <span>{{ product.category }}</span> /
+        {% endif %}
+        <span class="active">{{ product.name }}</span>
     </div>
 
-    <!-- Main Detail Grid -->
-    <div class="product-detail-grid" data-id="{{ product.id }}">
+    <!-- MAIN PRODUCT GRID -->
+    <div class="product-detail-grid animate-in" data-category-slug="{{ product.category_rel.slug if product.category_rel else (product.category|lower|replace(' ', '-')) }}">
 
-        <!-- Left: Image -->
-        <div class="product-image-main">
-            <img src="{{ product.image }}" alt="{{ product.name }}" id="main-product-img">
+        <!-- LEFT: IMAGE -->
+        <div class="product-image-main" style="position: relative;">
+            {% if not product.in_stock %}
+                <div class="stock-status out-of-stock" style="position: absolute; top: 20px; left: 20px; z-index: 10;">Закінчився</div>
+            {% endif %}
+
+            <!-- Використовуємо get_image для Cloudinary/1C -->
+            <img src="{{ get_image(product.image) }}" alt="{{ product.name }}" id="main-product-img"
+                 onerror="this.onerror=null;this.src='https://placehold.co/600x600/f8fafc/94a3b8?text=No+Image';">
         </div>
 
-        <!-- Right: Info -->
+        <!-- RIGHT: INFO & ACTIONS -->
         <div class="product-info-main">
-            <h1 class="product-title" style="font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 15px;">{{ product.name }}</h1>
-
-            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
-                <a href="{{ url_for('product_reviews', product_id=product.id) }}" class="reviews-summary-link" style="margin: 0; color: var(--text-secondary); text-decoration: underline;">
-                    <i class="fas fa-star" style="color: var(--color-accent);"></i>
-                    <span style="font-weight: 700; margin-left: 5px;">{{ "%.1f"|format(product.rating) }}</span>
-                    <span style="margin-left: 5px;">({{ product.reviews_count }} відгуків)</span>
-                </a>
-
+            <!-- Meta Row -->
+            <div class="product-meta-row">
+                <span class="sku-code">Код: {{ product.id }}</span>
                 {% if product.in_stock %}
-                    <span style="background: #dcfce7; color: #166534; padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; font-weight: 600;">
+                    <span style="color: var(--color-success); font-weight: 600; display: flex; align-items: center; gap: 5px;">
                         <i class="fas fa-check-circle"></i> В наявності
                     </span>
                 {% else %}
-                    <span style="background: #fee2e2; color: #991b1b; padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; font-weight: 600;">
-                        Закінчився
+                    <span style="color: var(--color-danger); font-weight: 600; display: flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-times-circle"></i> Немає в наявності
                     </span>
                 {% endif %}
             </div>
 
-            <div class="product-price-detail" style="font-size: 2.5rem; font-weight: 800; color: var(--color-brand-dark); margin-bottom: 30px;">
-                {{ "%.2f"|format(product.price) }} <small style="font-size: 1.5rem;">₴</small>
+            <!-- Title -->
+            <h1 class="product-title">{{ product.name }}</h1>
+
+            <!-- Rating Link (З ПРЕФІКСОМ main.) -->
+            <div style="margin-bottom: 25px;">
+                <a href="{{ url_for('main.product_reviews', product_id=product.id) }}" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none;">
+                    <div style="color: var(--color-accent); font-size: 1.1rem;">
+                        {% if product.rating > 0 %}
+                            <i class="fas fa-star"></i> <strong>{{ "%.1f"|format(product.rating) }}</strong>
+                        {% else %}
+                            <i class="far fa-star"></i>
+                        {% endif %}
+                    </div>
+                    <span style="color: var(--text-secondary); border-bottom: 1px dashed #cbd5e1; transition: 0.2s;">
+                        {{ product.reviews_count }} відгуків
+                    </span>
+                </a>
             </div>
 
+            <!-- Price -->
+            <div class="product-price-detail">
+                {{ "%.0f"|format(product.price) }} <small>₴</small>
+            </div>
+
+            <!-- Actions (Buttons) -->
             <div class="product-actions">
-                <button class="btn btn-primary btn-lg add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
-                    <i class="fas fa-shopping-cart"></i> Додати в кошик
-                </button>
-                <button class="buy-now-btn btn-lg" style="width: 100%; border-radius: 6px;" {% if not product.in_stock %}disabled{% endif %}>
-                    Купити зараз
+                {% if product.id in cart_ids %}
+                    <button class="btn add-to-cart-btn in-cart" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
+                        <i class="fas fa-check"></i> <span class="btn-text">В кошику</span>
+                    </button>
+                {% else %}
+                    <button class="btn add-to-cart-btn" data-id="{{ product.id }}" {% if not product.in_stock %}disabled{% endif %}>
+                        <i class="fas fa-shopping-cart"></i> Додати в кошик
+                    </button>
+                {% endif %}
+
+                <button class="buy-now-btn" type="button" data-id="{{ product.id }}" {% if not product.in_stock %}disabled style="opacity: 0.5; cursor: not-allowed;"{% endif %}>
+                    {{ 'Немає в наявності' if not product.in_stock else 'Купити зараз' }}
                 </button>
             </div>
 
-            <div style="margin-top: 40px;">
-                <h3 style="font-size: 1.25rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px;">Опис товару</h3>
-                <div style="line-height: 1.6; color: var(--text-secondary);">
-                    {{ product.description | safe }}
+            <!-- Trust Features -->
+            <div class="trust-features-grid">
+                <div class="trust-item">
+                    <div class="trust-icon"><i class="fas fa-truck-fast"></i></div>
+                    <div class="trust-text"><h5>Швидка доставка</h5><p>Нова Пошта або самовивіз</p></div>
+                </div>
+                <div class="trust-item">
+                    <div class="trust-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div class="trust-text"><h5>Гарантія якості</h5><p>Перевірка перед відправкою</p></div>
+                </div>
+                <div class="trust-item">
+                    <div class="trust-icon"><i class="fas fa-undo"></i></div>
+                    <div class="trust-text"><h5>Повернення</h5><p>14 днів на повернення</p></div>
+                </div>
+                <div class="trust-item">
+                    <div class="trust-icon"><i class="fas fa-headset"></i></div>
+                    <div class="trust-text"><h5>Підтримка</h5><p>Консультація експерта</p></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Similar Products Carousel -->
-    <div class="similar-products-section" style="margin-top: 80px;">
-        <h2 class="section-title">Схожі товари</h2>
+    <!-- DESCRIPTION SECTION -->
+    <div class="product-description-container">
+        <h2 style="font-size: 1.5rem; margin-bottom: 20px;">Опис товару</h2>
+        <div id="description-wrapper" style="line-height: 1.8; color: #475569; font-size: 1.05rem; overflow: hidden; max-height: 200px; position: relative; transition: max-height 0.5s ease;">
+            {{ product.description | safe }}
+            <div class="desc-gradient" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 80px; background: linear-gradient(transparent, white);"></div>
+        </div>
+        <button id="toggle-description-btn" class="btn btn-link" style="display: none; margin-top: 10px; font-weight: 600;">Читати далі <i class="fas fa-chevron-down"></i></button>
+    </div>
+
+    <!-- SIMILAR PRODUCTS CAROUSEL -->
+    <div class="similar-products-section" style="margin-top: 60px;">
+        <!-- Заголовок і кнопки на одному рівні -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h2 class="section-title" style="margin: 0; text-align: left;">Схожі товари</h2>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-outline btn-sm carousel-prev-btn" style="width: 40px; height: 40px; border-radius: 50%; padding: 0;"><i class="fas fa-chevron-left"></i></button>
+                <button class="btn btn-outline btn-sm carousel-next-btn" style="width: 40px; height: 40px; border-radius: 50%; padding: 0;"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+
         <div class="carousel-container">
             <div class="products-carousel">
                 <div class="products-grid-carousel">
-                    {% for p in similar_products %}
-                        <!-- Manual Product Card Inclusion to avoid path issues -->
-                        <div class="product-card" data-id="{{ p.id }}">
-                            <div class="product-image">
-                                <a href="{{ url_for('main.product_detail', product_id=p.id) }}">
-                                    <img src="{{ p.image }}" alt="{{ p.name }}" loading="lazy">
-                                </a>
-                            </div>
-                            <div class="product-info">
-                                <h3 class="product-name"><a href="{{ url_for('main.product_detail', product_id=p.id) }}">{{ p.name }}</a></h3>
-                                <div class="product-footer">
-                                    <div class="price">{{ "%.0f"|format(p.price) }} <small>₴</small></div>
-                                </div>
-                                <button class="add-to-cart-btn" data-id="{{ p.id }}">В кошик</button>
-                            </div>
-                        </div>
+                    <!-- ВИКОРИСТОВУЄМО НАШ КОМПОНЕНТ КАРТКИ -->
+                    {% for product in similar_products %}
+                        {% include 'components/_product_card.html' %}
                     {% else %}
-                        <p class="text-center w-100 text-muted">Схожих товарів не знайдено.</p>
+                        <p class="text-muted">Схожих товарів не знайдено.</p>
                     {% endfor %}
                 </div>
             </div>
-            {% if similar_products|length > 4 %}
-            <button class="carousel-btn carousel-prev-btn"><i class="fas fa-chevron-left"></i></button>
-            <button class="carousel-btn carousel-next-btn"><i class="fas fa-chevron-right"></i></button>
-            {% endif %}
         </div>
     </div>
 </div>
 
 <script>
-    // Simple Buy Now Logic
-    document.querySelector('.buy-now-btn')?.addEventListener('click', async function() {
-        const id = document.querySelector('.product-detail-grid').dataset.id;
-        await fetch('/add_to_cart', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ product_id: id })
+    // Логіка розгортання опису
+    const descWrapper = document.getElementById('description-wrapper');
+    const descBtn = document.getElementById('toggle-description-btn');
+    const gradient = document.querySelector('.desc-gradient');
+
+    if (descWrapper && descWrapper.scrollHeight > 220) {
+        descBtn.style.display = 'inline-block';
+        descBtn.addEventListener('click', () => {
+            if (descWrapper.style.maxHeight === '200px') {
+                descWrapper.style.maxHeight = descWrapper.scrollHeight + 'px';
+                gradient.style.display = 'none';
+                descBtn.innerHTML = 'Згорнути <i class="fas fa-chevron-up"></i>';
+            } else {
+                descWrapper.style.maxHeight = '200px';
+                gradient.style.display = 'block';
+                descBtn.innerHTML = 'Читати далі <i class="fas fa-chevron-down"></i>';
+            }
         });
-        window.location.href = "{{ url_for('cart.checkout') }}";
-    });
+    } else if (descWrapper) {
+        descWrapper.style.maxHeight = 'none';
+        if(gradient) gradient.style.display = 'none';
+    }
 </script>
 {% endblock %}

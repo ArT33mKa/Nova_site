@@ -3,7 +3,7 @@
     <div class="modal-content">
         <button class="close-modal">×</button>
         <h3 class="text-center mb-4">Написати відгук</h3>
-        <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
+        <form action="{{ url_for('main.add_review', product_id=product.id) }}" method="POST">
             <input type="hidden" name="review_type" value="review">
 
             <div class="form-group text-center">
@@ -54,7 +54,7 @@
     <div class="modal-content">
         <button class="close-modal">×</button>
         <h3>Поставити питання</h3>
-        <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
+        <form action="{{ url_for('main.add_review', product_id=product.id) }}" method="POST">
             <input type="hidden" name="review_type" value="question">
             <div class="form-group">
                 <textarea class="form-control" name="text" placeholder="Що вас цікавить про цей товар?" rows="4" required></textarea>
@@ -73,7 +73,7 @@
     <div class="modal-content">
         <button class="close-modal">×</button>
         <h3>Відповідь</h3>
-        <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
+        <form action="{{ url_for('main.add_review', product_id=product.id) }}" method="POST">
             <input type="hidden" name="review_type" value="reply">
             <input type="hidden" name="parent_id" id="reply-parent-id" value="">
             <div class="form-group">

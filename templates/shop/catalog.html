@@ -34,19 +34,22 @@
                     </a>
 
                     <!-- Рекурсивний макрос для виводу дерева -->
+<!-- Рекурсивний макрос для виводу дерева -->
                     {% macro render_category_tree(tree, level=0) %}
                         <div class="category-tree-level">
                             {% for cat_name, data in tree.items() %}
                                 {% if data.subcategories %}
-                                    <!-- Категорія з підкатегоріями -->
                                     <details class="category-details" {% if current_category == cat_name %}open{% endif %}>
                                         <summary class="category-summary">
-                                            <!-- Клік по назві - перехід на сторінку -->
                                             <a href="{{ url_for('main.catalog', category_slug=data.slug) }}"
                                                class="cat-name-link {{ 'active' if current_category == cat_name else '' }}">
-                                                {{ cat_name }} <span class="filter-count">{{ data.count }}</span>
+                                                <div class="cat-name-text">
+                                                    <i class="{{ data.icon }} cat-icon"></i>
+                                                    <!-- Фільтр capitalize робить першу літеру великою, інші - малими -->
+                                                    {{ cat_name | capitalize }}
+                                                </div>
+                                                <span class="filter-count">{{ data.count }}</span>
                                             </a>
-                                            <!-- Клік по цій зоні - розгортання списку -->
                                             <div class="toggle-btn"><i class="fas fa-chevron-down"></i></div>
                                         </summary>
                                         <div class="subcategory-nest">
@@ -54,10 +57,13 @@
                                         </div>
                                     </details>
                                 {% else %}
-                                    <!-- Кінцева категорія -->
                                     <a href="{{ url_for('main.catalog', category_slug=data.slug) }}"
                                        class="cat-name-link no-children {{ 'active' if current_category == cat_name else '' }}">
-                                        {{ cat_name }} <span class="filter-count">{{ data.count }}</span>
+                                        <div class="cat-name-text">
+                                            <i class="{{ data.icon }} cat-icon"></i>
+                                            {{ cat_name | capitalize }}
+                                        </div>
+                                        <span class="filter-count">{{ data.count }}</span>
                                     </a>
                                 {% endif %}
                             {% endfor %}
@@ -137,4 +143,22 @@
         </div>
     </div>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Знаходимо активне посилання в сайдбарі
+        const activeLink = document.querySelector('.cat-name-link.active');
+        if (activeLink) {
+            // Йдемо вгору по дереву і відкриваємо всі батьківські папки <details>
+            let parentDetails = activeLink.closest('details');
+            while (parentDetails) {
+                parentDetails.setAttribute('open', '');
+                parentDetails = parentDetails.parentElement.closest('details');
+            }
+            // Плавно прокручуємо сайдбар, щоб активна категорія була по центру
+            setTimeout(() => {
+                activeLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+    });
+</script>
 {% endblock %}

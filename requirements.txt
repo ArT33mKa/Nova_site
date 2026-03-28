@@ -6,10 +6,13 @@ requests
 firebase-admin
 twilio
 cloudinary
-gunicorn # <-- Дуже важливий для роботи на сервері!
-psycopg2-binary # <-- Для роботи з базою даних Postgres на Fly.io
+gunicorn
+psycopg2-binary
 lxml
 Flask-Dance
 flask_limiter
 Flask-Login
+Flask-wtf
 Werkzeug
+flask-cors
+itsdangerous
