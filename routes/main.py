@@ -2,7 +2,7 @@ import math
 from datetime import datetime, timezone, timedelta
 from collections import Counter
 
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app, Response
 from flask_login import current_user
 from sqlalchemy import func, case, or_ as db_or, and_
 
@@ -222,16 +222,35 @@ def catalog(category_slug):
                            search_query=search_query)
 
 
+# Маркери пошукових/ШІ-ботів — їм не рахуємо перегляди й не пишемо в сесію
+def _is_bot():
+    ua = (request.user_agent.string or '').lower()
+    return any(m in ua for m in (
+        'bot', 'crawl', 'spider', 'slurp', 'gptbot', 'bingpreview', 'facebookexternalhit'))
+
+
 @main_bp.route("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
 
-    view_key = f'viewed_{product_id}'
-    if view_key not in session:
-        product.views_count = (product.views_count or 0) + 1
-        product.update_global_score()
-        db.session.commit()
-        session[view_key] = True
+    # Перегляд рахуємо один раз на сесію, АЛЕ без роздування cookie:
+    # зберігаємо обмежений список останніх переглянутих (а не окремий ключ на кожен товар),
+    # і не рахуємо переглядів від пошукових ботів (GPTBot тощо).
+    if not _is_bot():
+        # одноразове прибирання старого формату (окремий ключ 'viewed_<id>' на кожен товар)
+        legacy = [k for k in list(session.keys()) if k.startswith('viewed_')]
+        if legacy:
+            for k in legacy:
+                session.pop(k, None)
+            session.modified = True
+
+        viewed = session.get('viewed', [])
+        if product_id not in viewed:
+            product.views_count = (product.views_count or 0) + 1
+            product.update_global_score()
+            db.session.commit()
+            viewed.append(product_id)
+            session['viewed'] = viewed[-100:]  # тримаємо лише останні 100 → cookie не росте
 
     similar = Product.query.filter(Product.category_id == product.category_id, Product.id != product.id) \
         .order_by(Product.in_stock.desc(), Product.global_score.desc()).limit(8).all()
@@ -305,3 +324,44 @@ def add_review(product_id):
     db.session.commit()
     flash('Ваш відгук додано!', 'success')
     return redirect(request.referrer or url_for('main.product_detail', product_id=product_id))
+
+
+@main_bp.route("/robots.txt")
+def robots_txt():
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /account",
+        "Disallow: /cart",
+        "Disallow: /favorites",
+        "Disallow: /auth",
+        "Disallow: /api",
+        "Disallow: /1c_exchange",
+        "",
+        "Sitemap: %s" % url_for("main.sitemap_xml", _external=True),
+    ]
+    return Response(chr(10).join(lines) + chr(10), mimetype="text/plain")
+
+
+@main_bp.route("/sitemap.xml")
+def sitemap_xml():
+    urls = [
+        (url_for("main.index", _external=True), "1.0"),
+        (url_for("main.catalog", _external=True), "0.9"),
+    ]
+    try:
+        for cat in Category.query.all():
+            if cat.slug:
+                urls.append((url_for("main.catalog", category_slug=cat.slug, _external=True), "0.7"))
+        for p in Product.query.filter(Product.price > 1).all():
+            urls.append((url_for("main.product_detail", product_id=p.id, _external=True), "0.6"))
+    except Exception:
+        pass
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for loc, prio in urls:
+        parts.append("  <url><loc>%s</loc><priority>%s</priority></url>" % (loc, prio))
+    parts.append("</urlset>")
+    return Response(chr(10).join(parts), mimetype="application/xml")

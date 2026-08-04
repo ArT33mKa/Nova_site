@@ -2,11 +2,60 @@
 {% block title %}Оформлення{% endblock %}
 
 {% block content %}
+<style>
+    .field-error { color: #ef4444; font-size: 0.8rem; display: none; margin-top: 5px; }
+    .input-error { border-color: #ef4444 !important; box-shadow: 0 0 0 2px rgba(239,68,68,0.12) !important; }
+    .summary-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+    .summary-item:last-child { border-bottom: none; }
+    .summary-item img { width: 54px; height: 54px; object-fit: cover; border-radius: 8px; background:#f8fafc; flex-shrink: 0; }
+    .summary-item-details { flex: 1; min-width: 0; }
+    .summary-item-details .name { font-size: 0.9rem; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+    .summary-item-details .price { font-size: 0.8rem; color: #64748b; }
+    .summary-item > div:last-child { flex-shrink: 0; white-space: nowrap; font-size: 0.9rem; color: #0f172a; }
+
+    /* Випадаючі списки міста / відділення */
+    #nova-poshta-details .form-group.position-relative { position: relative; }
+    #city-suggestions, #warehouse-suggestions { padding: 6px; }
+    #city-suggestions .suggestion-item,
+    #warehouse-suggestions .suggestion-item {
+        display: block;
+        width: 100%;
+        padding: 11px 14px;
+        margin: 0;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.92rem;
+        line-height: 1.4;
+        color: #1e293b;
+        text-align: left;
+        white-space: normal;
+        cursor: pointer;
+        transition: background .15s ease, color .15s ease;
+    }
+    #city-suggestions .suggestion-item + .suggestion-item,
+    #warehouse-suggestions .suggestion-item + .suggestion-item {
+        border-top: 1px solid #f1f5f9;
+    }
+    #city-suggestions .suggestion-item:hover,
+    #warehouse-suggestions .suggestion-item:hover {
+        background: #eff6ff;
+        color: var(--color-brand-primary);
+    }
+    #city-suggestions .suggestion-empty,
+    #warehouse-suggestions .suggestion-empty,
+    .suggestion-loading {
+        padding: 12px 14px;
+        color: #94a3b8;
+        font-size: 0.9rem;
+        cursor: default;
+    }
+</style>
 <div class="checkout-page-v2">
     <div class="container">
         <h1 class="page-title">Оформлення замовлення</h1>
 
-        <form action="{{ url_for('cart.checkout') }}" method="POST" id="checkout-form" class="checkout-grid-v2">
+        <form action="/checkout" method="POST" id="checkout-form" class="checkout-grid-v2" novalidate>
+            <input type="hidden" name="csrf_token" id="csrf_token_field">
 
             <!-- Left: Forms -->
             <div>
@@ -18,16 +67,18 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                         <div class="form-group">
                             <label>Ім'я</label>
-                            <input type="text" name="customer_first_name" required value="{{ current_user.first_name }}">
+                            <input type="text" name="customer_first_name" id="customer_first_name" class="form-control" required placeholder="Ваше ім'я">
+                            <small class="field-error" data-error-for="customer_first_name"></small>
                         </div>
                         <div class="form-group">
                             <label>Прізвище</label>
-                            <input type="text" name="customer_last_name" required value="{{ current_user.last_name }}">
+                            <input type="text" name="customer_last_name" id="customer_last_name" class="form-control" placeholder="Ваше прізвище">
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Телефон</label>
-                        <input type="tel" name="customer_phone" id="customer_phone" class="js-phone-mask" required value="{{ current_user.phone }}" placeholder="+380 (__) ___-__-__">
+                        <input type="tel" name="customer_phone" id="customer_phone" class="form-control js-phone-mask" required placeholder="+380 (__) ___-__-__">
+                        <small class="field-error" data-error-for="customer_phone"></small>
                     </div>
                 </section>
 
@@ -38,33 +89,27 @@
                     </div>
                     <div class="radio-group">
                         <label class="radio-option">
-                            <input type="radio" name="delivery_method" value="Самовивіз з магазину" required>
+                            <input type="radio" name="delivery_method" value="Нова Пошта" required checked>
                             <div>
-                                <strong>Самовивіз</strong>
-                                <p class="text-muted text-sm">Безкоштовно з нашого магазину</p>
-                            </div>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="delivery_method" value="Нова Пошта" required>
-                            <div>
-                                <strong>Нова Пошта</strong>
-                                <p class="text-muted text-sm">У відділення або поштомат</p>
+                                <strong>Нова Пошта (відділення)</strong>
+                                <p class="text-muted text-sm">Доставка у відділення Нової Пошти по всій Україні</p>
                             </div>
                         </label>
                     </div>
 
                     <!-- Nova Poshta Logic Container -->
-                    <div id="nova-poshta-details" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                    <div id="nova-poshta-details" style="display: block; margin-top: 20px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
                         <div class="form-group position-relative">
                             <label>Місто</label>
-                            <input type="text" name="delivery_city" id="delivery_city" placeholder="Введіть назву міста..." autocomplete="off">
-                            <div id="city-suggestions" class="search-suggestions-popup" style="max-height: 200px; overflow-y: auto;"></div>
+                            <input type="text" name="delivery_city" id="delivery_city" class="form-control" placeholder="Введіть назву міста..." autocomplete="off">
+                            <div id="city-suggestions" class="search-suggestions-popup" style="max-height: 220px; overflow-y: auto;"></div>
+                            <small class="field-error" data-error-for="delivery_city"></small>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group position-relative">
                             <label>Відділення</label>
-                            <select name="delivery_warehouse" id="delivery_warehouse" class="form-control" disabled>
-                                <option value="">Спочатку оберіть місто</option>
-                            </select>
+                            <input type="text" name="delivery_warehouse" id="delivery_warehouse" class="form-control" placeholder="Спочатку оберіть місто" autocomplete="off" disabled>
+                            <div id="warehouse-suggestions" class="search-suggestions-popup" style="max-height: 220px; overflow-y: auto;"></div>
+                            <small class="field-error" data-error-for="delivery_warehouse"></small>
                         </div>
                     </div>
                 </section>
@@ -76,12 +121,18 @@
                     </div>
                     <div class="radio-group">
                         <label class="radio-option">
-                            <input type="radio" name="payment_method" value="Післяплата" required checked>
-                            <strong>Оплата при отриманні</strong>
+                            <input type="radio" name="payment_method" value="Оплата при отриманні" required checked>
+                            <div>
+                                <strong>Оплата при отриманні</strong>
+                                <p class="text-muted text-sm">Готівкою або карткою у відділенні</p>
+                            </div>
                         </label>
                         <label class="radio-option">
-                            <input type="radio" name="payment_method" value="Оплата на рахунок">
-                            <strong>Оплата на картку / рахунок</strong>
+                            <input type="radio" name="payment_method" value="Онлайн-оплата карткою">
+                            <div>
+                                <strong>Оплата онлайн карткою</strong>
+                                <p class="text-muted text-sm">Безпечна оплата карткою на сайті</p>
+                            </div>
                         </label>
                     </div>
                 </section>
@@ -96,28 +147,20 @@
 
             <!-- Right: Summary -->
             <div>
-                <div class="checkout-section" style="position: sticky; top: 100px;">
-                    <h3 class="mb-4">Ваше замовлення</h3>
+                <div class="checkout-section summary-card" style="position: sticky; top: 100px; border-top: 4px solid var(--color-brand-primary); background: linear-gradient(180deg, #f8fbff 0%, #ffffff 60%);">
+                    <h3 class="mb-4" style="font-size: 1.15rem; display: flex; align-items: center; gap: 10px;"><i class="fas fa-bag-shopping" style="color: var(--color-brand-primary);"></i> Ваше замовлення</h3>
                     <div id="checkout-items-list">
-                        <!-- Rendered by JS usually, or server side -->
-                        {% for item in cart_items %}
-                        <div class="summary-item">
-                            <img src="{{ item.product.image }}" alt="{{ item.product.name }}">
-                            <div class="summary-item-details">
-                                <div class="name">{{ item.product.name }}</div>
-                                <div class="price">{{ item.quantity }} x {{ "%.2f"|format(item.product.price) }}</div>
-                            </div>
-                            <div style="font-weight: 600;">{{ "%.2f"|format(item.item_total) }}</div>
+                        <div class="text-center text-muted" style="padding: 20px;">
+                            <i class="fas fa-spinner fa-spin"></i> Завантаження...
                         </div>
-                        {% endfor %}
                     </div>
 
-                    <div class="summary-totals mt-4">
-                        <div class="summary-total-row"><span>Сума:</span> <span>{{ "%.2f"|format(total_cost) }} ₴</span></div>
-                        <div class="summary-total-row"><span>Доставка:</span> <span>За тарифами перевізника</span></div>
+                    <div class="summary-totals mt-4" style="background: #fff; border: 1px solid #e8eef7; border-radius: 12px; padding: 16px;">
+                        <div class="summary-total-row"><span>Сума:</span> <span id="summary-subtotal">0.00 ₴</span></div>
+                        <div class="summary-total-row"><span>Доставка:</span> <span id="summary-delivery">—</span></div>
                         <div class="grand-total d-flex justify-between">
                             <span>Разом:</span>
-                            <span>{{ "%.2f"|format(total_cost) }} ₴</span>
+                            <span id="summary-grand-total" style="color: var(--color-brand-primary); font-size: 1.3rem;">0.00 ₴</span>
                         </div>
                     </div>
 

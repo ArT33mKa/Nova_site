@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Реєстрація{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <h1 class="auth-title">Створення акаунту</h1>
+        <p class="auth-subtitle">Зареєструйтеся, щоб зберігати обране та історію замовлень</p>
+
+        <form method="POST" action="" class="auth-form" novalidate>
+            <div class="form-row-2">
+                <div>
+                    <label class="form-label" for="reg-first">Ім'я</label>
+                    <input class="form-control" type="text" id="reg-first" name="first_name" required>
+                </div>
+                <div>
+                    <label class="form-label" for="reg-last">Прізвище</label>
+                    <input class="form-control" type="text" id="reg-last" name="last_name" required>
+                </div>
+            </div>
+
+            <label class="form-label" for="reg-email">Електронна пошта</label>
+            <input class="form-control" type="email" id="reg-email" name="email" required placeholder="you@example.com">
+
+            <label class="form-label" for="reg-phone">Номер телефону</label>
+            <input class="form-control" type="tel" id="reg-phone" name="phone" placeholder="+38 (0__) ___-__-__">
+
+            <div class="form-row-2">
+                <div>
+                    <label class="form-label" for="reg-pass">Пароль</label>
+                    <input class="form-control" type="password" id="reg-pass" name="password" required autocomplete="new-password" placeholder="Мінімум 6 символів">
+                </div>
+                <div>
+                    <label class="form-label" for="reg-pass2">Повторіть пароль</label>
+                    <input class="form-control" type="password" id="reg-pass2" name="password2" required autocomplete="new-password">
+                </div>
+            </div>
+
+            <label class="checkbox-row consent-row">
+                <input type="checkbox" name="agree" value="1" required {% if request.form.get('agree') %}checked{% endif %}>
+                <span>Виражаю згоду на обробку моїх персональних даних відповідно до умов сайту.</span>
+            </label>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Зареєструватися</button>
+        </form>
+
+        <div style="display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--text-tertiary);font-size:.85rem;"><span style="flex:1;height:1px;background:#e2e8f0;"></span>або<span style="flex:1;height:1px;background:#e2e8f0;"></span></div>
+        <a href="/auth/google" class="btn btn-block btn-lg" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#3c4043;border:1px solid #dadce0;font-weight:600;">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" style="width:18px;height:18px;">Зареєструватися через Google
+        </a>
+
+        <p class="auth-switch">Вже маєте акаунт? <a href="/auth/login">Увійти</a></p>
+
+        <script>
+        (function(){
+          const form = document.querySelector('.auth-form');
+          if(!form) return;
+          const showErr = (el, msg) => {
+            el.classList.add('input-error');
+            let m = el.parentElement.querySelector('.field-error');
+            if(!m){ m = document.createElement('small'); m.className='field-error'; el.parentElement.appendChild(m); }
+            m.textContent = msg; m.style.display='block';
+          };
+          const clearErr = (el) => {
+            el.classList.remove('input-error');
+            const m = el.parentElement.querySelector('.field-error');
+            if(m) m.style.display='none';
+          };
+          const SKEY = 'authform_' + location.pathname;
+          const persist = () => { try { const d={}; form.querySelectorAll('input').forEach(el=>{ if(el.type!=='password'&&el.type!=='checkbox'&&el.name) d[el.name]=el.value; }); sessionStorage.setItem(SKEY, JSON.stringify(d)); } catch(e){} };
+          try { const saved = JSON.parse(sessionStorage.getItem(SKEY)||'{}'); form.querySelectorAll('input').forEach(el=>{ if(el.name && saved[el.name]!==undefined && !el.value) el.value=saved[el.name]; }); } catch(e){}
+          form.querySelectorAll('input').forEach(el => el.addEventListener('input', () => { clearErr(el); persist(); }));
+          form.addEventListener('submit', (e) => {
+            let ok = true, first = null;
+            form.querySelectorAll('input[required]').forEach(el => {
+              const val = (el.value||'').trim();
+              let bad = !val;
+              if(el.type==='email' && val && !(val.indexOf('@')>0 && val.lastIndexOf('.')>val.indexOf('@'))) bad = true;
+              if(el.type==='checkbox' && !el.checked) bad = true;
+              if(bad){ ok=false; first=first||el; showErr(el, el.type==='checkbox' ? 'Потрібно надати згоду' : (el.type==='email' ? 'Введіть коректну пошту' : 'Заповніть це поле')); }
+            });
+            const pass = form.querySelector('input[name=password]');
+            const pass2 = form.querySelector('input[name=password2]');
+            if(pass && pass.value && pass.value.length < 6){ ok=false; first=first||pass; showErr(pass,'Мінімум 6 символів'); }
+            if(pass2 && pass.value !== pass2.value){ ok=false; first=first||pass2; showErr(pass2,'Паролі не співпадають'); }
+            if(!ok){ e.preventDefault(); if(first) first.focus(); }
+          });
+        })();
+        </script>
+    </div>
+</div>
+{% endblock %}

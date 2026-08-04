@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Вхід{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <h1 class="auth-title">Вхід в акаунт</h1>
+        <p class="auth-subtitle">Раді бачити вас знову у НОВА ХВИЛЯ</p>
+
+        <form method="POST" action="" class="auth-form" novalidate>
+            <label class="form-label" for="login-email">Електронна пошта</label>
+            <input class="form-control" type="email" id="login-email" name="email" required autocomplete="email" placeholder="you@example.com">
+
+            <label class="form-label" for="login-password">Пароль</label>
+            <input class="form-control" type="password" id="login-password" name="password" required autocomplete="current-password" placeholder="Ваш пароль">
+
+            <label class="checkbox-row">
+                <input type="checkbox" name="remember" value="1"> Запам'ятати мене
+            </label>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Увійти</button>
+        </form>
+
+        <div style="display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--text-tertiary);font-size:.85rem;"><span style="flex:1;height:1px;background:#e2e8f0;"></span>або<span style="flex:1;height:1px;background:#e2e8f0;"></span></div>
+        <a href="/auth/google" class="btn btn-block btn-lg" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#3c4043;border:1px solid #dadce0;font-weight:600;">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" style="width:18px;height:18px;">Увійти через Google
+        </a>
+
+        <p class="auth-switch">Ще не маєте акаунту? <a href="/auth/register">Зареєструватися</a></p>
+
+        <script>
+        (function(){
+          const form = document.querySelector('.auth-form');
+          if(!form) return;
+          const showErr = (el, msg) => {
+            el.classList.add('input-error');
+            let m = el.parentElement.querySelector('.field-error');
+            if(!m){ m = document.createElement('small'); m.className='field-error'; el.parentElement.appendChild(m); }
+            m.textContent = msg; m.style.display='block';
+          };
+          const clearErr = (el) => {
+            el.classList.remove('input-error');
+            const m = el.parentElement.querySelector('.field-error');
+            if(m) m.style.display='none';
+          };
+          const SKEY = 'authform_' + location.pathname;
+          const persist = () => { try { const d={}; form.querySelectorAll('input').forEach(el=>{ if(el.type!=='password'&&el.type!=='checkbox'&&el.name) d[el.name]=el.value; }); sessionStorage.setItem(SKEY, JSON.stringify(d)); } catch(e){} };
+          try { const saved = JSON.parse(sessionStorage.getItem(SKEY)||'{}'); form.querySelectorAll('input').forEach(el=>{ if(el.name && saved[el.name]!==undefined && !el.value) el.value=saved[el.name]; }); } catch(e){}
+          form.querySelectorAll('input').forEach(el => el.addEventListener('input', () => { clearErr(el); persist(); }));
+          form.addEventListener('submit', (e) => {
+            let ok = true, first = null;
+            form.querySelectorAll('input[required]').forEach(el => {
+              const val = (el.value||'').trim();
+              let bad = !val;
+              if(el.type==='email' && val && !(val.indexOf('@')>0 && val.lastIndexOf('.')>val.indexOf('@'))) bad = true;
+              if(bad){ ok=false; first=first||el; showErr(el, el.type==='email' ? 'Введіть коректну пошту' : 'Заповніть це поле'); }
+            });
+            if(!ok){ e.preventDefault(); if(first) first.focus(); }
+          });
+        })();
+        </script>
+    </div>
+</div>
+{% endblock %}

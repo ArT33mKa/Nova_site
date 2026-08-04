@@ -1,26 +1,22 @@
 app = "nova-khvylia"
-primary_region = "ams" # Переконайся, що регіон правильний (waw або ams)
-swap_size_mb = 512     # <--- ВАЖЛИВО: Це має бути тут, на самому верху!
-
-[build]
-  # Тут пусто, використовується Dockerfile
+primary_region = "ams"
+swap_size_mb = 512
 
 [deploy]
-  release_command = "python init_db.py"
+release_command = 'python -c "import app"'
 
 [http_service]
-  internal_port = 8000
-  force_https = true     # Примусовий HTTPS для безпеки (uploader.exe це підтримає)
-  auto_stop_machines = true
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ["app"]
-
-# Налаштування статики (CSS/JS)
-[[statics]]
-  guest_path = "/app/static"
-  url_prefix = "/static/"
+auto_start_machines = true
+auto_stop_machines = false
+force_https = false
+internal_port = 8080
+min_machines_running = 1
+processes = [ "app" ]
 
 [processes]
-  # Тайм-аут 120 секунд, щоб великий файл встиг обробитися
-  app = "gunicorn --bind :8000 --workers 1 --threads 2 --timeout 120 app:app"
+app = "gunicorn --bind :8080 --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile - --log-level info app:app"
+
+[[statics]]
+guest_path = "/app/static"
+tigris_bucket = ""
+url_prefix = "/static/"

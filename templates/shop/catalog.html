@@ -81,7 +81,7 @@
                 <h3 class="sidebar-title">Фільтри</h3>
                 <form action="{{ url_for('main.catalog', category_slug=category_slug) }}" method="GET" id="filter-form">
                     <label class="custom-checkbox">
-                        <input type="checkbox" name="in_stock" value="1" {% if request.args.get('in_stock') %}checked{% endif %} onchange="this.form.submit()">
+                        <input type="checkbox" name="in_stock" value="1" {% if request.args.get('in_stock') %}checked{% endif %}>
                         Тільки в наявності
                     </label>
                     <div style="margin-top: 15px;">

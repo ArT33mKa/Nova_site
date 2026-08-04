@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}Налаштування акаунту{% endblock %}
+
+{% block content %}
+<div class="account-page">
+    <div class="account-container">
+        <h1 class="account-title">Налаштування акаунту</h1>
+        <p class="account-subtitle">Керуйте своїми особистими даними та безпекою</p>
+
+        <section class="account-section">
+            <h2 class="account-section-title">Особисті дані</h2>
+            <form class="account-form" data-editable method="POST" action="/account/update_profile">
+                <div class="form-row-2">
+                    <div>
+                        <label class="form-label" for="acc-first">Ім'я</label>
+                        <input class="form-control" type="text" id="acc-first" name="first_name" value="{{current_user.first_name}}" disabled>
+                    </div>
+                    <div>
+                        <label class="form-label" for="acc-last">Прізвище</label>
+                        <input class="form-control" type="text" id="acc-last" name="last_name" value="{{current_user.last_name}}" disabled>
+                    </div>
+                </div>
+                <button type="button" class="edit-toggle-btn btn btn-outline">Змінити</button>
+                <div class="save-row" style="display:none;">
+                    <button type="submit" class="btn btn-primary">Зберегти</button>
+                    <button type="button" class="btn btn-light cancel-edit-btn">Скасувати</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="account-section">
+            <h2 class="account-section-title">Електронна пошта</h2>
+            <form class="account-form" data-editable method="POST" action="/account/update_email">
+                <label class="form-label" for="acc-email">Email</label>
+                <input class="form-control" type="email" id="acc-email" name="email" value="{{current_user.email}}" disabled>
+                <button type="button" class="edit-toggle-btn btn btn-outline">Змінити</button>
+                <div class="save-row" style="display:none;">
+                    <button type="submit" class="btn btn-primary">Зберегти</button>
+                    <button type="button" class="btn btn-light cancel-edit-btn">Скасувати</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="account-section">
+            <h2 class="account-section-title">Номер телефону</h2>
+            <form class="account-form" data-editable method="POST" action="/account/update_phone">
+                <label class="form-label" for="acc-phone">Телефон</label>
+                <input class="form-control" type="tel" id="acc-phone" name="phone" value="{{current_user.phone or '' }}" disabled placeholder="+38 (0__) ___-__-__">
+                <button type="button" class="edit-toggle-btn btn btn-outline">Змінити</button>
+                <div class="save-row" style="display:none;">
+                    <button type="submit" class="btn btn-primary">Зберегти</button>
+                    <button type="button" class="btn btn-light cancel-edit-btn">Скасувати</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="account-section">
+            <h2 class="account-section-title">Зміна пароля</h2>
+            <form class="account-form" data-editable method="POST" action="/account/update_password">
+                <label class="form-label" for="acc-new-pass">Новий пароль</label>
+                <input class="form-control" type="password" id="acc-new-pass" name="new_password" autocomplete="new-password" disabled placeholder="Мінімум 6 символів">
+                <label class="form-label" for="acc-new-pass2">Повторіть пароль</label>
+                <input class="form-control" type="password" id="acc-new-pass2" name="new_password2" autocomplete="new-password" disabled>
+                <button type="button" class="edit-toggle-btn btn btn-outline">Змінити пароль</button>
+                <div class="save-row" style="display:none;">
+                    <button type="submit" class="btn btn-primary">Зберегти</button>
+                    <button type="button" class="btn btn-light cancel-edit-btn">Скасувати</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="account-section danger-zone">
+            <h2 class="account-section-title">Видалення акаунту</h2>
+            <p class="danger-text">Ця дія незворотна. Всі ваші дані, замовлення та обране будуть видалені назавжди.</p>
+            <form method="POST" action="/account/delete" onsubmit="return confirm('Ви впевнені? Акаунт буде видалено назавжди.');">
+                <button type="submit" class="btn btn-danger">Видалити акаунт</button>
+            </form>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('.account-form[data-editable]').forEach(function (form) {
+        var editBtn = form.querySelector('.edit-toggle-btn');
+        var saveRow = form.querySelector('.save-row');
+        var cancelBtn = form.querySelector('.cancel-edit-btn');
+        var fields = form.querySelectorAll('.form-control');
+        var original = {};
+        fields.forEach(function (f) { original[f.name] = f.value; });
+        function enable() {
+            fields.forEach(function (f) { f.disabled = false; });
+            if (editBtn) editBtn.style.display = 'none';
+            if (saveRow) saveRow.style.display = 'flex';
+            if (fields[0]) fields[0].focus();
+        }
+        function disable() {
+            fields.forEach(function (f) { f.disabled = true; f.value = original[f.name]; });
+            if (editBtn) editBtn.style.display = 'inline-flex';
+            if (saveRow) saveRow.style.display = 'none';
+        }
+        if (editBtn) editBtn.addEventListener('click', enable);
+        if (cancelBtn) cancelBtn.addEventListener('click', disable);
+    });
+</script>
+{% endblock %}

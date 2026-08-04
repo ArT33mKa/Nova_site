@@ -7,19 +7,23 @@
         <a href="{{ url_for('main.product_detail', product_id=product.id) }}">{{ product.name }}</a> / <span>Відгуки</span>
     </div>
 
-    <!-- Responsive Grid: Sidebar stacks on mobile -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; align-items: start;">
+    <div style="display: grid; grid-template-columns: 320px 1fr; gap: 40px; align-items: start;">
         <!-- Left Sidebar (Summary) -->
-        <div style="order: 2;"> <!-- On mobile this goes below on some layouts, but typically summary is good on top. Let's rely on media queries in CSS if needed, defaulting to grid auto flow -->
+        <div>
              {% include 'components/_review_summary_box.html' %}
         </div>
 
         <!-- Main Content -->
-        <div style="order: 1; min-width: 60%;">
+        <div style="min-width: 60%;">
+            <div style="background: linear-gradient(135deg, #eff6ff, #dbeafe); border-left: 4px solid var(--color-brand-primary); padding: 16px 20px; border-radius: 10px; margin-bottom: 24px;">
+                <h2 style="margin: 0; font-size: 1.3rem; color: var(--color-brand-dark);"><i class="fas fa-star" style="color: #f59e0b;"></i> Відгуки покупців</h2>
+                <p style="margin: 6px 0 0; color: var(--text-secondary); font-size: 0.9rem;">Реальні враження від тих, хто вже придбав цей товар.</p>
+            </div>
             <div style="display: flex; gap: 20px; border-bottom: 2px solid #f1f5f9; margin-bottom: 30px;">
                 <a href="{{ url_for('main.product_reviews', product_id=product.id) }}" style="padding: 10px 0; border-bottom: 2px solid var(--color-brand-primary); font-weight: 700;">Відгуки</a>
                 <a href="{{ url_for('main.product_questions', product_id=product.id) }}" style="padding: 10px 0; color: var(--text-secondary);">Питання</a>
             </div>
+
 
             {% if reviews %}
                 {% for r in reviews %}

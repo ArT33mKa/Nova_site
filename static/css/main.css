@@ -189,7 +189,7 @@ textarea.form-control { height: auto; padding: 12px 16px; }
 .footer-contacts i { color: var(--color-brand-primary); width: 20px; text-align: center; }
 .footer-bottom { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; text-align: center; font-size: 0.8rem; color: #64748b; }
 /* 9. CATALOG & FILTERS */
-.catalog-content { display: grid; grid-template-columns: 260px 1fr; gap: 30px; align-items: start; }
+.catalog-content { display: grid; grid-template-columns: 320px 1fr; gap: 30px; align-items: start; }
 .filters-sidebar { background: #ffffff; border-radius: 16px; padding: 20px; box-shadow: var(--shadow-sm); border: 1px solid rgba(0,0,0,0.05); position: sticky; top: 90px; width: 100%; max-height: calc(100vh - 110px); height: auto; overflow-y: auto; overscroll-behavior: contain; display: block; padding-bottom: 20px; scrollbar-width: none; -ms-overflow-style: none; }
 .filters-sidebar::-webkit-scrollbar { display: none; }
 .sidebar-title { font-size: 0.95rem; font-weight: 800; margin-bottom: 15px; color: var(--color-brand-dark); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
@@ -307,6 +307,86 @@ textarea.form-control { height: auto; padding: 12px 16px; }
 .carousel-container { position: relative; width: 100%; padding: 0 5px; }
 .products-carousel { overflow: hidden; border-radius: 16px; }
 .products-grid-carousel { display: flex !important; flex-wrap: nowrap !important; gap: 20px !important; transition: transform 0.4s ease; width: max-content; }
+/* ==============================================
+   IMPROVEMENTS 2026 — catalog UX, cart button, filters
+   ============================================== */
+
+/* Green in-cart state on product cards */
+.add-to-cart-btn.in-cart { background: var(--color-success) !important; color: #fff !important; border-color: var(--color-success) !important; }
+.add-to-cart-btn.in-cart:hover { background: #0ea371 !important; }
+
+/* Consistent category filter rows */
+.cat-name-link { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 8px; font-size: 0.9rem; color: var(--text-primary); min-height: 40px; transition: var(--transition); }
+.cat-name-link:hover { background: var(--bg-surface-alt); color: var(--color-brand-primary); }
+.cat-name-link.active { background: rgba(37,99,235,0.08); color: var(--color-brand-primary); font-weight: 700; }
+.cat-name-text { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; white-space: normal; overflow-wrap: break-word; word-break: normal; line-height: 1.25; }
+.cat-icon { width: 18px; text-align: center; color: var(--text-tertiary); flex-shrink: 0; }
+.cat-name-link.active .cat-icon { color: var(--color-brand-primary); }
+.filter-count { flex-shrink: 0; background: var(--bg-surface-alt); color: var(--text-secondary); font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; min-width: 30px; text-align: center; }
+.cat-name-link.active .filter-count { background: var(--color-brand-primary); color: #fff; }
+.category-details { border: none; }
+.category-summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; gap: 4px; }
+.category-summary::-webkit-details-marker { display: none; }
+.category-summary .cat-name-link { flex: 1; }
+.category-summary .toggle-btn { flex-shrink: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); border-radius: 6px; transition: var(--transition); }
+.category-summary:hover .toggle-btn { background: var(--bg-surface-alt); }
+.category-details[open] > .category-summary .toggle-btn { transform: rotate(180deg); }
+.subcategory-nest { padding-left: 8px; margin-top: 2px; border-left: 1px solid #e2e8f0; margin-left: 18px; }
+
+/* Hide number spinners + price slider */
+.price-filter-container input[type=number]::-webkit-outer-spin-button,
+.price-filter-container input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.price-filter-container input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.price-slider { position: relative; height: 34px; margin: 18px 6px 6px; }
+.price-slider-track { position: absolute; top: 14px; left: 0; right: 0; height: 6px; background: #e9eef5; border-radius: 6px; transition: background 0.2s ease; }
+.price-slider-range { position: absolute; top: 0; height: 100%; background: linear-gradient(90deg, var(--color-brand-primary), #4f86f7); border-radius: 6px; }
+.price-slider input[type=range] { position: absolute; top: 0; left: 0; width: 100%; height: 34px; -webkit-appearance: none; appearance: none; background: none; pointer-events: none; margin: 0; padding: 0; }
+.price-slider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 4px solid var(--color-brand-primary); cursor: grab; box-shadow: 0 2px 8px rgba(37,99,235,0.35); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.price-slider input[type=range]::-moz-range-thumb { pointer-events: auto; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 4px solid var(--color-brand-primary); cursor: grab; box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
+
+/* Prominent reset filters button */
+.reset-filters-btn { margin-top: 10px; background: #fff; color: var(--color-danger); border: 1.5px solid var(--color-danger); justify-content: center; }
+.reset-filters-btn:hover { background: var(--color-danger); color: #fff; }
+.price-slider input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.12); box-shadow: 0 4px 14px rgba(37,99,235,0.45); }
+.price-slider:hover .price-slider-track { background: #dde6f1; }
+
+/* ===== IMPROVEMENTS 2026 (B) — header auth, guest modal, favorites, checkout, validation ===== */
+.header-auth-btns { display: flex; align-items: center; gap: 8px; margin-right: 4px; }
+.btn-header-login, .btn-header-register { display: inline-flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; transition: var(--transition); white-space: nowrap; }
+.btn-header-login { color: var(--color-brand-primary); background: #eff6ff; border: 1px solid #dbeafe; }
+.btn-header-login:hover { background: #dbeafe; }
+.btn-header-register { color: #fff; background: var(--color-brand-primary); border: 1px solid var(--color-brand-primary); box-shadow: 0 4px 12px rgba(37,99,235,0.25); }
+.btn-header-register:hover { background: var(--color-brand-hover); }
+@media (max-width: 991px) {
+    .btn-header-login { display: none; }
+    .btn-header-register { height: 34px; padding: 0 12px; font-size: 0.8rem; }
+    .header-auth-btns { gap: 6px; margin-right: 2px; }
+}
+.auth-required-content { text-align: center; max-width: 420px; }
+.auth-required-icon { width: 64px; height: 64px; border-radius: 50%; background: #eff6ff; color: var(--color-brand-primary); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 18px; }
+.auth-required-content h3 { margin-bottom: 8px; }
+.auth-required-content p { color: var(--text-secondary); margin-bottom: 22px; }
+.auth-required-actions { display: flex; flex-direction: column; gap: 10px; }
+.favorites-sidebar .cart-item-bottom { gap: 14px; }
+.favorites-sidebar .cart-item-bottom .add-to-cart-btn { width: auto; flex-shrink: 0; padding: 8px 14px; }
+.favorites-sidebar .cart-item-price { margin-right: auto; }
+.checkout-page-v2 .checkout-section-header .icon { background: linear-gradient(135deg, var(--color-brand-primary), #4f86f7); }
+.checkout-page-v2 .radio-option:has(input:checked) strong { color: var(--color-brand-primary); }
+.field-error { color: var(--color-danger); font-size: 0.8rem; margin-top: 5px; display: none; }
+.input-error { border-color: var(--color-danger) !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.12) !important; }
+
+/* Numbered pagination */
+.pagination-container { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.pagination-pages { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.pagination-pages .page-num { min-width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; padding: 0 8px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; font-weight: 600; color: var(--text-primary); transition: var(--transition); }
+.pagination-pages .page-num:hover { border-color: var(--color-brand-primary); color: var(--color-brand-primary); }
+.pagination-pages .page-num.active { background: var(--color-brand-primary); border-color: var(--color-brand-primary); color: #fff; }
+.pagination-pages .page-dots { color: var(--text-tertiary); padding: 0 2px; }
+.page-jump { display: flex; align-items: center; gap: 6px; margin-left: 10px; }
+.page-jump-input { width: 72px !important; height: 40px !important; text-align: center; }
+.page-jump-btn { height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--color-brand-primary); background: var(--color-brand-primary); color: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.page-jump-btn:hover { background: var(--color-brand-hover); }
+
 .products-grid-carousel .product-card { min-width: 230px; max-width: 230px; flex-shrink: 0; }
 .carousel-prev-btn, .carousel-next-btn { width: 40px; height: 40px; border-radius: 50%; background: white; border: 1px solid #e2e8f0; box-shadow: var(--shadow-sm); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
@@ -612,4 +692,56 @@ textarea.form-control { height: auto; padding: 12px 16px; }
 .products-grid-carousel .product-card {
     min-width: 240px;
     max-width: 240px;
+}
+
+/* ==============================================
+   IMPROVEMENTS 2026 — ACCOUNT, AUTH, FAVORITES
+   ============================================== */
+
+/* Активне серце "Обране" */
+.favorite-btn.active,
+.favorite-btn.active i { color: var(--color-danger) !important; }
+.favorite-btn.active i { font-weight: 900; }
+
+/* Сайдбар обраного (успадковує cart-sidebar) */
+.favorites-sidebar .cart-item-price { color: var(--color-brand-primary); font-weight: 700; }
+
+/* --- Сторінки входу / реєстрації --- */
+.auth-page { display: flex; justify-content: center; align-items: flex-start; padding: 60px 20px; min-height: 60vh; }
+.auth-card { background: white; width: 100%; max-width: 440px; padding: 40px; border-radius: 20px; box-shadow: var(--shadow-md); border: 1px solid #f1f5f9; }
+.auth-title { font-size: 1.8rem; margin-bottom: 8px; text-align: center; }
+.auth-subtitle { color: var(--text-secondary); text-align: center; margin-bottom: 30px; }
+.auth-form .form-label { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 0.9rem; }
+.auth-form .form-control { width: 100%; height: 48px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 16px; font-size: 1rem; transition: var(--transition); }
+.auth-form .form-control:focus { border-color: var(--color-brand-primary); box-shadow: 0 0 0 4px rgba(37,99,235,0.1); outline: none; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; margin: 18px 0; font-size: 0.9rem; color: var(--text-secondary); cursor: pointer; }
+.auth-switch { text-align: center; margin-top: 22px; color: var(--text-secondary); font-size: 0.95rem; }
+.auth-switch a { color: var(--color-brand-primary); font-weight: 600; }
+
+/* --- Сторінка кабінету / налаштувань --- */
+.account-page { max-width: 720px; margin: 0 auto; padding: 50px 20px 80px; }
+.account-title { font-size: 2rem; margin-bottom: 6px; }
+.account-subtitle { color: var(--text-secondary); margin-bottom: 35px; }
+.account-section { background: white; border: 1px solid #f1f5f9; border-radius: 18px; padding: 28px; margin-bottom: 22px; box-shadow: var(--shadow-sm); }
+.account-section-title { font-size: 1.15rem; margin-bottom: 18px; }
+.account-form .form-label { display: block; margin: 0 0 6px; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); }
+.account-form .form-control { width: 100%; height: 46px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 16px; font-size: 1rem; margin-bottom: 16px; transition: var(--transition); background: #fff; }
+.account-form .form-control:disabled { background: #f8fafc; color: var(--text-secondary); cursor: not-allowed; }
+.account-form .form-control:focus { border-color: var(--color-brand-primary); box-shadow: 0 0 0 4px rgba(37,99,235,0.1); outline: none; }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.edit-toggle-btn { margin-top: 4px; }
+.save-row { gap: 12px; margin-top: 4px; }
+.danger-zone { border-color: #fecaca; background: #fef2f2; }
+.danger-zone .account-section-title { color: var(--color-danger); }
+.danger-text { color: #b91c1c; font-size: 0.9rem; margin-bottom: 18px; line-height: 1.5; }
+.btn-danger { background: var(--color-danger); color: #fff; border: none; }
+.btn-danger:hover { background: #b91c1c; }
+.btn-light { background: #f1f5f9; color: var(--text-primary); border: 1px solid #e2e8f0; }
+.btn-light:hover { background: #e2e8f0; }
+.btn-block { width: 100%; }
+.btn-lg { height: 50px; font-size: 1.05rem; }
+
+@media (max-width: 600px) {
+    .form-row-2 { grid-template-columns: 1fr; }
+    .auth-card, .account-section { padding: 24px; }
 }

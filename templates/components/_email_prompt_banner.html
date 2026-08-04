@@ -1,8 +1,0 @@
-{% if current_user.is_authenticated and not current_user.email and not session.get('hide_email_prompt') %}
-<div id="email-prompt-banner" style="background: var(--color-brand-dark); color: white; padding: 10px; text-align: center; position: relative; z-index: 1000;">
-    <div class="container">
-        <span>📧 Вкажіть Email для отримання чеків та відновлення доступу.</span>
-        <a href="{{ url_for('profile_settings') }}" style="color: #fbbf24; text-decoration: underline; margin-left: 10px;">Налаштувати</a>
-    </div>
-</div>
-{% endif %}

@@ -3,7 +3,7 @@ from flask_login import current_user
 
 from extensions import db
 from models import Product, CartItem, Order, OrderItem
-from utils import send_telegram_notification, send_email, shop_info
+from utils import get_image
 
 cart_bp = Blueprint('cart', __name__)
 
@@ -56,7 +56,7 @@ def get_cart():
             if item.product:
                 cart_items.append({
                     "id": item.product.id, "name": item.product.name, "price": item.product.price,
-                    "image": item.product.image, "quantity": item.quantity, "in_stock": item.product.in_stock,
+                    "image": get_image(item.product.image), "quantity": item.quantity, "in_stock": item.product.in_stock,
                     "url": url_for('main.product_detail', product_id=item.product.id)
                 })
                 total += item.product.price * item.quantity
@@ -68,7 +68,7 @@ def get_cart():
             for product_id, quantity in cart.items():
                 if product := product_map.get(product_id):
                     cart_items.append({
-                        "id": product.id, "name": product.name, "price": product.price, "image": product.image,
+                        "id": product.id, "name": product.name, "price": product.price, "image": get_image(product.image),
                         "quantity": quantity, "in_stock": product.in_stock,
                         "url": url_for('main.product_detail', product_id=product.id)
                     })
@@ -85,6 +85,45 @@ def remove_from_cart(product_id):
         if str(product_id) in cart: del cart[str(product_id)]
         session["cart"] = cart
     return jsonify(status="success")
+
+@cart_bp.route('/api/checkout_summary')
+def checkout_summary():
+    buy_now_id = request.args.get('buy_now_id')
+    items, subtotal = [], 0
+
+    def add_item(product, quantity):
+        nonlocal subtotal
+        line = product.price * quantity
+        subtotal += line
+        items.append({
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "image": get_image(product.image),
+            "quantity": quantity,
+            "in_stock": product.in_stock,
+            "line_total": line,
+            "url": url_for('main.product_detail', product_id=product.id)
+        })
+
+    if buy_now_id:
+        product = Product.query.get(buy_now_id)
+        if product:
+            add_item(product, 1)
+    elif current_user.is_authenticated:
+        for item in CartItem.query.filter_by(user_id=current_user.id).all():
+            if item.product:
+                add_item(item.product, item.quantity)
+    else:
+        cart = session.get("cart", {})
+        if cart:
+            product_map = {str(p.id): p for p in Product.query.filter(
+                Product.id.in_([int(pid) for pid in cart.keys() if pid.isdigit()])).all()}
+            for pid, qty in cart.items():
+                if product := product_map.get(pid):
+                    add_item(product, qty)
+
+    return jsonify({"items": items, "subtotal": subtotal})
 
 @cart_bp.route('/checkout', methods=['GET', 'POST'])
 def checkout():
@@ -125,7 +164,7 @@ def checkout():
                 payment_method=request.form.get('payment_method'),
                 comment=request.form.get('order_comment'),
                 total_cost=total_cost,
-                status='Новий'
+                status='Нове'
             )
             db.session.add(new_order)
             db.session.commit()
@@ -142,20 +181,10 @@ def checkout():
                     session.pop('cart', None)
             db.session.commit()
 
-            try:
-                send_telegram_notification(new_order, OrderItem.query.filter_by(order_id=new_order.id).all())
-            except Exception as e:
-                print(f"Telegram fail: {e}")
-
-            if current_user.is_authenticated and current_user.email and '@' in current_user.email and 'temp.user' not in current_user.email:
-                try:
-                    send_email(current_user.email, f"Ваше замовлення #{new_order.id} прийнято! 🎉",
-                               render_template('email/order_confirmation.html', order=new_order, shop=shop_info))
-                except Exception as e:
-                    print(f"Email fail: {e}")
-
-            flash('Дякуємо! Ваше замовлення прийнято 🎉 Менеджер зв\'яжеться з вами.', 'success')
-            return redirect(url_for('auth.my_orders') if current_user.is_authenticated else url_for('main.index'))
+            if request.form.get('payment_method') == 'Онлайн-оплата карткою':
+                return redirect(url_for('payment.pay', order_id=new_order.id))
+            flash('Дякуємо! Ваше замовлення прийнято. Менеджер зв\'яжеться з вами.', 'success')
+            return redirect(url_for('main.index'))
         except Exception as e:
             db.session.rollback()
             flash('Сталася помилка при оформленні. Перевірте дані.', 'danger')

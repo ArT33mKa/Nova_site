@@ -1,20 +1,16 @@
 /* ==============================================
-   NOVA KHVULIA - Main Frontend Logic
+   NOVA KHVULIA - Main Frontend Logic (локальна версія: каталог, кошик, пошук)
    ============================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
     UI.init();
     Cart.init();
-    Auth.init();
-    Favorites.init();
     Search.init();
-    Reviews.init();
     UserTracker.init();
 
     if (document.querySelector('.card-slider')) HeroSlider.init();
     if (document.querySelector('.product-detail-grid')) ProductPage.init();
     if (document.querySelector('.checkout-page-v2')) Checkout.init();
-    if (document.querySelector('.profile-page-container')) Profile.init();
 
     GlobalHelpers.initPhoneMasks();
 });
@@ -148,7 +144,12 @@ const Cart = {
 
         document.body.addEventListener('click', (e) => {
             const btn = e.target.closest('.add-to-cart-btn');
-            if (btn && !btn.disabled && !btn.classList.contains('in-cart')) {
+            if (!btn || btn.disabled) return;
+            if (btn.classList.contains('in-cart')) {
+                // Товар уже в кошику -> відкриваємо сайдбар кошика
+                this.fetchCart();
+                UI.openModal(this.sidebar);
+            } else {
                 this.addItem(btn);
             }
         });
@@ -249,12 +250,27 @@ const Cart = {
         }, 500);
     },
 
+    syncCardButtons(idSet) {
+        document.querySelectorAll('.add-to-cart-btn[data-id]').forEach(btn => {
+            if (btn.disabled) return;
+            const inCart = idSet.has(String(btn.dataset.id));
+            if (inCart && !btn.classList.contains('in-cart')) {
+                btn.classList.add('in-cart');
+                btn.innerHTML = `<i class="fas fa-check"></i> <span class="btn-text">В кошику</span>`;
+            } else if (!inCart && btn.classList.contains('in-cart')) {
+                btn.classList.remove('in-cart');
+                btn.innerHTML = `<i class="fas fa-shopping-cart"></i> <span class="btn-text">В кошик</span>`;
+            }
+        });
+    },
+
     async fetchCart(render = true) {
         try {
             const res = await fetch('/get_cart');
             const data = await res.json();
             const totalQty = data.items.reduce((acc, item) => acc + item.quantity, 0);
             this.updateBadge(totalQty);
+            this.syncCardButtons(new Set(data.items.map(i => String(i.id))));
 
             if (render && this.container) {
                 this.renderSidebar(data);
@@ -318,670 +334,148 @@ const Cart = {
 };
 
 /* ==============================================
-   AUTH SYSTEM
-   ============================================== */
-const Auth = {
-    modal: document.getElementById('auth-modal'),
-    recaptchaVerifier: null,
-    confirmationResult: null,
-    authMethod: 'phone',
-
-    init() {
-        if (!this.modal) return;
-
-        document.querySelectorAll('[data-trigger="auth"]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                UI.closeAllModals(false);
-                UI.openModal(this.modal);
-                this.showScreen('phone');
-                this.setupRecaptcha();
-            });
-        });
-
-        this.setupPhoneLogin();
-        this.setupEmailFlow();
-        this.setupVerification();
-        this.setupRegistration();
-        this.setupGoogleCompletion();
-
-        const codeInput = document.getElementById('verify_code_input');
-        const codeDisplay = document.getElementById('verify_code_display');
-        if (codeInput && codeDisplay) GlobalHelpers.setupCodeInput(codeInput, codeDisplay);
-    },
-
-    setupRecaptcha() {
-        const container = document.getElementById('recaptcha-container');
-        if (!container) return;
-
-        if (this.recaptchaVerifier) {
-            try { this.recaptchaVerifier.clear(); } catch(e) {}
-            this.recaptchaVerifier = null;
-        }
-        container.innerHTML = '';
-
-        try {
-            this.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                'size': 'invisible',
-                'callback': () => { console.log("Recaptcha solved"); },
-                'expired-callback': () => {
-                    console.log("Recaptcha expired");
-                    if(this.recaptchaVerifier) { try { this.recaptchaVerifier.clear(); } catch(e){} }
-                }
-            });
-        } catch (e) {
-            console.error("Критична помилка ініціалізації Recaptcha:", e);
-            container.innerHTML = '';
-        }
-    },
-
-    showScreen(id) {
-        document.querySelectorAll('.auth-screen').forEach(s => s.classList.remove('active'));
-        const target = document.getElementById(`auth-screen-${id}`);
-        if(target) target.classList.add('active');
-        document.querySelectorAll('.text-danger').forEach(el => el.style.display = 'none');
-    },
-
-    setupPhoneLogin() {
-        const form = document.getElementById('phone-form');
-        form?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = form.querySelector('button');
-            const phone = document.getElementById('auth_phone').value;
-            const errorEl = document.getElementById('phone-error');
-
-            UI.setLoading(btn, true);
-            errorEl.style.display = 'none';
-
-            try {
-                const checkRes = await fetch('/api/auth/check_user_exists', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phone })
-                });
-                const checkData = await checkRes.json();
-
-                if (!checkData.exists) {
-                    throw new Error("Акаунт не знайдено. Будь ласка, натисніть 'Зареєструватись' знизу.");
-                }
-
-                this.setupRecaptcha();
-                this.confirmationResult = await firebase.auth().signInWithPhoneNumber(phone, this.recaptchaVerifier);
-
-                document.getElementById('verify-dest-display').textContent = phone;
-                this.authMethod = 'phone';
-                window.authIntent = 'login';
-                this.showScreen('verify');
-
-            } catch (err) {
-                console.error(err);
-                errorEl.textContent = err.message || "Помилка відправки СМС.";
-                errorEl.style.display = 'block';
-                this.setupRecaptcha();
-            } finally {
-                UI.setLoading(btn, false);
-            }
-        });
-    },
-
-    setupRegistration() {
-        const form = document.getElementById('register-form');
-        form?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = form.querySelector('button');
-            const errorEl = document.getElementById('register-error');
-
-            const phone = document.getElementById('register_phone').value;
-            const email = document.getElementById('register_email').value;
-            const pass = document.getElementById('register_password').value;
-            const confirm = document.getElementById('register_confirm_password').value;
-
-            if (pass !== confirm) {
-                errorEl.textContent = "Паролі не співпадають";
-                errorEl.style.display = 'block';
-                return;
-            }
-
-            window.regData = {
-                first_name: document.getElementById('register_first_name').value,
-                last_name: document.getElementById('register_last_name').value,
-                email: email,
-                password: pass
-            };
-
-            UI.setLoading(btn, true);
-            errorEl.style.display = 'none';
-
-            try {
-                const checkRes = await fetch('/api/auth/check_user_exists', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phone })
-                });
-                const checkData = await checkRes.json();
-
-                if (checkData.exists) {
-                    throw new Error("Цей номер вже зареєстровано. Спробуйте увійти.");
-                }
-
-                this.setupRecaptcha();
-                this.confirmationResult = await firebase.auth().signInWithPhoneNumber(phone, this.recaptchaVerifier);
-
-                document.getElementById('verify-dest-display').textContent = phone;
-                this.authMethod = 'phone';
-                window.authIntent = 'register';
-
-                this.showScreen('verify');
-            } catch (err) {
-                console.error(err);
-                let msg = err.message || "Помилка. Спробуйте пізніше.";
-                if (err.code === 'auth/invalid-phone-number') msg = "Невірний формат телефону";
-                errorEl.textContent = msg;
-                errorEl.style.display = 'block';
-                this.setupRecaptcha();
-            } finally {
-                UI.setLoading(btn, false);
-            }
-        });
-    },
-
-    setupVerification() {
-        const form = document.getElementById('verify-form');
-        form?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = form.querySelector('button');
-            const code = document.getElementById('verify_code_input').value;
-            const errorEl = document.getElementById('verify-error');
-
-            if (code.length < 6) {
-                errorEl.textContent = "Введіть повний код (6 цифр)";
-                errorEl.style.display = 'block';
-                return;
-            }
-
-            UI.setLoading(btn, true);
-            errorEl.style.display = 'none';
-
-            try {
-                if (this.authMethod === 'email') {
-                    const res = await fetch('/api/auth/verify_email_code', {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ code })
-                    });
-                    const data = await res.json();
-                    if(data.status !== 'success') throw new Error(data.message);
-                    window.location.reload();
-                } else {
-                    const result = await this.confirmationResult.confirm(code);
-                    const token = await result.user.getIdToken();
-
-                    const res = await fetch('/api/auth/firebase_verify', {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            token: token,
-                            intent: window.authIntent,
-                            first_name: window.regData?.first_name,
-                            last_name: window.regData?.last_name,
-                            email: window.regData?.email,
-                            password: window.regData?.password
-                        })
-                    });
-                    const data = await res.json();
-
-                    if (data.status === 'success') {
-                        window.regData = null;
-                        if (window.nextRedirectUrl) window.location.href = window.nextRedirectUrl;
-                        else window.location.reload();
-                    } else {
-                        throw new Error(data.message);
-                    }
-                }
-            } catch (err) {
-                errorEl.textContent = err.message || "Невірний код або помилка сервера";
-                errorEl.style.display = 'block';
-            } finally {
-                UI.setLoading(btn, false);
-            }
-        });
-    },
-
-    setupEmailFlow() {
-        const form = document.getElementById('email-input-form');
-        form?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = form.querySelector('button');
-            const email = document.getElementById('auth_email').value;
-
-            let errorEl = form.querySelector('.text-danger');
-            if(!errorEl) {
-                errorEl = document.createElement('div');
-                errorEl.className = 'text-danger text-center mb-3';
-                errorEl.style.display = 'none';
-                form.insertBefore(errorEl, btn);
-            }
-
-            UI.setLoading(btn, true);
-            errorEl.style.display = 'none';
-
-            try {
-                const res = await fetch('/api/auth/start_email_login', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email })
-                });
-                const data = await res.json();
-
-                if (data.status === 'success') {
-                    document.getElementById('verify-dest-display').textContent = email;
-                    this.authMethod = 'email';
-                    this.showScreen('verify');
-                } else {
-                    throw new Error(data.message);
-                }
-            } catch(e) {
-                errorEl.textContent = e.message || 'Помилка сервера';
-                errorEl.style.display = 'block';
-            } finally {
-                UI.setLoading(btn, false);
-            }
-        });
-    },
-
-    setupGoogleCompletion() {
-        const phoneForm = document.getElementById('google-phone-form');
-        const finalizeForm = document.getElementById('google-finalize-form');
-
-        phoneForm?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('google-send-sms-btn');
-            const phone = document.getElementById('google_complete_phone').value;
-            const errorEl = document.getElementById('google-phone-error');
-
-            UI.setLoading(btn, true);
-            errorEl.style.display = 'none';
-
-            try {
-                const checkRes = await fetch('/api/auth/check_user_exists', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phone })
-                });
-                const checkData = await checkRes.json();
-
-                if (checkData.exists) {
-                    throw new Error("Цей номер вже використовується іншим акаунтом.");
-                }
-
-                this.setupRecaptcha();
-                this.confirmationResult = await firebase.auth().signInWithPhoneNumber(phone, this.recaptchaVerifier);
-
-                phoneForm.style.display = 'none';
-                finalizeForm.style.display = 'block';
-                setTimeout(() => document.getElementById('google_verify_code').focus(), 100);
-
-            } catch (err) {
-                console.error(err);
-                errorEl.textContent = err.message || "Помилка відправки СМС";
-                errorEl.style.display = 'block';
-                this.setupRecaptcha();
-            } finally {
-                UI.setLoading(btn, false);
-            }
-        });
-
-        finalizeForm?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = finalizeForm.querySelector('button[type="submit"]');
-            const code = document.getElementById('google_verify_code').value;
-            const password = document.getElementById('google_new_password').value;
-            const errorEl = document.getElementById('google-finalize-error');
-
-            if(password.length < 6) {
-                errorEl.textContent = "Пароль має бути не менше 6 символів";
-                errorEl.style.display = 'block';
-                return;
-            }
-
-            UI.setLoading(btn, true);
-            errorEl.style.display = 'none';
-
-            try {
-                const result = await this.confirmationResult.confirm(code);
-                const firebaseToken = await result.user.getIdToken();
-
-                const res = await fetch('/api/auth/finalize_google', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        firebase_token: firebaseToken,
-                        password: password
-                    })
-                });
-
-                const data = await res.json();
-
-                if (data.status === 'success') {
-                    window.location.href = "/";
-                } else {
-                    throw new Error(data.message);
-                }
-
-            } catch (err) {
-                errorEl.textContent = err.message || "Невірний код або помилка сервера";
-                errorEl.style.display = 'block';
-            } finally {
-                UI.setLoading(btn, false);
-            }
-        });
-    }
-};
-
-/* ==============================================
-   CHECKOUT SYSTEM
+   CHECKOUT SYSTEM (локальний — місто/відділення вводяться вручну)
    ============================================== */
 const Checkout = {
-    cachedWarehouses: [],
+    subtotal: 0,
 
     init() {
         const form = document.getElementById('checkout-form');
         if (!form) return;
 
-        this.setupDeliveryLogic();
+        const tokenField = document.getElementById('csrf_token_field');
+        if (tokenField) tokenField.value = getCsrfToken() || '';
+
+        form.setAttribute('action', '/checkout' + window.location.search);
+
+        this.setupSummary();
+        this.setupDeliveryToggle();
         this.setupFormValidation(form);
     },
 
-    setupDeliveryLogic() {
-        const cityInput = document.getElementById('delivery_city');
-        const cityList = document.getElementById('city-suggestions');
-        const whInput = document.getElementById('delivery_warehouse');
-        const whList = document.getElementById('warehouse-suggestions');
-
-        if (!cityInput || !whInput) return;
-
-        let timer;
-        cityInput.addEventListener('input', () => {
-            clearTimeout(timer);
-            const q = cityInput.value.trim();
-
-            whInput.value = '';
-            whInput.disabled = true;
-            whInput.placeholder = "Спочатку оберіть місто";
-            this.cachedWarehouses = [];
-
-            if (q.length < 2) {
-                cityList.style.display = 'none';
-                return;
-            }
-
-            timer = setTimeout(async () => {
-                cityList.style.display = 'block';
-                cityList.innerHTML = '<div class="suggestion-loading"><i class="fas fa-spinner fa-spin"></i> Пошук...</div>';
-
-                try {
-                    const res = await fetch(`/api/np/cities?q=${encodeURIComponent(q)}`);
-                    const data = await res.json();
-
-                    if (data.length === 0) {
-                        cityList.innerHTML = '<div class="suggestion-item text-muted">Місто не знайдено</div>';
-                        return;
-                    }
-
-                    cityList.innerHTML = data.map(c =>
-                        `<div class="suggestion-item" data-ref="${c.ref}">${c.name}</div>`
-                    ).join('');
-
-                    cityList.querySelectorAll('.suggestion-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            cityInput.value = item.textContent;
-                            cityList.style.display = 'none';
-                            this.loadWarehouses(item.dataset.ref);
-                        });
-                    });
-
-                } catch (e) {
-                    cityList.innerHTML = '<div class="suggestion-item text-danger">Помилка з\'єднання</div>';
-                }
-            }, 400);
-        });
-
-        whInput.addEventListener('input', () => {
-            const q = whInput.value.toLowerCase();
-            if(!this.cachedWarehouses.length) return;
-
-            whList.style.display = 'block';
-            const filtered = this.cachedWarehouses.filter(w => w.toLowerCase().includes(q));
-            this.renderWarehouseList(filtered.slice(0, 50));
-        });
-
-        whInput.addEventListener('focus', () => {
-            if(this.cachedWarehouses.length > 0) {
-                whList.style.display = 'block';
-                const q = whInput.value.toLowerCase();
-                const filtered = q ? this.cachedWarehouses.filter(w => w.toLowerCase().includes(q)) : this.cachedWarehouses;
-                this.renderWarehouseList(filtered.slice(0, 50));
-            }
-        });
-
-        document.addEventListener('click', (e) => {
-            if (!cityInput.contains(e.target) && !cityList.contains(e.target)) {
-                cityList.style.display = 'none';
-            }
-            if (!whInput.contains(e.target) && !whList.contains(e.target)) {
-                whList.style.display = 'none';
-            }
-        });
-    },
-
-    async loadWarehouses(cityRef) {
-        const whInput = document.getElementById('delivery_warehouse');
-        whInput.value = '';
-        whInput.placeholder = "Завантаження...";
-        whInput.disabled = true;
-
+    async setupSummary() {
+        const list = document.getElementById('checkout-items-list');
+        if (!list) return;
         try {
-            const res = await fetch(`/api/np/warehouses?city_ref=${cityRef}`);
+            const res = await fetch('/api/checkout_summary' + window.location.search);
             const data = await res.json();
-            this.cachedWarehouses = data;
-
-            if (data.length === 0) {
-                whInput.placeholder = "У цьому місті немає відділень";
-            } else {
-                whInput.disabled = false;
-                whInput.placeholder = "Оберіть відділення або введіть номер";
-                whInput.focus();
-            }
+            this.subtotal = data.subtotal || 0;
+            this.renderSummary(data.items || []);
         } catch (e) {
-            whInput.placeholder = "Помилка завантаження";
+            list.innerHTML = '<p class="text-danger text-center">Не вдалося завантажити кошик</p>';
         }
     },
 
-    renderWarehouseList(items) {
-        const whList = document.getElementById('warehouse-suggestions');
-        const whInput = document.getElementById('delivery_warehouse');
+    renderSummary(items) {
+        const list = document.getElementById('checkout-items-list');
+        if (!list) return;
 
-        if (items.length === 0) {
-            whList.innerHTML = '<div class="suggestion-item text-muted">Нічого не знайдено</div>';
-            return;
+        if (!items.length) {
+            list.innerHTML = '<p class="text-muted text-center" style="padding:15px;">Кошик порожній</p>';
+        } else {
+            list.innerHTML = items.map(item => `
+                <div class="summary-item">
+                    <img src="${item.image}" alt="${item.name}" onerror="this.onerror=null;this.src='https://placehold.co/400x400/f8fafc/94a3b8?text=No+Image';">
+                    <div class="summary-item-details">
+                        <div class="name">${item.name}</div>
+                        <div class="price">${item.price.toFixed(2)} ₴ x ${item.quantity}</div>
+                    </div>
+                    <div style="font-weight: 600;">${item.line_total.toFixed(2)} ₴</div>
+                </div>
+            `).join('');
         }
 
-        whList.innerHTML = items.map(w =>
-            `<div class="suggestion-item warehouse-item">${w}</div>`
-        ).join('');
+        const subEl = document.getElementById('summary-subtotal');
+        const grandEl = document.getElementById('summary-grand-total');
+        if (subEl) subEl.textContent = `${this.subtotal.toFixed(2)} ₴`;
+        if (grandEl) grandEl.textContent = `${this.subtotal.toFixed(2)} ₴`;
+        this.updateDeliveryUI();
+    },
 
-        whList.querySelectorAll('.suggestion-item').forEach(item => {
-            item.addEventListener('click', () => {
-                whInput.value = item.textContent;
-                whList.style.display = 'none';
+    setupDeliveryToggle() {
+        const npBlock = document.getElementById('nova-poshta-details');
+        document.querySelectorAll('input[name="delivery_method"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (npBlock) npBlock.style.display = (radio.value === 'Нова Пошта' && radio.checked) ? 'block' : 'none';
+                this.updateDeliveryUI();
             });
         });
+    },
+
+    updateDeliveryUI() {
+        const deliveryEl = document.getElementById('summary-delivery');
+        if (!deliveryEl) return;
+        const selected = document.querySelector('input[name="delivery_method"]:checked');
+        if (!selected) { deliveryEl.textContent = '—'; return; }
+        deliveryEl.textContent = (selected.value === 'Нова Пошта')
+            ? 'За тарифами перевізника'
+            : 'Безкоштовно';
     },
 
     setupFormValidation(form) {
         const submitBtn = form.querySelector('button[type="submit"]');
         const phoneInput = document.getElementById('customer_phone');
+        const firstNameInput = document.getElementById('customer_first_name');
+
+        const showError = (input, msg) => {
+            if (!input) return;
+            input.classList.add('input-error');
+            const err = document.querySelector(`.field-error[data-error-for="${input.id}"]`);
+            if (err) { err.textContent = msg; err.style.display = 'block'; }
+        };
+        const clearError = (input) => {
+            if (!input) return;
+            input.classList.remove('input-error');
+            const err = document.querySelector(`.field-error[data-error-for="${input.id}"]`);
+            if (err) { err.textContent = ''; err.style.display = 'none'; }
+        };
+
+        form.querySelectorAll('input, select, textarea').forEach(el => {
+            el.addEventListener('input', () => clearError(el));
+            el.addEventListener('change', () => clearError(el));
+        });
 
         form.addEventListener('submit', (e) => {
-            const digits = phoneInput.value.replace(/\D/g, '');
+            let valid = true;
+            let firstInvalid = null;
+
+            if (!firstNameInput || !firstNameInput.value.trim()) {
+                showError(firstNameInput, "Вкажіть ім'я");
+                valid = false; firstInvalid = firstInvalid || firstNameInput;
+            }
+
+            const digits = (phoneInput.value || '').replace(/\D/g, '');
             if (digits.length !== 12) {
+                showError(phoneInput, 'Введіть коректний номер (+380...)');
+                valid = false; firstInvalid = firstInvalid || phoneInput;
+            }
+
+            const method = document.querySelector('input[name="delivery_method"]:checked');
+            if (!method) {
+                UI.toast('Оберіть спосіб доставки', 'error');
+                valid = false;
+            } else if (method.value === 'Нова Пошта') {
+                const cityInput = document.getElementById('delivery_city');
+                const whInput = document.getElementById('delivery_warehouse');
+                if (cityInput && !cityInput.value.trim()) {
+                    showError(cityInput, 'Вкажіть місто');
+                    valid = false; firstInvalid = firstInvalid || cityInput;
+                }
+                if (whInput && !whInput.value.trim()) {
+                    showError(whInput, 'Вкажіть відділення');
+                    valid = false; firstInvalid = firstInvalid || whInput;
+                }
+            }
+
+            if (!valid) {
                 e.preventDefault();
-                UI.toast('Введіть коректний номер телефону (+380...)', 'error');
-                phoneInput.focus();
+                if (firstInvalid) firstInvalid.focus();
+                UI.toast('Перевірте правильність заповнення полів', 'error');
                 return;
             }
             UI.setLoading(submitBtn, true);
         });
     }
-};
-
-/* ==============================================
-   FAVORITES SYSTEM
-   ============================================== */
-const Favorites = {
-    init() {
-        this.isAuth = document.body.classList.contains('user-logged-in');
-
-        document.body.addEventListener('click', (e) => {
-            const btn = e.target.closest('.favorite-btn');
-            if (btn) {
-                e.preventDefault();
-                e.stopPropagation();
-                this.toggle(btn);
-            }
-        });
-
-        if (this.isAuth) {
-            this.syncInitialState();
-        }
-
-        document.getElementById('open-favorites-btn')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.renderModal();
-            UI.openModal(document.getElementById('favorites-modal'));
-        });
-    },
-
-    async syncInitialState() {
-        try {
-            const res = await fetch('/api/favorites/list');
-            const data = await res.json();
-            const ids = data.ids || [];
-
-            this.updateBadge(ids.length);
-            ids.forEach(id => {
-                const btn = document.querySelector(`.product-card[data-id="${id}"] .favorite-btn`);
-                if (btn) btn.classList.add('active');
-            });
-        } catch (e) { console.error(e); }
-    },
-
-    async toggle(btn) {
-        const isUserLoggedIn = document.body.classList.contains('user-logged-in');
-
-        if (!isUserLoggedIn) {
-            UI.toast('Увійдіть або зареєструйтесь, щоб зберігати товари', 'info');
-            UI.openModal(document.getElementById('auth-modal'));
-            return;
-        }
-
-        const card = btn.closest('.product-card');
-        const id = card.dataset.id;
-        const wasActive = btn.classList.contains('active');
-        btn.classList.toggle('active');
-
-        try {
-            const res = await fetch('/api/favorites/toggle', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ product_id: id })
-            });
-            const data = await res.json();
-
-            if (data.status === 'success') {
-                this.updateBadge(data.count);
-                UI.toast(data.action === 'added' ? 'Додано до обраного' : 'Видалено з обраного');
-
-                document.querySelectorAll(`.product-card[data-id="${id}"] .favorite-btn`).forEach(b => {
-                    if (data.action === 'added') b.classList.add('active');
-                    else b.classList.remove('active');
-                });
-
-                if (data.action === 'removed' && card.classList.contains('fav-modal-card')) {
-                    card.remove();
-                    if (data.count === 0) this.renderModal();
-                }
-
-            } else {
-                throw new Error('Server error');
-            }
-        } catch (err) {
-            btn.classList.toggle('active', wasActive);
-            UI.toast('Помилка з\'єднання', 'error');
-        }
-    },
-
-    updateBadge(count) {
-        const badge = document.getElementById('favorites-count');
-        if (badge) {
-            badge.textContent = count;
-            badge.style.display = count > 0 ? 'flex' : 'none';
-        }
-    },
-
-    async renderModal() {
-        const container = document.getElementById('favorites-list-container');
-        if (!container) return;
-
-        const isUserLoggedIn = document.body.classList.contains('user-logged-in');
-        if (!isUserLoggedIn) {
-            container.innerHTML = `
-                <div class="empty-favs">
-                    <i class="fas fa-lock"></i>
-                    <p>Увійдіть, щоб переглянути обране</p>
-                    <button onclick="UI.openModal(document.getElementById('auth-modal'))" class="btn btn-primary">Увійти</button>
-                </div>`;
-            return;
-        }
-
-        container.innerHTML = '<div class="text-center p-4"><span class="btn-spinner" style="border-color:var(--color-brand-primary); display:inline-block"></span></div>';
-
-        try {
-            const res = await fetch('/api/favorites/render');
-            const products = await res.json();
-
-            if (products.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-favs">
-                        <i class="far fa-heart"></i>
-                        <p>Список порожній</p>
-                        <button onclick="UI.closeAllModals()" class="btn btn-sm btn-primary">До каталогу</button>
-                    </div>`;
-                return;
-            }
-
-            container.innerHTML = products.map(p => `
-                <div class="product-card fav-modal-card" data-id="${p.id}">
-                    <div class="product-image">
-                        <a href="${p.url}">
-                            <img src="${p.image}" alt="${p.name}"
-                                 onerror="this.onerror=null;this.src='https://placehold.co/400x400/f8fafc/94a3b8?text=No+Image';">
-                        </a>
-                        ${!p.in_stock ? '<div class="stock-status out-of-stock" style="font-size:0.6rem; padding:4px;">Закінчився</div>' : ''}
-                        <button class="favorite-btn active" title="Видалити з обраного">
-                            <i class="fas fa-heart"></i>
-                        </button>
-                    </div>
-                    <div class="product-info">
-                        <h4><a href="${p.url}">${p.name}</a></h4>
-                        <div class="product-footer">
-                            <div class="price">${p.price.toFixed(2)} <small>₴</small></div>
-                        </div>
-                        ${p.in_stock
-                            ? `<button class="btn btn-sm btn-primary add-to-cart-btn btn-block" data-id="${p.id}"><i class="fas fa-shopping-basket"></i></button>`
-                            : `<button class="btn btn-sm btn-block" disabled style="background:#f1f5f9; color:#94a3b8; cursor:not-allowed;"><i class="fas fa-ban"></i></button>`
-                        }
-                    </div>
-                </div>
-            `).join('');
-        } catch (e) {
-            container.innerHTML = '<p class="text-danger text-center">Помилка завантаження</p>';
-        }
-    },
 };
 
 /* ==============================================
@@ -1067,23 +561,6 @@ const ProductPage = {
                 window.location.href = `/checkout?buy_now_id=${id}`;
             });
         }
-    }
-};
-
-const Profile = {
-    init() {
-        document.body.addEventListener('click', (e) => {
-            const link = e.target.closest('a[href*="/profile/orders"]');
-            const isUserLoggedIn = document.body.classList.contains('user-logged-in');
-
-            if (link && !isUserLoggedIn) {
-                e.preventDefault();
-                e.stopPropagation();
-                UI.closeModal(document.getElementById('cabinet-modal'));
-                UI.toast('Увійдіть, щоб переглянути історію замовлень', 'info');
-                UI.openModal(document.getElementById('auth-modal'));
-            }
-        });
     }
 };
 
@@ -1227,109 +704,6 @@ const GlobalHelpers = {
                 let x = value.match(/(\d{0,2})(\d{0,3})(\d{0,2})(\d{0,2})/);
                 input.value = !x[2] ? prefix + " (" + x[1] : prefix + " (" + x[1] + ") " + x[2] + (x[3] ? "-" + x[3] : "") + (x[4] ? "-" + x[4] : "");
             });
-        }
-    },
-
-    setupCodeInput(hiddenInput, displayContainer) {
-        if (!hiddenInput) return;
-
-        const updateDisplay = () => {
-            const val = hiddenInput.value;
-            const spans = displayContainer.querySelectorAll('.code-digit');
-
-            spans.forEach((span, idx) => {
-                const char = val[idx] || '';
-                span.textContent = char;
-
-                if (char) {
-                    span.classList.add('filled');
-                    span.classList.remove('active');
-                } else {
-                    span.classList.remove('filled');
-                }
-
-                if (document.activeElement === hiddenInput) {
-                    if (idx === val.length) {
-                        span.classList.add('active');
-                    } else {
-                        span.classList.remove('active');
-                    }
-                } else {
-                    span.classList.remove('active');
-                }
-            });
-        };
-
-        hiddenInput.addEventListener('input', () => {
-            hiddenInput.value = hiddenInput.value.replace(/\D/g, '').substring(0, 6);
-            updateDisplay();
-        });
-
-        hiddenInput.addEventListener('focus', () => {
-            displayContainer.classList.add('focused');
-            updateDisplay();
-        });
-
-        hiddenInput.addEventListener('blur', () => {
-            displayContainer.classList.remove('focused');
-            updateDisplay();
-        });
-
-        displayContainer.addEventListener('click', () => {
-            hiddenInput.focus();
-        });
-    }
-};
-
-const Reviews = {
-    init() {
-        document.body.addEventListener('click', (e) => {
-            const btn = e.target.closest('.vote-btn');
-            if (btn) this.handleVote(btn);
-        });
-    },
-
-    async handleVote(btn) {
-        const isUserLoggedIn = document.body.classList.contains('user-logged-in');
-        if (!isUserLoggedIn) {
-            UI.toast('Увійдіть, щоб оцінювати відгуки', 'info');
-            UI.openModal(document.getElementById('auth-modal'));
-            return;
-        }
-
-        const reviewId = btn.dataset.id;
-        const value = parseInt(btn.dataset.value);
-        const container = btn.closest('.review-votes');
-
-        btn.style.transform = 'scale(1.2)';
-        setTimeout(() => btn.style.transform = 'scale(1)', 200);
-
-        try {
-            const res = await fetch('/api/reviews/vote', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ review_id: reviewId, value: value })
-            });
-            const data = await res.json();
-
-            if (data.status === 'success') {
-                container.querySelector('.likes-count').textContent = data.likes;
-                container.querySelector('.dislikes-count').textContent = data.dislikes;
-
-                const likeBtn = container.querySelector('.vote-btn[data-value="1"]');
-                const dislikeBtn = container.querySelector('.vote-btn[data-value="-1"]');
-
-                likeBtn.classList.remove('active');
-                dislikeBtn.classList.remove('active');
-
-                if (data.action !== 'removed') {
-                    if (value === 1) likeBtn.classList.add('active');
-                    else dislikeBtn.classList.add('active');
-                }
-            }
-        } catch (e) {
-            console.error(e);
-            UI.toast('Помилка з\'єднання', 'error');
         }
     }
 };
@@ -1512,3 +886,544 @@ function openReplyModal(parentId, redirectTo = '', productId = null) {
         UI.openModal(modal);
     }
 }
+
+/* ==============================================
+   CATALOG ENHANCEMENTS (price slider, reset, pagination)
+   ============================================== */
+document.addEventListener('DOMContentLoaded', () => {
+    const filterForm = document.getElementById('filter-form');
+    if (!filterForm) return;
+
+    const minInput = filterForm.querySelector('input[name=min_price]');
+    const maxInput = filterForm.querySelector('input[name=max_price]');
+
+    if (minInput && maxInput) {
+        const FLOOR = 0, CEIL = 100000, STEP = 50;
+        const num = (v, def) => { const n = parseFloat(v); return isNaN(n) ? def : n; };
+        const clamp = (v) => Math.min(Math.max(v, num(rMin.min, FLOOR)), num(rMax.max, CEIL));
+
+        const wrap = document.createElement('div');
+        wrap.className = 'price-slider';
+        wrap.innerHTML = `<div class='price-slider-track'><div class='price-slider-range'></div></div><input type='range' class='price-range-min' min='${FLOOR}' max='${CEIL}' step='${STEP}'><input type='range' class='price-range-max' min='${FLOOR}' max='${CEIL}' step='${STEP}'>`;
+        const container = minInput.closest('.price-filter-container');
+        if (container) container.parentNode.insertBefore(wrap, container.nextSibling);
+
+        const rMin = wrap.querySelector('.price-range-min');
+        const rMax = wrap.querySelector('.price-range-max');
+        const fill = wrap.querySelector('.price-slider-range');
+
+        const THUMB = 20; // ширина повзунка (px), синхронізовано з CSS
+        const paint = () => {
+            const floor = num(rMin.min, FLOOR), ceil = num(rMax.max, CEIL);
+            const span = (ceil - floor) || 1;
+            let pLo = (num(rMin.value, floor) - floor) / span;
+            let pHi = (num(rMax.value, ceil) - floor) / span;
+            pLo = Math.min(Math.max(pLo, 0), 1);
+            pHi = Math.min(Math.max(pHi, 0), 1);
+            fill.style.left = 'calc(' + (pLo * 100) + '% + ' + ((0.5 - pLo) * THUMB) + 'px)';
+            fill.style.right = 'calc(' + ((1 - pHi) * 100) + '% - ' + ((0.5 - pHi) * THUMB) + 'px)';
+        };
+        wrap.__repaint = paint;
+
+        rMin.value = clamp(num(minInput.value, FLOOR));
+        rMax.value = clamp(num(maxInput.value, CEIL));
+        paint();
+
+        rMin.addEventListener('input', () => {
+            const floor = num(rMin.min, FLOOR), ceil = num(rMax.max, CEIL);
+            let lo = num(rMin.value, floor), hi = num(rMax.value, ceil);
+            if (lo > hi - STEP) { lo = hi - STEP; rMin.value = lo; }
+            minInput.value = lo > floor ? lo : '';
+            paint();
+        });
+        rMax.addEventListener('input', () => {
+            const floor = num(rMin.min, FLOOR), ceil = num(rMax.max, CEIL);
+            let lo = num(rMin.value, floor), hi = num(rMax.value, ceil);
+            if (hi < lo + STEP) { hi = lo + STEP; rMax.value = hi; }
+            maxInput.value = hi < ceil ? hi : '';
+            paint();
+        });
+        minInput.addEventListener('input', () => { rMin.value = clamp(num(minInput.value, FLOOR)); paint(); });
+        maxInput.addEventListener('input', () => { rMax.value = clamp(num(maxInput.value, CEIL)); paint(); });
+    }
+
+    if (!filterForm.querySelector('.reset-filters-btn')) {
+        const resetBtn = document.createElement('a');
+        resetBtn.href = window.location.pathname;
+        resetBtn.className = 'btn reset-filters-btn btn-block';
+        resetBtn.innerHTML = `<i class='fas fa-rotate-left'></i> Скинути фільтри`;
+        filterForm.appendChild(resetBtn);
+    }
+});
+
+function enhancePagination() {
+    const pag = document.querySelector('.pagination-container');
+    const info = pag ? pag.querySelector('.pagination-info') : null;
+    if (!pag || !info) return;
+
+    const m = info.textContent.match(/(\d+)\s*з\s*(\d+)/i);
+    if (!m) return;
+    const current = parseInt(m[1], 10), total = parseInt(m[2], 10);
+    if (!total || total <= 1) return;
+
+    const buildUrl = (p) => { const u = new URL(window.location.href); u.searchParams.set('page', p); return u.toString(); };
+
+    const nav = document.createElement('div');
+    nav.className = 'pagination-pages';
+    const addPage = (p) => {
+        const a = document.createElement('a');
+        a.className = 'page-num' + (p === current ? ' active' : '');
+        a.textContent = p;
+        a.href = buildUrl(p);
+        nav.appendChild(a);
+    };
+    const addDots = () => { const s = document.createElement('span'); s.className = 'page-dots'; s.textContent = '…'; nav.appendChild(s); };
+
+    const wanted = [1, 2, current - 1, current, current + 1, total - 1, total];
+    const pages = [...new Set(wanted)].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+    let prev = 0;
+    pages.forEach(p => { if (p - prev > 1) addDots(); addPage(p); prev = p; });
+
+    const jump = document.createElement('div');
+    jump.className = 'page-jump';
+    jump.innerHTML = `<input type='number' min='1' max='${total}' placeholder='№' class='page-jump-input'><button type='button' class='page-jump-btn'>Перейти</button>`;
+    const ji = jump.querySelector('.page-jump-input');
+    const jb = jump.querySelector('.page-jump-btn');
+    const go = () => { let p = parseInt(ji.value, 10); if (isNaN(p)) return; p = Math.min(Math.max(p, 1), total); window.location.href = buildUrl(p); };
+    jb.addEventListener('click', go);
+    ji.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+
+    info.replaceWith(nav);
+    pag.appendChild(jump);
+}
+document.addEventListener('DOMContentLoaded', enhancePagination);
+
+/* ==============================================
+   FAVORITES SYSTEM (обране)
+   ============================================== */
+const Favorites = {
+    sidebar: null,
+    listEl: null,
+    badge: null,
+    guestKey: 'guest_favorites',
+    ids: new Set(),
+
+    init() {
+        this.sidebar = document.getElementById('favorites-modal');
+        this.listEl = document.getElementById('favorites-list-container');
+        this.badge = document.getElementById('favorites-count');
+
+        document.getElementById('open-favorites-btn')?.addEventListener('click', () => this.open());
+        document.getElementById('open-favorites-btn-sidebar')?.addEventListener('click', (e) => { e.preventDefault(); this.open(); });
+
+        document.body.addEventListener('click', (e) => {
+            const btn = e.target.closest('.favorite-btn');
+            if (!btn) return;
+            e.preventDefault();
+            const card = btn.closest('[data-id]');
+            const id = card ? card.dataset.id : btn.dataset.id;
+            if (id) this.toggle(String(id));
+        });
+
+        this.listEl?.addEventListener('click', (e) => {
+            const rm = e.target.closest('.fav-remove');
+            if (rm) {
+                const row = rm.closest('[data-id]');
+                if (row) this.toggle(String(row.dataset.id));
+            }
+        });
+
+        this.refresh();
+    },
+
+    getGuestIds() {
+        try { return JSON.parse(localStorage.getItem(this.guestKey) || '[]').map(String); }
+        catch (e) { return []; }
+    },
+    setGuestIds(arr) {
+        localStorage.setItem(this.guestKey, JSON.stringify([...new Set(arr.map(String))]));
+    },
+
+    async refresh() {
+        try {
+            const res = await fetch('/favorites/ids');
+            const data = await res.json();
+            let ids = (data.ids || []).map(String);
+            if (ids.length === 0) {
+                const guest = this.getGuestIds();
+                if (guest.length) ids = guest;
+            }
+            this.ids = new Set(ids);
+        } catch (e) {
+            this.ids = new Set(this.getGuestIds());
+        }
+        this.updateBadge();
+        this.syncButtons();
+    },
+
+    async toggle(id) {
+        try {
+            const res = await fetch('/favorites/toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: id })
+            });
+            const data = await res.json();
+
+            if (data.status === 'guest') {
+                const guest = this.getGuestIds();
+                let active;
+                if (guest.includes(id)) {
+                    this.setGuestIds(guest.filter(x => x !== id));
+                    this.ids.delete(id);
+                    active = false;
+                } else {
+                    guest.push(id);
+                    this.setGuestIds(guest);
+                    this.ids.add(id);
+                    active = true;
+                }
+                UI.toast(active ? 'Додано в обране' : 'Видалено з обраного', active ? 'success' : 'info');
+            } else if (data.status === 'success') {
+                if (data.active) { this.ids.add(id); UI.toast('Додано в обране'); }
+                else { this.ids.delete(id); UI.toast('Видалено з обраного', 'info'); }
+            } else {
+                throw new Error(data.message || 'error');
+            }
+        } catch (e) {
+            UI.toast('Не вдалося оновити обране', 'error');
+            return;
+        }
+        this.updateBadge();
+        this.syncButtons();
+        if (this.sidebar && this.sidebar.classList.contains('active')) this.render();
+    },
+
+    syncButtons() {
+        document.querySelectorAll('.favorite-btn').forEach(btn => {
+            const card = btn.closest('[data-id]');
+            const id = card ? String(card.dataset.id) : btn.dataset.id;
+            btn.classList.toggle('active', this.ids.has(String(id)));
+        });
+    },
+
+    updateBadge() {
+        if (!this.badge) return;
+        const n = this.ids.size;
+        this.badge.textContent = n;
+        this.badge.style.display = n > 0 ? 'flex' : 'none';
+    },
+
+    open() {
+        UI.openModal(this.sidebar);
+        this.render();
+    },
+
+    async render() {
+        if (!this.listEl) return;
+        this.listEl.innerHTML = `<div class="text-center" style="padding:30px;color:var(--text-tertiary);"><i class="fas fa-spinner fa-spin"></i></div>`;
+        let items = [];
+        try {
+            const res = await fetch('/favorites/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: [...this.ids] })
+            });
+            const data = await res.json();
+            items = data.items || [];
+        } catch (e) { /* ignore */ }
+
+        if (!items.length) {
+            this.listEl.innerHTML = `
+                <div class="text-center" style="padding:40px;color:var(--text-tertiary);">
+                    <i class="far fa-heart" style="font-size:3rem;margin-bottom:15px;"></i>
+                    <p>У вас ще немає обраних товарів</p>
+                    <button onclick="UI.closeAllModals()" class="btn btn-sm btn-outline mt-3">Перейти до покупок</button>
+                </div>`;
+            return;
+        }
+
+        this.listEl.innerHTML = items.map(item => `
+            <div class="cart-item" data-id="${item.id}">
+                <div class="cart-item-left">
+                    <a href="${item.url}"><img src="${item.image}" alt="${item.name}" onerror="this.onerror=null;this.src='https://placehold.co/400x400/f8fafc/94a3b8?text=No+Image';"></a>
+                </div>
+                <div class="cart-item-right">
+                    <div class="cart-item-top">
+                        <a href="${item.url}" class="cart-item-title">${item.name}</a>
+                        <button class="remove-item fav-remove" title="Видалити з обраного"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="cart-item-bottom">
+                        <div class="cart-item-price">${item.price.toFixed(2)} ₴</div>
+                        <button class="btn btn-sm add-to-cart-btn" data-id="${item.id}"><i class="fas fa-shopping-cart"></i> <span class="btn-text">В кошик</span></button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        if (typeof Cart !== 'undefined' && Cart.fetchCart) Cart.fetchCart(false);
+    }
+};
+
+/* ==============================================
+   REVIEWS / QUESTIONS modal triggers
+   ============================================== */
+const ReviewsUI = {
+    init() {
+        document.getElementById('open-review-modal-btn')?.addEventListener('click', () => {
+            UI.openModal(document.getElementById('review-modal'));
+        });
+        document.getElementById('open-question-modal-btn')?.addEventListener('click', () => {
+            UI.openModal(document.getElementById('question-modal'));
+        });
+        document.body.addEventListener('click', (e) => {
+            const rb = e.target.closest('.reply-btn');
+            if (rb) {
+                e.preventDefault();
+                openReplyModal(rb.dataset.reviewId, window.location.href);
+            }
+        });
+    }
+};
+
+/* ==============================================
+   NOVA POSHTA autocomplete (checkout)
+   ============================================== */
+const NovaPoshta = {
+    cityRef: '',
+    init() {
+        const cityInput = document.getElementById('delivery_city');
+        const whInput = document.getElementById('delivery_warehouse');
+        const citySug = document.getElementById('city-suggestions');
+        const whSug = document.getElementById('warehouse-suggestions');
+        if (!cityInput || !whInput) return;
+
+        let cityTimer, whTimer;
+        const hide = (el) => { if (el) { el.innerHTML = ''; el.style.display = 'none'; } };
+        const show = (el) => { if (el) el.style.display = 'block'; };
+
+        hide(citySug); hide(whSug);
+
+        cityInput.addEventListener('input', () => {
+            this.cityRef = '';
+            whInput.value = '';
+            whInput.disabled = true;
+            whInput.placeholder = 'Спочатку оберіть місто';
+            const q = cityInput.value.trim();
+            clearTimeout(cityTimer);
+            if (q.length < 2) { hide(citySug); return; }
+            cityTimer = setTimeout(async () => {
+                citySug.innerHTML = '<div class="suggestion-loading">Пошук...</div>'; show(citySug);
+                try {
+                    const res = await fetch(`/api/np/cities?q=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+                    if (data.error) { citySug.innerHTML = `<div class="suggestion-empty">${data.error}</div>`; return; }
+                    if (!data.cities.length) { citySug.innerHTML = '<div class="suggestion-empty">Нічого не знайдено</div>'; return; }
+                    citySug.innerHTML = data.cities.map(c =>
+                        `<button type="button" class="suggestion-item" data-ref="${c.ref}" data-name="${c.name}">${c.name}${c.area ? ` <span style="color:#94a3b8">(${c.area} обл.)</span>` : ''}</button>`
+                    ).join('');
+                } catch (e) { citySug.innerHTML = '<div class="suggestion-empty">Помилка завантаження</div>'; }
+            }, 350);
+        });
+
+        citySug && citySug.addEventListener('click', (e) => {
+            const item = e.target.closest('.suggestion-item');
+            if (!item) return;
+            cityInput.value = item.dataset.name;
+            this.cityRef = item.dataset.ref;
+            hide(citySug);
+            whInput.disabled = false;
+            whInput.placeholder = 'Введіть номер або адресу відділення';
+            whInput.focus();
+        });
+
+        whInput.addEventListener('input', () => {
+            const q = whInput.value.trim();
+            clearTimeout(whTimer);
+            if (!this.cityRef) { hide(whSug); return; }
+            whTimer = setTimeout(async () => {
+                whSug.innerHTML = '<div class="suggestion-loading">Пошук...</div>'; show(whSug);
+                try {
+                    const res = await fetch(`/api/np/warehouses?city_ref=${encodeURIComponent(this.cityRef)}&q=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+                    if (data.error) { whSug.innerHTML = `<div class="suggestion-empty">${data.error}</div>`; return; }
+                    if (!data.warehouses.length) { whSug.innerHTML = '<div class="suggestion-empty">Відділень не знайдено</div>'; return; }
+                    whSug.innerHTML = data.warehouses.map(w =>
+                        `<button type="button" class="suggestion-item" data-name="${w.name}">${w.name}</button>`
+                    ).join('');
+                } catch (e) { whSug.innerHTML = '<div class="suggestion-empty">Помилка завантаження</div>'; }
+            }, 350);
+        });
+
+        whInput.addEventListener('focus', () => {
+            if (this.cityRef && whInput.value.trim() === '') whInput.dispatchEvent(new Event('input'));
+        });
+
+        whSug && whSug.addEventListener('click', (e) => {
+            const item = e.target.closest('.suggestion-item');
+            if (!item) return;
+            whInput.value = item.dataset.name;
+            hide(whSug);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (citySug && !cityInput.contains(e.target) && !citySug.contains(e.target)) hide(citySug);
+            if (whSug && !whInput.contains(e.target) && !whSug.contains(e.target)) hide(whSug);
+        });
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    Favorites.init();
+    ReviewsUI.init();
+    if (document.querySelector('.checkout-page-v2')) NovaPoshta.init();
+});
+
+/* ==============================================
+   GUEST GATING — блокуємо кошик/обране для неавторизованих
+   ============================================== */
+document.addEventListener('click', (e) => {
+    if (document.body.classList.contains('user-logged-in')) return;
+    const cartBtn = e.target.closest('.add-to-cart-btn');
+    const favBtn = e.target.closest('.favorite-btn');
+    const buyBtn = e.target.closest('.buy-now-btn');
+    if (cartBtn || favBtn || buyBtn) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const modal = document.getElementById('auth-required-modal');
+        if (modal && typeof UI !== 'undefined') UI.openModal(modal);
+    }
+}, true);
+
+/* ==============================================
+   CATALOG — миттєва AJAX-фільтрація без перезавантаження
+   + реальні мінімальна/максимальна ціни
+   ============================================== */
+(function () {
+    const catalogPage = document.querySelector('.catalog-page');
+    if (!catalogPage) return;
+
+    const getContainer = () => document.querySelector('.products-container');
+
+    function setActiveCategory(url) {
+        try {
+            const target = new URL(url, window.location.origin).pathname;
+            document.querySelectorAll('.cat-name-link').forEach(a => {
+                const href = a.getAttribute('href');
+                if (!href) return;
+                const path = new URL(href, window.location.origin).pathname;
+                a.classList.toggle('active', path === target);
+            });
+        } catch (e) { /* ignore */ }
+    }
+
+    async function loadCatalog(url, push = true) {
+        const container = getContainer();
+        if (!container) { window.location.href = url; return; }
+        container.style.transition = 'opacity .15s';
+        container.style.opacity = '0.45';
+        container.style.pointerEvents = 'none';
+        try {
+            const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const html = await res.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const fresh = doc.querySelector('.products-container');
+            if (!fresh) { window.location.href = url; return; }
+            container.innerHTML = fresh.innerHTML;
+            if (typeof enhancePagination === 'function') enhancePagination();
+            setActiveCategory(url);
+            if (push) history.pushState({ catalogUrl: url }, '', url);
+            window.scrollTo({ top: catalogPage.offsetTop - 80, behavior: 'smooth' });
+            applyPriceRange();
+        } catch (e) {
+            window.location.href = url;
+        } finally {
+            container.style.opacity = '';
+            container.style.pointerEvents = '';
+        }
+    }
+
+    // Кліки по категоріях (разом із "Всі товари") — фільтруємо без перезавантаження
+    document.addEventListener('click', (e) => {
+        const pageLink = e.target.closest('.page-num, .pagination-btn');
+        if (pageLink) {
+            if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+            if (pageLink.classList.contains('disabled')) { e.preventDefault(); return; }
+            const phref = pageLink.getAttribute('href');
+            if (phref && phref !== '#') { e.preventDefault(); loadCatalog(phref); }
+            return;
+        }
+        const link = e.target.closest('.cat-name-link');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        if (!href || href === '#') return;
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        loadCatalog(href);
+    });
+
+    // Застосування фільтрів (ціна / наявність) без перезавантаження
+    const filterForm = document.getElementById('filter-form');
+    if (filterForm) {
+        const submitForm = () => {
+            const params = new URLSearchParams(window.location.search);
+            params.delete('in_stock');
+            params.delete('min_price');
+            params.delete('max_price');
+            params.delete('page');
+            const fd = new FormData(filterForm);
+            for (const [k, v] of fd.entries()) { if (v) params.set(k, v); }
+            const qs = params.toString();
+            loadCatalog(qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+        };
+        filterForm.addEventListener('submit', (e) => { e.preventDefault(); submitForm(); });
+        const inStock = filterForm.querySelector('input[name="in_stock"]');
+        if (inStock) inStock.addEventListener('change', submitForm);
+    }
+
+    window.addEventListener('popstate', () => { loadCatalog(window.location.href, false); });
+
+    // Реальні мін/макс ціни на основі наявних товарів
+    async function applyPriceRange() {
+        const minInput = document.querySelector('#filter-form input[name="min_price"]');
+        const maxInput = document.querySelector('#filter-form input[name="max_price"]');
+        if (!minInput && !maxInput) return;
+        const slug = catalogPage.dataset.categorySlug || '';
+        try {
+            const res = await fetch(`/api/price_range?category_slug=${encodeURIComponent(slug)}`);
+            const data = await res.json();
+            if (typeof data.min !== 'number' || typeof data.max !== 'number') return;
+            [minInput, maxInput].forEach(inp => { if (inp) { inp.min = data.min; inp.max = data.max; } });
+            if (minInput) minInput.placeholder = `Від ${data.min}`;
+            if (maxInput) maxInput.placeholder = `До ${data.max}`;
+            const sMin = document.querySelector('.price-range-min');
+            const sMax = document.querySelector('.price-range-max');
+            [sMin, sMax].forEach(s => { if (s) { s.min = data.min; s.max = data.max; } });
+            if (sMin && !sMin.dataset.userSet) sMin.value = data.min;
+            if (sMax && !sMax.dataset.userSet) sMax.value = data.max;
+            const sliderWrap = document.querySelector('.price-slider');
+            if (sliderWrap && typeof sliderWrap.__repaint === 'function') sliderWrap.__repaint();
+        } catch (e) { /* мовчки ігноруємо */ }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyPriceRange);
+    } else {
+        applyPriceRange();
+    }
+})();
+
+/* ==============================================
+   REVIEWS — на сторінці питань кнопка "Написати відгук" веде до сторінки відгуків
+   ============================================== */
+document.addEventListener('DOMContentLoaded', () => {
+    if (/\/questions\/?$/.test(window.location.pathname)) {
+        document.querySelectorAll('#open-review-modal-btn').forEach(btn => {
+            const clone = btn.cloneNode(true);
+            btn.parentNode.replaceChild(clone, btn);
+            clone.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = window.location.pathname.replace(/\/questions\/?$/, '/reviews');
+            });
+        });
+    }
+});

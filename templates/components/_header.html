@@ -23,6 +23,13 @@
             <div class="header-actions">
                 <!-- Сюди можна додати іконку пошуку, якщо треба -->
 
+                {% if not current_user.is_authenticated %}
+                <div class="header-auth-btns">
+                    <a href="/auth/login" class="btn-header-login">Увійти</a>
+                    <a href="/auth/register" class="btn-header-register">Реєстрація</a>
+                </div>
+                {% endif %}
+
                 <div class="icon-wrapper" id="open-favorites-btn" title="Обране">
                     <i class="far fa-heart"></i>
                     <!-- Додаємо клас pulse для анімації при зміні -->

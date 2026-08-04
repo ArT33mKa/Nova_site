@@ -44,6 +44,12 @@ class User(db.Model, UserMixin):
         s = URLSafeTimedSerializer(current_app.secret_key)
         return s.dumps({'user_id': self.id, 'email': self.email})
 
+    def get_email_change_token(self, new_email):
+        # Токен для підтвердження НОВОЇ пошти (сама пошта зберігається лише в токені,
+        # в акаунт вона запишеться лише після переходу за посиланням).
+        s = URLSafeTimedSerializer(current_app.secret_key)
+        return s.dumps({'user_id': self.id, 'email': new_email})
+
     @staticmethod
     def verify_email_token(token, max_age=86400):
         s = URLSafeTimedSerializer(current_app.secret_key)
@@ -72,10 +78,12 @@ class User(db.Model, UserMixin):
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    external_id = db.Column(db.String(64), unique=True, nullable=True, index=True)
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
     image = db.Column(db.String(255), nullable=True)
+    image_hash = db.Column(db.String(128), nullable=True)
     category = db.Column(db.String(100))
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
     in_stock = db.Column(db.Boolean, default=True)
@@ -140,6 +148,7 @@ class ReviewVote(db.Model):
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     status = db.Column(db.String(50), nullable=False, default='Нове')
+    payment_id = db.Column(db.String(64), nullable=True, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     customer_name = db.Column(db.String(100), nullable=False)
     customer_phone = db.Column(db.String(20), nullable=False)
