@@ -1,22 +1,33 @@
-app = "nova-khvylia"
-primary_region = "ams"
+# fly.toml app configuration file generated for nova-site on 2026-08-05T13:28:49Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'nova-site'
+primary_region = 'ams'
 swap_size_mb = 512
 
-[deploy]
-release_command = 'python -c "import app"'
+[build]
 
-[http_service]
-auto_start_machines = true
-auto_stop_machines = false
-force_https = false
-internal_port = 8080
-min_machines_running = 1
-processes = [ "app" ]
+[deploy]
+  release_command = 'python -c "import app"'
 
 [processes]
-app = "gunicorn --bind :8080 --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile - --log-level info app:app"
+  app = 'gunicorn --bind :8080 --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile - --log-level info app:app'
+
+[http_service]
+  internal_port = 8080
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256
 
 [[statics]]
-guest_path = "/app/static"
-tigris_bucket = ""
-url_prefix = "/static/"
+  guest_path = '/app/static'
+  url_prefix = '/static/'
